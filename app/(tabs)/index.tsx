@@ -7,7 +7,19 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
 
+
 export default function HomeScreen() {
+  // 👇 연결 테스트: 화면 뜰 때 한 번 호출
+  // useEffect(() => {
+  //   getExampleList()
+  //     .then((data) => console.log("✅ 연결 성공:", JSON.stringify(data)))
+  //     .catch((err) => {
+  //       console.log("❌ 메시지:", err.message);
+  //       console.log("❌ 상태코드:", err.response?.status);
+  //       console.log("❌ 응답내용:", JSON.stringify(err.response?.data));
+  //     });
+  // }, []);
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
