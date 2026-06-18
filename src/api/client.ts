@@ -2,6 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from "@/src/features/auth/storage";
 import { refreshTokens } from "@/src/features/auth/api";
 
+// eslint-disable-next-line import/no-named-as-default-member
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL,
   timeout: 10000,

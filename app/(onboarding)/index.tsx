@@ -17,7 +17,7 @@ export default function OnboardingScreen() {
 
         <TouchableOpacity
           className="w-full bg-gray-900 rounded-2xl py-4 items-center"
-          onPress={() => router.push("/(onboarding)/login")}
+          onPress={() => router.push("./login")}
           activeOpacity={0.85}
         >
           <Text className="text-white text-base font-semibold">시작하기</Text>

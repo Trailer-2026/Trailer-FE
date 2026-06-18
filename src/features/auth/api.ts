@@ -22,7 +22,6 @@ export async function loginKakao(kakaoAccessToken: string): Promise<TokenRespons
   return res.data.data;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function loginGoogle(_googleAccessToken: string): Promise<TokenResponse> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 400));
