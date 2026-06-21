@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:rnkakao.mjstudio.net)",
+      "WebFetch(domain:docs.expo.dev)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx npm-check-updates *)",
+      "Bash(npm info *)",
+      "Bash(Select-String -Pattern '\"version\"|\"peerDependencies\"|\"react-native\"')",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(npx expo *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['dependencies'].get\\('expo-secure-store','not installed'\\)\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git restore *)"
+    ]
+  }
+}
