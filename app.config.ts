@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { ExpoConfig, ConfigContext } from "expo/config";
-=======
 import { ConfigContext, ExpoConfig } from "expo/config";
->>>>>>> dev
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -57,8 +53,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-<<<<<<< HEAD
-=======
     [
       "expo-build-properties",
       {
@@ -67,7 +61,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
->>>>>>> dev
   ],
   experiments: {
     typedRoutes: true,

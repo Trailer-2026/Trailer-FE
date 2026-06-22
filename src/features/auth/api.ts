@@ -22,14 +22,14 @@ export async function loginKakao(kakaoAccessToken: string): Promise<TokenRespons
   return res.data.data;
 }
 
-export async function loginGoogle(_googleAccessToken: string): Promise<TokenResponse> {
+export async function loginGoogle(googleIdToken: string): Promise<TokenResponse> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 400));
     return MOCK_TOKENS;
   }
   const res = await api.post<CommonResponse<TokenResponse>>(
     "/api/auth/login/google",
-    { access_token: _googleAccessToken },
+    { id_token: googleIdToken },
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
