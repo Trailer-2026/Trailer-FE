@@ -1,14 +1,17 @@
-import { View, Text, TouchableOpacity, Alert } from "react-native";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuthStore } from "@/src/features/auth/store";
-import { logout } from "@/src/features/auth/api";
 
-export default function MainScreen() {
+import { logout } from "@/src/features/auth/api";
+import { getRefreshToken } from "@/src/features/auth/storage";
+import { useAuthStore } from "@/src/features/auth/store";
+
+export default function ProfileTab() {
   const clear = useAuthStore((s) => s.clear);
 
   async function handleLogout() {
     try {
-      await logout();
+      const refreshToken = await getRefreshToken();
+      if (refreshToken) await logout(refreshToken);
     } catch {
       // 서버 로그아웃 실패해도 로컬 토큰은 삭제
     } finally {
@@ -26,7 +29,7 @@ export default function MainScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-2xl font-bold text-gray-900 mb-2">메인 화면</Text>
+        <Text className="text-2xl font-bold text-gray-900 mb-2">프로필</Text>
         <Text className="text-sm text-gray-400 mb-16">로그인 성공!</Text>
 
         <TouchableOpacity
