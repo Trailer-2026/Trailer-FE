@@ -48,19 +48,19 @@ export async function refreshTokens(refreshToken: string): Promise<TokenResponse
 
 export async function getMe(): Promise<UserProfile> {
   if (USE_MOCK) {
-    return { id: 1, nickname: "테스트유저" };
+    return { user_idx: 1, provider: "kakao", email: "test@example.com" };
   }
   const res = await api.get<CommonResponse<UserProfile>>("/api/auth/me");
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
 }
 
-export async function logout(): Promise<void> {
+export async function logout(refreshToken: string): Promise<void> {
   if (USE_MOCK) return;
-  await api.post("/api/auth/logout");
+  await api.post("/api/auth/logout", { refresh_token: refreshToken });
 }
 
-export async function logoutAll(): Promise<void> {
+export async function logoutAll(refreshToken: string): Promise<void> {
   if (USE_MOCK) return;
-  await api.post("/api/auth/logout-all");
+  await api.post("/api/auth/logout-all", { refresh_token: refreshToken });
 }

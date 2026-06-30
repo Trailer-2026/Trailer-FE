@@ -3,6 +3,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import 'react-native-reanimated';
+import "../global.css";
 
 import { useAuthStore } from "@/src/features/auth/store";
 import { initializeKakaoSDK } from "@react-native-kakao/core";

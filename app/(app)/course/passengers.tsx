@@ -27,7 +27,7 @@ export default function PassengersScreen() {
           여행인원 선택
         </Text>
 
-        <View className="mt-6 gap-3">
+        <View className="mt-6 gap-4">
           {ROWS.map((row) => (
             <View
               key={row.key}

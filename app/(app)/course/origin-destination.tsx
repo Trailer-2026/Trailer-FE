@@ -42,25 +42,27 @@ export default function OriginDestinationScreen() {
           </Pressable>
         </View>
 
-        <View className="mt-6 bg-gray-100 rounded-2xl p-4">
-          <LocationRow label="출발지" value={origin} />
+        <View className="mt-6 bg-gray-100 rounded-2xl p-5">
+          <Text className="text-sm font-medium text-gray-500 mb-2">출발지</Text>
+          <LocationSelect value={origin} />
 
-          <View className="items-center my-1">
+          <View className="items-center my-3">
             <Pressable
               onPress={swap}
-              className="w-9 h-9 rounded-full bg-gray-700 items-center justify-center"
+              className="w-14 h-9 rounded-full bg-gray-700 items-center justify-center"
             >
               <Feather name="repeat" size={16} color="#FFFFFF" />
             </Pressable>
           </View>
 
-          <LocationRow label="도착지" value={destination} />
+          <Text className="text-sm font-medium text-gray-500 mb-2">도착지</Text>
+          <LocationSelect value={destination} />
         </View>
 
-        <View className="mt-6">
+        <View className="mt-8">
           <DateRow label="가는날" value={departAt} />
           {roundTrip ? (
-            <View className="mt-3">
+            <View className="mt-6">
               <DateRow label="오는날" value={returnAt} />
             </View>
           ) : null}
@@ -78,26 +80,23 @@ export default function OriginDestinationScreen() {
   );
 }
 
-function LocationRow({ label, value }: { label: string; value: string }) {
+function LocationSelect({ value }: { value: string }) {
   return (
-    <View className="flex-row items-center justify-between py-2">
-      <Text className="text-sm text-gray-500 w-16">{label}</Text>
-      <Pressable className="flex-1 flex-row items-center justify-end gap-2">
-        <Text className="text-lg font-semibold text-gray-900">{value}</Text>
-        <Feather name="chevron-down" size={18} color="#6B7280" />
-      </Pressable>
-    </View>
+    <Pressable className="bg-gray-300 rounded-xl px-4 h-14 flex-row items-center justify-between">
+      <Text className="text-lg font-semibold text-gray-900">{value}</Text>
+      <Feather name="chevron-down" size={20} color="#4B5563" />
+    </Pressable>
   );
 }
 
 function DateRow({ label, value }: { label: string; value: string }) {
   return (
-    <Pressable className="flex-row items-center justify-between py-3 border-b border-gray-200">
-      <Text className="text-sm text-gray-500">{label}</Text>
-      <View className="flex-row items-center gap-2">
-        <Text className="text-base text-gray-900">{value}</Text>
-        <Feather name="chevron-right" size={18} color="#9CA3AF" />
-      </View>
-    </Pressable>
+    <View>
+      <Text className="text-sm font-bold text-gray-500">{label}</Text>
+      <Pressable className="flex-row items-center justify-between mt-2">
+        <Text className="text-lg text-gray-900">{value}</Text>
+        <Feather name="chevron-right" size={20} color="#9CA3AF" />
+      </Pressable>
+    </View>
   );
 }

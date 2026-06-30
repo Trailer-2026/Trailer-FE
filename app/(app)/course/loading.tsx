@@ -30,11 +30,9 @@ export default function LoadingScreen() {
       <StepHeader progress={1} />
 
       <View className="flex-1 items-center justify-center px-5">
-        <ActivityIndicator size="large" color="#374151" />
-        <Text className="mt-6 text-4xl font-extrabold text-gray-900">
-          {progress}%
-        </Text>
-        <Text className="mt-3 text-base text-gray-600">
+        <ActivityIndicator size="large" color="#D1D5DB" />
+        <Text className="mt-8 text-sm text-gray-400">{progress}%</Text>
+        <Text className="mt-2 text-xl font-bold text-gray-900">
           일정을 만들고 있어요
         </Text>
       </View>

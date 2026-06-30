@@ -30,26 +30,22 @@ export default function StylesScreen() {
             const value = TRAVEL_STYLES[i];
             const selected = value ? styles.includes(value) : false;
             return (
-              <View key={i} className="w-1/2 px-1.5 mb-3">
+              <View key={i} className="w-1/2 px-1.5 mb-4">
                 <Pressable
                   disabled={!value}
                   onPress={() => value && toggleStyle(value)}
-                  className={`h-24 rounded-2xl items-center justify-center border ${
+                  className={`h-36 rounded-2xl items-center justify-center border ${
                     selected
                       ? "border-gray-800 bg-gray-100"
                       : "border-gray-200 bg-white"
                   }`}
-                  style={
-                    selected
-                      ? {
-                          shadowColor: "#000",
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.08,
-                          shadowRadius: 6,
-                          elevation: 2,
-                        }
-                      : undefined
-                  }
+                  style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: selected ? 0.1 : 0.05,
+                    shadowRadius: 6,
+                    elevation: selected ? 3 : 1,
+                  }}
                 >
                   {value ? (
                     <Text
@@ -59,9 +55,7 @@ export default function StylesScreen() {
                     >
                       {value}
                     </Text>
-                  ) : (
-                    <View className="w-10 h-10 rounded-full bg-gray-100" />
-                  )}
+                  ) : null}
                 </Pressable>
               </View>
             );

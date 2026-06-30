@@ -45,17 +45,23 @@ export default function ResultScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 16 }}
       >
-        <View className="px-5 mt-2 flex-row items-center justify-center gap-4">
-          <Text className="text-xl font-bold text-gray-900">출발 {origin}</Text>
+        <View className="px-5 mt-2 flex-row items-center justify-center gap-5">
+          <View className="items-center">
+            <Text className="text-xs text-gray-400">출발</Text>
+            <Text className="mt-1 text-2xl font-bold text-gray-900">{origin}</Text>
+          </View>
           <Pressable
             onPress={swap}
-            className="w-8 h-8 rounded-full bg-gray-200 items-center justify-center"
+            className="mt-5 w-12 h-7 rounded-full bg-gray-100 items-center justify-center"
           >
             <Feather name="repeat" size={14} color="#374151" />
           </Pressable>
-          <Text className="text-xl font-bold text-gray-900">
-            도착 {destination}
-          </Text>
+          <View className="items-center">
+            <Text className="text-xs text-gray-400">도착</Text>
+            <Text className="mt-1 text-2xl font-bold text-gray-900">
+              {destination}
+            </Text>
+          </View>
         </View>
 
         <View className="mt-5">
@@ -72,19 +78,20 @@ export default function ResultScreen() {
             {RECOMMENDATIONS.map((rec) => (
               <View
                 key={rec.id}
-                className="w-[280px] h-44 bg-gray-200 rounded-2xl p-4 justify-between"
+                className="w-[280px] h-60 bg-gray-200 rounded-2xl p-5 justify-between"
               >
-                <View className="bg-white/80 self-start px-2 py-0.5 rounded-md">
-                  <Text className="text-xs font-semibold text-gray-700">
+                <View className="bg-gray-700 self-start px-3 py-1 rounded-full">
+                  <Text className="text-xs font-semibold text-white">
                     {rec.badge}
                   </Text>
                 </View>
-                <View>
+                <Text className="text-xl font-bold text-gray-900">
+                  {rec.title}
+                </Text>
+                <View className="flex-row items-baseline gap-2">
+                  <Text className="text-xs text-gray-500">예산</Text>
                   <Text className="text-lg font-bold text-gray-900">
-                    {rec.title}
-                  </Text>
-                  <Text className="text-xs text-gray-700 mt-1">
-                    예산 {rec.budget}
+                    {rec.budget}
                   </Text>
                 </View>
               </View>
@@ -94,28 +101,38 @@ export default function ResultScreen() {
 
         <StepDots total={RECOMMENDATIONS.length} index={carouselIndex} />
 
-        <View className="px-5 mt-2 flex-row gap-2">
-          {DATE_TABS.map((tab, i) => {
-            const active = i === dateIndex;
-            return (
-              <Pressable
-                key={tab.date}
-                onPress={() => setDateIndex(i)}
-                className={`flex-1 py-3 rounded-xl items-center ${
-                  active ? "bg-gray-800" : "bg-gray-100"
-                }`}
-              >
-                <Text
-                  className={`text-sm ${active ? "text-white" : "text-gray-500"}`}
+        <View className="px-5 mt-4">
+          <View className="flex-row gap-6">
+            {DATE_TABS.map((tab, i) => {
+              const active = i === dateIndex;
+              return (
+                <Pressable
+                  key={tab.date}
+                  onPress={() => setDateIndex(i)}
+                  className="items-center"
                 >
-                  {tab.day} {tab.date}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text className="text-xs text-gray-500">{tab.day}</Text>
+                  <View
+                    className={`mt-1 w-9 h-9 rounded-full items-center justify-center ${
+                      active ? "bg-gray-300" : ""
+                    }`}
+                  >
+                    <Text
+                      className={`text-base ${
+                        active ? "font-bold text-gray-900" : "text-gray-700"
+                      }`}
+                    >
+                      {tab.date}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View className="h-px bg-gray-200 mt-3" />
         </View>
 
-        <View className="mx-5 mt-4 h-64 bg-gray-200 rounded-2xl" />
+        <View className="mx-5 mt-4 h-72 bg-gray-200 rounded-2xl" />
       </ScrollView>
 
       <View className="px-5 pb-4">
