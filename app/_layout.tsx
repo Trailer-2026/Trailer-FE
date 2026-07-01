@@ -1,8 +1,10 @@
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import 'react-native-reanimated';
+import "../global.css";
 
 import { useAuthStore } from "@/src/features/auth/store";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
@@ -21,18 +23,21 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const { isAuthenticated, isBootstrapping, bootstrap } = useAuthStore();
+  const [fontsLoaded] = useFonts({
+    Pretendard: require("../assets/fonts/PretendardVariable.ttf"),
+  });
 
   useEffect(() => {
     bootstrap();
   }, [bootstrap]);
 
   useEffect(() => {
-    if (!isBootstrapping) {
+    if (!isBootstrapping && fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [isBootstrapping]);
+  }, [isBootstrapping, fontsLoaded]);
 
-  if (isBootstrapping) return null;
+  if (isBootstrapping || !fontsLoaded) return null;
 
   return (
     <>

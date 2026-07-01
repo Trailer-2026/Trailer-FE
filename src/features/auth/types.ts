@@ -11,7 +11,7 @@ export type TokenResponse = {
 };
 
 export type UserProfile = {
-  id: number;
-  email?: string;
-  nickname?: string;
+  user_idx: number;
+  provider: "google" | "kakao";
+  email?: string | null;
 };

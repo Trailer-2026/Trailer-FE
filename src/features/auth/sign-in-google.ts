@@ -49,7 +49,15 @@ export async function signInWithGoogle(): Promise<void> {
     const tokens = await loginGoogle(idToken);
     await useAuthStore.getState().setTokens(tokens.access_token, tokens.refresh_token);
   } catch (err: unknown) {
-    const status = (err as { response?: { status?: number } })?.response?.status;
+    // TEMP: 백엔드 응답 진단용 로깅 (원인 파악 후 제거)
+    const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
+    console.error("[loginGoogle FAIL]", {
+      status: axiosErr?.response?.status,
+      data: axiosErr?.response?.data,
+      message: axiosErr?.message,
+      idTokenHead: idToken.slice(0, 40) + "...",
+    });
+    const status = axiosErr?.response?.status;
     if (status === 400) {
       throw { type: "invalid_token" } satisfies GoogleSignInError;
     }
