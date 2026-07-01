@@ -1,6 +1,8 @@
-import Feather from "@expo/vector-icons/Feather";
 import { router } from "expo-router";
 import { Pressable, View } from "react-native";
+
+import BackIcon from "@/src/components/icons/BackIcon";
+import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 type Props = {
   progress: number;
@@ -9,18 +11,43 @@ type Props = {
 export function StepHeader({ progress }: Props) {
   const clamped = Math.max(0, Math.min(1, progress));
   return (
-    <View className="px-5 pt-2 pb-3 flex-row items-center gap-3">
-      <Pressable
-        onPress={() => router.back()}
-        hitSlop={12}
-        className="w-7 h-7 items-center justify-center"
+    <View>
+      {/* 뒤로가기 */}
+      <View
+        style={{
+          paddingHorizontal: scale(20),
+          paddingTop: verticalScale(6),
+          paddingBottom: verticalScale(10),
+        }}
       >
-        <Feather name="chevron-left" size={24} color="#111827" />
-      </Pressable>
-      <View className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={{
+            width: scale(28),
+            height: scale(28),
+            justifyContent: "center",
+          }}
+        >
+          <BackIcon width={moderateScale(14)} height={moderateScale(20)} />
+        </Pressable>
+      </View>
+
+      {/* 진행바 — 화면 왼쪽 끝 ~ 오른쪽 끝, 진행률만큼 채움 */}
+      <View
+        style={{
+          width: "100%",
+          height: verticalScale(3),
+          backgroundColor: "#EFEFEF",
+          marginBottom: verticalScale(16),
+        }}
+      >
         <View
-          className="h-full bg-gray-800 rounded-full"
-          style={{ width: `${clamped * 100}%` }}
+          style={{
+            height: "100%",
+            width: `${clamped * 100}%`,
+            backgroundColor: "#81E4D0",
+          }}
         />
       </View>
     </View>

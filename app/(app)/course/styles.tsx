@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/src/components/Text";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";

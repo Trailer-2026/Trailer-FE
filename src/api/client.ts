@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from "@/src/features/auth/storage";
-import { refreshTokens } from "@/src/features/auth/api";
+// refreshTokens 는 require cycle(client ↔ api) 방지를 위해 인터셉터 내부에서 동적 import 한다.
 
 // eslint-disable-next-line import/no-named-as-default-member
 export const api = axios.create({
@@ -56,6 +56,7 @@ api.interceptors.response.use(
       const refreshToken = await getRefreshToken();
       if (!refreshToken) throw new Error("no refresh token");
 
+      const { refreshTokens } = await import("@/src/features/auth/api");
       const tokens = await refreshTokens(refreshToken);
       await saveTokens(tokens.access_token, tokens.refresh_token);
 

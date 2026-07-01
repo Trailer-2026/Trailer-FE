@@ -15,8 +15,8 @@ type CourseState = {
   origin: string;
   destination: string;
   roundTrip: boolean;
-  departAt: string;
-  returnAt: string;
+  departDate: Date;
+  returnDate: Date;
   passengers: Record<PassengerKey, number>;
   styles: TravelStyle[];
 };
@@ -26,19 +26,23 @@ type CourseActions = {
   setDestination: (v: string) => void;
   swapOriginDestination: () => void;
   setRoundTrip: (v: boolean) => void;
-  setDepartAt: (v: string) => void;
-  setReturnAt: (v: string) => void;
+  setDepartDate: (v: Date) => void;
+  setReturnDate: (v: Date) => void;
   setPassenger: (key: PassengerKey, delta: number) => void;
   toggleStyle: (style: TravelStyle) => void;
   reset: () => void;
 };
 
+const now = new Date();
+const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
 const initialState: CourseState = {
   origin: "서울",
   destination: "부산",
   roundTrip: true,
-  departAt: "2026년 06월 20일(토) 09:00",
-  returnAt: "2026년 06월 21일(일) 20:00",
+  departDate: today,
+  returnDate: tomorrow,
   passengers: { adult: 1, teen: 0, child: 0 },
   styles: [],
 };
@@ -53,8 +57,8 @@ export const useCourseStore = create<CourseState & CourseActions>((set) => ({
     set((s) => ({ origin: s.destination, destination: s.origin })),
 
   setRoundTrip: (v) => set({ roundTrip: v }),
-  setDepartAt: (v) => set({ departAt: v }),
-  setReturnAt: (v) => set({ returnAt: v }),
+  setDepartDate: (v) => set({ departDate: v }),
+  setReturnDate: (v) => set({ returnDate: v }),
 
   setPassenger: (key, delta) =>
     set((s) => {

@@ -1,4 +1,7 @@
-import { Pressable, Text } from "react-native";
+import { Pressable } from "react-native";
+import { Text } from "@/src/components/Text";
+
+import { moderateScale, verticalScale } from "@/src/utils/responsive";
 
 type Props = {
   label: string;
@@ -11,14 +14,18 @@ export function PrimaryButton({ label, onPress, disabled }: Props) {
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      className={`w-full rounded-2xl py-4 items-center ${
-        disabled ? "bg-gray-300" : "bg-gray-800"
-      }`}
+      className="w-full rounded-2xl items-center justify-center"
+      style={{
+        height: verticalScale(61),
+        backgroundColor: disabled ? "#D1D5DB" : "#5E84F4",
+      }}
     >
       <Text
-        className={`text-base font-semibold ${
-          disabled ? "text-gray-500" : "text-white"
-        }`}
+        className="font-semibold"
+        style={{
+          fontSize: moderateScale(16),
+          color: disabled ? "#9CA3AF" : "#FFFFFF",
+        }}
       >
         {label}
       </Text>

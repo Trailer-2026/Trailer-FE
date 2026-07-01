@@ -1,62 +1,90 @@
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import BellIcon from "@/src/components/icons/BellIcon";
+import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
+import HomeIcon from "@/src/components/icons/HomeIcon";
+import PersonIcon from "@/src/components/icons/PersonIcon";
+import PlayIcon from "@/src/components/icons/PlayIcon";
+import { moderateScale, verticalScale } from "@/src/utils/responsive";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#111827",
-        tabBarInactiveTintColor: "#9CA3AF",
-        tabBarLabelStyle: { fontSize: 11 },
+        tabBarShowLabel: false, // 하단바 글씨 제거 (아이콘만)
+        tabBarActiveTintColor: "#668DFF",
+        tabBarInactiveTintColor: "#9D9D9D",
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopColor: "#E5E7EB",
+          // 디자인상 바 높이 65 + 시스템 내비 인셋만큼 아래 여백 → 겹침 방지
+          height: verticalScale(65) + insets.bottom,
+          paddingTop: verticalScale(8),
+          paddingBottom: insets.bottom + verticalScale(8),
         },
       }}
     >
+      {/* 순서: 홈 · 피드(재생) · 캘린더(일정) · 알림 · 프로필  */}
       <Tabs.Screen
         name="index"
         options={{
-          title: "홈",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          title: "캘린더",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="calendar-blank-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <HomeIcon
+              color={color}
+              width={moderateScale(22)}
+              height={moderateScale(22)}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
-          title: "피드",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="play-circle-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <PlayIcon
+              color={color}
+              width={moderateScale(22)}
+              height={moderateScale(22)}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <CalendarGridIcon
+              color={color}
+              width={moderateScale(22)}
+              height={moderateScale(22)}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
-          title: "알림",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="bell-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <BellIcon
+              color={color}
+              width={moderateScale(20)}
+              height={moderateScale(22)}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "프로필",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <PersonIcon
+              color={color}
+              width={moderateScale(19)}
+              height={moderateScale(21)}
+            />
           ),
         }}
       />

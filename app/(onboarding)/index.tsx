@@ -1,4 +1,5 @@
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
+import { Text } from "@/src/components/Text";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 

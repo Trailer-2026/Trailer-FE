@@ -1,146 +1,414 @@
 import Feather from "@expo/vector-icons/Feather";
 import { router } from "expo-router";
-import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import BackIcon from "@/src/components/icons/BackIcon";
+import { Text } from "@/src/components/Text";
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
-import { StepDots } from "@/src/features/course/components/StepDots";
-import { useCourseStore } from "@/src/features/course/store";
+import {
+  RESULT_ITINERARY as R,
+  type ItineraryStep,
+} from "@/src/features/schedule/data";
+import { useScheduleStore } from "@/src/features/schedule/store";
+import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-const RECOMMENDATIONS = [
-  { id: "A", badge: "일정 A", title: "서귀포 바닷가 투어", budget: "23,0000원" },
-  { id: "B", badge: "일정 B", title: "한라산 트레킹 코스", budget: "18,0000원" },
-  { id: "C", badge: "일정 C", title: "성산일출봉 일주", budget: "21,0000원" },
-];
-
-const DATE_TABS = [
-  { day: "월", date: "20" },
-  { day: "화", date: "21" },
-];
+const RAIL_WIDTH = scale(58);
+const LINE_COLOR = "#D9D9D9";
+const BOARD_DOT = "#C4C4C4";
+const ALIGHT_DOT = "#2FD3B4";
+const TIME_COLOR = "#9AA0A6";
 
 export default function ResultScreen() {
-  const origin = useCourseStore((s) => s.origin);
-  const destination = useCourseStore((s) => s.destination);
-  const swap = useCourseStore((s) => s.swapOriginDestination);
-
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  const [dateIndex, setDateIndex] = useState(0);
+  function handleAdd() {
+    useScheduleStore.getState().addTrip();
+    router.replace("/calendar");
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
-      <View className="px-5 pt-2 pb-3 flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Feather name="chevron-left" size={24} color="#111827" />
-          </Pressable>
-          <Text className="text-xl font-extrabold text-gray-900">일정 추천</Text>
-        </View>
-        <Pressable onPress={() => router.replace("/course/loading")}>
-          <Text className="text-sm text-gray-500">다시추천받기</Text>
+      {/* 헤더 */}
+      <View
+        className="flex-row items-center"
+        style={{
+          paddingHorizontal: scale(20),
+          paddingTop: verticalScale(6),
+          paddingBottom: verticalScale(6),
+          gap: scale(10),
+        }}
+      >
+        <Pressable onPress={() => router.back()} hitSlop={12}>
+          <BackIcon
+            color="#111827"
+            width={moderateScale(14)}
+            height={moderateScale(20)}
+          />
         </Pressable>
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(20) }}
+        >
+          일정
+        </Text>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 16 }}
+        contentContainerStyle={{
+          paddingHorizontal: scale(20),
+          paddingBottom: verticalScale(20),
+        }}
       >
-        <View className="px-5 mt-2 flex-row items-center justify-center gap-5">
-          <View className="items-center">
-            <Text className="text-xs text-gray-400">출발</Text>
-            <Text className="mt-1 text-2xl font-bold text-gray-900">{origin}</Text>
-          </View>
-          <Pressable
-            onPress={swap}
-            className="mt-5 w-12 h-7 rounded-full bg-gray-100 items-center justify-center"
+        {/* 총 소요시간 */}
+        <View
+          className="flex-row items-baseline"
+          style={{ marginTop: verticalScale(10) }}
+        >
+          <Text
+            className="font-bold text-gray-900"
+            style={{ fontSize: moderateScale(28) }}
           >
-            <Feather name="repeat" size={14} color="#374151" />
-          </Pressable>
-          <View className="items-center">
-            <Text className="text-xs text-gray-400">도착</Text>
-            <Text className="mt-1 text-2xl font-bold text-gray-900">
-              {destination}
-            </Text>
-          </View>
+            {R.totalHours}
+          </Text>
+          <Text
+            className="text-gray-900"
+            style={{ fontSize: moderateScale(16), marginLeft: scale(2) }}
+          >
+            시간{" "}
+          </Text>
+          <Text
+            className="font-bold text-gray-900"
+            style={{ fontSize: moderateScale(28) }}
+          >
+            {R.totalMinutes}
+          </Text>
+          <Text
+            className="text-gray-900"
+            style={{ fontSize: moderateScale(16), marginLeft: scale(2) }}
+          >
+            분
+          </Text>
         </View>
+        <Text
+          className="text-gray-500"
+          style={{ fontSize: moderateScale(13), marginTop: verticalScale(4) }}
+        >
+          {R.timeRange}
+        </Text>
 
-        <View className="mt-5">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            contentContainerStyle={{ paddingHorizontal: 40, gap: 12 }}
-            onMomentumScrollEnd={(e) => {
-              const x = e.nativeEvent.contentOffset.x;
-              setCarouselIndex(Math.round(x / 280));
+        {/* 구간 슬라이더 */}
+        <View
+          style={{
+            height: verticalScale(64),
+            marginTop: verticalScale(20),
+            justifyContent: "center",
+          }}
+        >
+          {/* 트랙 */}
+          <View
+            style={{
+              height: verticalScale(6),
+              borderRadius: 999,
+              backgroundColor: "#E3E3E3",
             }}
-          >
-            {RECOMMENDATIONS.map((rec) => (
+          />
+          {/* 채워진 구간 */}
+          <View
+            style={{
+              position: "absolute",
+              left: `${R.markers[0].left * 100}%`,
+              right: `${(1 - R.markers[1].left) * 100}%`,
+              height: verticalScale(6),
+              borderRadius: 999,
+              backgroundColor: "#9AA0A6",
+            }}
+          />
+          {R.markers.map((m) => (
+            <View
+              key={m.station}
+              style={{
+                position: "absolute",
+                left: `${m.left * 100}%`,
+                alignItems: "center",
+              }}
+            >
+              {/* 소요시간 말풍선 pill */}
               <View
-                key={rec.id}
-                className="w-[280px] h-60 bg-gray-200 rounded-2xl p-5 justify-between"
+                className="bg-white items-center justify-center"
+                style={{
+                  transform: [{ translateX: -scale(24) }],
+                  paddingHorizontal: scale(10),
+                  height: verticalScale(24),
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: "#E3E3E3",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 3,
+                  elevation: 2,
+                }}
               >
-                <View className="bg-gray-700 self-start px-3 py-1 rounded-full">
-                  <Text className="text-xs font-semibold text-white">
-                    {rec.badge}
-                  </Text>
-                </View>
-                <Text className="text-xl font-bold text-gray-900">
-                  {rec.title}
+                <Text
+                  className="font-medium text-gray-700"
+                  style={{ fontSize: moderateScale(12) }}
+                >
+                  {m.duration}
                 </Text>
-                <View className="flex-row items-baseline gap-2">
-                  <Text className="text-xs text-gray-500">예산</Text>
-                  <Text className="text-lg font-bold text-gray-900">
-                    {rec.budget}
-                  </Text>
-                </View>
               </View>
-            ))}
-          </ScrollView>
+              {/* 역 라벨 */}
+              <Text
+                className="text-gray-500"
+                style={{
+                  transform: [{ translateX: -scale(24) }],
+                  fontSize: moderateScale(12),
+                  marginTop: verticalScale(8),
+                }}
+              >
+                {m.station}
+              </Text>
+            </View>
+          ))}
         </View>
 
-        <StepDots total={RECOMMENDATIONS.length} index={carouselIndex} />
+        {/* 기준 시각 구분선 */}
+        <View
+          style={{
+            marginTop: verticalScale(16),
+            marginHorizontal: -scale(20),
+            paddingHorizontal: scale(20),
+            paddingVertical: verticalScale(14),
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: "#F0F0F0",
+          }}
+        >
+          <Text
+            className="text-gray-400"
+            style={{ fontSize: moderateScale(13) }}
+          >
+            {R.baseline}
+          </Text>
+        </View>
 
-        <View className="px-5 mt-4">
-          <View className="flex-row gap-6">
-            {DATE_TABS.map((tab, i) => {
-              const active = i === dateIndex;
+        {/* 타임라인 */}
+        <View style={{ marginTop: verticalScale(18) }}>
+          {R.steps.map((step, i) => {
+            const isLast = i === R.steps.length - 1;
+
+            if (step.kind === "place") {
               return (
-                <Pressable
-                  key={tab.date}
-                  onPress={() => setDateIndex(i)}
-                  className="items-center"
+                <View
+                  key={i}
+                  className="flex-row"
+                  style={{ paddingBottom: verticalScale(22) }}
                 >
-                  <Text className="text-xs text-gray-500">{tab.day}</Text>
-                  <View
-                    className={`mt-1 w-9 h-9 rounded-full items-center justify-center ${
-                      active ? "bg-gray-300" : ""
-                    }`}
-                  >
+                  <Rail dotColor={ALIGHT_DOT} isLast={isLast} showDot={false} />
+                  <PlaceCard step={step} walkDuration={R.walkDuration} />
+                </View>
+              );
+            }
+
+            if (step.kind === "alight") {
+              return (
+                <View
+                  key={i}
+                  className="flex-row"
+                  style={{ paddingBottom: verticalScale(22) }}
+                >
+                  <Rail dotColor={ALIGHT_DOT} isLast={isLast} />
+                  <View style={{ flex: 1, paddingTop: verticalScale(2) }}>
                     <Text
-                      className={`text-base ${
-                        active ? "font-bold text-gray-900" : "text-gray-700"
-                      }`}
+                      className="font-bold text-gray-900"
+                      style={{ fontSize: moderateScale(18) }}
                     >
-                      {tab.date}
+                      {step.station}
                     </Text>
                   </View>
-                </Pressable>
+                </View>
               );
-            })}
-          </View>
-          <View className="h-px bg-gray-200 mt-3" />
-        </View>
+            }
 
-        <View className="mx-5 mt-4 h-72 bg-gray-200 rounded-2xl" />
+            // board
+            return (
+              <View
+                key={i}
+                className="flex-row"
+                style={{ paddingBottom: verticalScale(22) }}
+              >
+                <Rail dotColor={BOARD_DOT} time={step.time} isLast={isLast} />
+                <View style={{ flex: 1, paddingTop: verticalScale(2) }}>
+                  <Text
+                    className="font-bold text-gray-900"
+                    style={{ fontSize: moderateScale(18) }}
+                  >
+                    {step.station}
+                  </Text>
+                  {/* 사진/메모 카드 */}
+                  <View
+                    style={{
+                      marginTop: verticalScale(12),
+                      height: verticalScale(120),
+                      borderRadius: scale(12),
+                      borderWidth: 1,
+                      borderColor: "#E5E7EB",
+                      backgroundColor: "#FFFFFF",
+                    }}
+                  />
+                  {/* n개 역 이동 */}
+                  <View
+                    className="flex-row items-center"
+                    style={{ marginTop: verticalScale(16), gap: scale(8) }}
+                  >
+                    <Text
+                      className="text-gray-500"
+                      style={{ fontSize: moderateScale(13) }}
+                    >
+                      {step.move}
+                    </Text>
+                    <Text
+                      className="font-bold text-gray-800"
+                      style={{ fontSize: moderateScale(14) }}
+                    >
+                      {R.moveDuration}
+                    </Text>
+                    <Feather
+                      name="chevron-down"
+                      size={moderateScale(16)}
+                      color="#9AA0A6"
+                    />
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
       </ScrollView>
 
-      <View className="px-5 pb-4">
-        <PrimaryButton
-          label="일정표에 추가하기"
-          onPress={() => router.replace("/(tabs)")}
-        />
+      <View style={{ paddingHorizontal: scale(20), paddingBottom: verticalScale(8) }}>
+        <PrimaryButton label="일정표에 추가하기" onPress={handleAdd} />
       </View>
     </SafeAreaView>
+  );
+}
+
+function Rail({
+  dotColor,
+  time,
+  isLast,
+  showDot = true,
+}: {
+  dotColor: string;
+  time?: string;
+  isLast?: boolean;
+  showDot?: boolean;
+}) {
+  return (
+    <View style={{ width: RAIL_WIDTH, alignItems: "center" }}>
+      {/* 세로 연결선 */}
+      {!isLast ? (
+        <View
+          style={{
+            position: "absolute",
+            top: verticalScale(8),
+            bottom: -verticalScale(22),
+            width: 1.5,
+            backgroundColor: LINE_COLOR,
+          }}
+        />
+      ) : null}
+      {/* 점 */}
+      {showDot ? (
+        <View
+          style={{
+            width: scale(13),
+            height: scale(13),
+            borderRadius: 999,
+            backgroundColor: dotColor,
+            marginTop: verticalScale(4),
+          }}
+        />
+      ) : null}
+      {/* 시각 */}
+      {time ? (
+        <Text
+          style={{
+            fontSize: moderateScale(12),
+            color: TIME_COLOR,
+            marginTop: verticalScale(22),
+          }}
+        >
+          {time}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function PlaceCard({
+  step,
+  walkDuration,
+}: {
+  step: Extract<ItineraryStep, { kind: "place" }>;
+  walkDuration: string;
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      {/* 이름 + 화살표 */}
+      <View className="flex-row items-center justify-between">
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(16) }}
+        >
+          {step.name}
+        </Text>
+        <Feather name="chevron-right" size={moderateScale(20)} color="#9AA0A6" />
+      </View>
+      <Text
+        className="text-gray-400"
+        style={{ fontSize: moderateScale(13), marginTop: verticalScale(4) }}
+      >
+        {step.address}
+      </Text>
+
+      {/* 이미지 자리 */}
+      <View
+        className="overflow-hidden"
+        style={{
+          marginTop: verticalScale(12),
+          height: verticalScale(110),
+          borderRadius: scale(12),
+          backgroundColor: "#D9D9D9",
+        }}
+      >
+        <Image
+          source={require("../../../assets/images/Main.png")}
+          resizeMode="cover"
+          style={{ width: "100%", height: "100%", opacity: 0.9 }}
+        />
+      </View>
+
+      {/* 도보 */}
+      <View
+        className="flex-row items-center"
+        style={{
+          marginTop: verticalScale(14),
+          paddingTop: verticalScale(14),
+          borderTopWidth: 1,
+          borderColor: "#F0F0F0",
+          gap: scale(10),
+        }}
+      >
+        <Text className="text-gray-400" style={{ fontSize: moderateScale(13) }}>
+          {step.walk}
+        </Text>
+        <Text
+          className="font-bold text-gray-800"
+          style={{ fontSize: moderateScale(14) }}
+        >
+          {walkDuration}
+        </Text>
+      </View>
+    </View>
   );
 }
