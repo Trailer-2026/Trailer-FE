@@ -39,7 +39,8 @@
       "Bash(file assets/fonts/PretendardVariable.ttf)",
       "PowerShell(npx expo install expo-linear-gradient)",
       "PowerShell(npx expo install react-native-svg)",
-      "PowerShell(git branch --show-current; \"---- 로컬 vs 원격 차이 ----\"; git log --oneline origin/feat/TRA-23..HEAD 2>&1; \"---- 미커밋 변경 개수 ----\"; \\(git status --porcelain | Measure-Object -Line\\).Lines)"
+      "PowerShell(git branch --show-current; \"---- 로컬 vs 원격 차이 ----\"; git log --oneline origin/feat/TRA-23..HEAD 2>&1; \"---- 미커밋 변경 개수 ----\"; \\(git status --porcelain | Measure-Object -Line\\).Lines)",
+      "PowerShell(\"---- status ----\")"
     ]
   }
 }
