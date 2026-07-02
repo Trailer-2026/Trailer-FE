@@ -1,4 +1,5 @@
 import { login } from "@react-native-kakao/user";
+import { syncFcmToken } from "@/src/features/notification/fcm";
 import { loginKakao } from "./api";
 import { useAuthStore } from "./store";
 
@@ -25,6 +26,8 @@ export async function signInWithKakao(): Promise<void> {
   try {
     const tokens = await loginKakao(kakaoToken);
     await useAuthStore.getState().setTokens(tokens.access_token, tokens.refresh_token);
+    // 토큰 저장 완료 후 FCM 권한 요청 + 서버 등록 (실패해도 로그인 흐름은 계속)
+    void syncFcmToken();
   } catch (err: unknown) {
     const status = (err as { response?: { status?: number } })?.response?.status;
     if (status === 400) {
