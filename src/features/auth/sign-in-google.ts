@@ -4,6 +4,7 @@ import {
   isSuccessResponse,
   statusCodes,
 } from "@react-native-google-signin/google-signin";
+import { syncFcmToken } from "@/src/features/notification/fcm";
 import { loginGoogle } from "./api";
 import { useAuthStore } from "./store";
 
@@ -48,6 +49,8 @@ export async function signInWithGoogle(): Promise<void> {
   try {
     const tokens = await loginGoogle(idToken);
     await useAuthStore.getState().setTokens(tokens.access_token, tokens.refresh_token);
+    // 토큰 저장 완료 후 FCM 권한 요청 + 서버 등록 (실패해도 로그인 흐름은 계속)
+    void syncFcmToken();
   } catch (err: unknown) {
     // TEMP: 백엔드 응답 진단용 로깅 (원인 파악 후 제거)
     const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
