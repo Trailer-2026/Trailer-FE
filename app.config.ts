@@ -22,6 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
+    googleServicesFile: "./google-services.json",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
   },
@@ -61,6 +62,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
+    "@react-native-firebase/app",
   ],
   experiments: {
     typedRoutes: true,
