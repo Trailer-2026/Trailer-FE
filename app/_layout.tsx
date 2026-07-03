@@ -24,8 +24,9 @@ GoogleSignin.configure({
 
 // ⚠️ FCM 백그라운드/종료 상태 데이터 메시지 처리가 필요해지면
 //    바로 이 모듈 스코프(컴포넌트 바깥)에서 아래처럼 등록한다:
-//   import messaging from "@react-native-firebase/messaging";
-//   messaging().setBackgroundMessageHandler(async (msg) => { ... });
+//   import { getApp } from "@react-native-firebase/app";
+//   import { getMessaging, setBackgroundMessageHandler } from "@react-native-firebase/messaging";
+//   setBackgroundMessageHandler(getMessaging(getApp()), async (msg) => { ... });
 // 현재는 notification 페이로드만 사용하므로 등록하지 않는다.
 
 export const unstable_settings = {

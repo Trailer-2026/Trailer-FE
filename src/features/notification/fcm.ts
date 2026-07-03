@@ -1,4 +1,11 @@
-import messaging from "@react-native-firebase/messaging";
+import { getApp } from "@react-native-firebase/app";
+import {
+  AuthorizationStatus,
+  getMessaging,
+  getToken,
+  onTokenRefresh,
+  requestPermission as requestFirebasePermission,
+} from "@react-native-firebase/messaging";
 import { PermissionsAndroid, Platform } from "react-native";
 
 import { api } from "@/src/api/client";
@@ -36,10 +43,10 @@ export async function requestPermission(): Promise<boolean> {
     }
 
     // Firebase 레벨 권한 상태 확인 (구버전/크로스플랫폼 대비)
-    const authStatus = await messaging().requestPermission();
+    const authStatus = await requestFirebasePermission(getMessaging(getApp()));
     const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL;
 
     if (!enabled) console.log("[fcm] 알림 권한 미허용:", authStatus);
     return enabled;
@@ -52,7 +59,7 @@ export async function requestPermission(): Promise<boolean> {
 /** FCM 기기 토큰 문자열 반환. 실패 시 null. */
 export async function getFcmToken(): Promise<string | null> {
   try {
-    const token = await messaging().getToken();
+    const token = await getToken(getMessaging(getApp()));
     return token || null;
   } catch (e) {
     console.log("[fcm] getToken 실패:", e);
@@ -81,7 +88,7 @@ export async function registerFcmToken(): Promise<void> {
  * @returns 구독 해제 함수
  */
 export function setupTokenRefresh(): () => void {
-  return messaging().onTokenRefresh(async (token) => {
+  return onTokenRefresh(getMessaging(getApp()), async (token) => {
     try {
       await postToken(token);
       console.log("[fcm] 갱신 토큰 재등록 완료");

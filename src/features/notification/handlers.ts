@@ -1,4 +1,10 @@
-import messaging from "@react-native-firebase/messaging";
+import { getApp } from "@react-native-firebase/app";
+import {
+  getInitialNotification,
+  getMessaging,
+  onMessage,
+  onNotificationOpenedApp,
+} from "@react-native-firebase/messaging";
 
 /**
  * FCM 메시지 수신 처리 핸들러 모음.
@@ -12,7 +18,7 @@ import messaging from "@react-native-firebase/messaging";
  * @returns 구독 해제 함수
  */
 export function setupForegroundHandler(): () => void {
-  return messaging().onMessage(async (remoteMessage) => {
+  return onMessage(getMessaging(getApp()), async (remoteMessage) => {
     console.log("[fcm] 포그라운드 수신:", JSON.stringify(remoteMessage));
     // TODO: 인앱 알림 배너/토스트 표시 (notifee 등으로 추후 확장)
   });
@@ -25,8 +31,10 @@ export function setupForegroundHandler(): () => void {
  * @returns 구독 해제 함수 (onNotificationOpenedApp 구독 해제)
  */
 export function setupNotificationOpenHandlers(): () => void {
+  const messaging = getMessaging(getApp());
+
   // 백그라운드 상태에서 알림 탭 → 앱 포그라운드로
-  const unsubscribe = messaging().onNotificationOpenedApp((remoteMessage) => {
+  const unsubscribe = onNotificationOpenedApp(messaging, (remoteMessage) => {
     console.log(
       "[fcm] 백그라운드에서 알림 탭:",
       JSON.stringify(remoteMessage),
@@ -36,16 +44,14 @@ export function setupNotificationOpenHandlers(): () => void {
   });
 
   // 종료 상태에서 알림 탭 → 앱 실행 (실행 시 1회 확인)
-  messaging()
-    .getInitialNotification()
-    .then((remoteMessage) => {
-      if (!remoteMessage) return;
-      console.log(
-        "[fcm] 종료 상태에서 알림 탭으로 실행:",
-        JSON.stringify(remoteMessage),
-      );
-      // TODO: remoteMessage.data 기반으로 초기 라우팅 이동
-    });
+  getInitialNotification(messaging).then((remoteMessage) => {
+    if (!remoteMessage) return;
+    console.log(
+      "[fcm] 종료 상태에서 알림 탭으로 실행:",
+      JSON.stringify(remoteMessage),
+    );
+    // TODO: remoteMessage.data 기반으로 초기 라우팅 이동
+  });
 
   return unsubscribe;
 }
@@ -58,8 +64,9 @@ export function setupNotificationOpenHandlers(): () => void {
  *    Expo Router에서는 app/_layout.tsx 상단(모듈 스코프)이 그 위치다.
  *
  * 사용 예 — app/_layout.tsx 최상단에서:
- *   import messaging from "@react-native-firebase/messaging";
- *   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+ *   import { getApp } from "@react-native-firebase/app";
+ *   import { getMessaging, setBackgroundMessageHandler } from "@react-native-firebase/messaging";
+ *   setBackgroundMessageHandler(getMessaging(getApp()), async (remoteMessage) => {
  *     console.log("[fcm] 백그라운드 데이터 메시지:", remoteMessage);
  *   });
  *
