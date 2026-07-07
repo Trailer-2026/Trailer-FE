@@ -11,6 +11,7 @@ const STALE_MS = 1000 * 60 * 5; // 5분
  * "일정 생성" / "다시받기" 트리거 시에만 호출되는 조건부 훅.
  * - enabled 로 자동실행 방지: criteria 가 준비되고 themes 가 1개 이상일 때만 호출.
  * - queryKey 에 criteria 전체(page 포함)를 넣어 같은 조건의 이전 page 는 캐시 히트.
+ * - retry 0: AI 추천은 응답이 오래 걸려 자동 재시도 시 대기시간이 크게 늘어남 → 사용자 액션으로만 재시도.
  */
 export function useRecommendCourses(criteria: RecommendCriteria | null) {
   return useQuery({
@@ -18,6 +19,7 @@ export function useRecommendCourses(criteria: RecommendCriteria | null) {
     queryFn: () => recommendCourses(criteria!),
     enabled: !!criteria && criteria.themes.length > 0,
     staleTime: STALE_MS,
+    retry: 0,
   });
 }
 
@@ -38,6 +40,7 @@ export function usePrefetchNextRecommendPage() {
         queryKey: recommendKeys.detail(nextCriteria),
         queryFn: () => recommendCourses(nextCriteria),
         staleTime: STALE_MS,
+        retry: 0,
       });
     },
     [queryClient],

@@ -4,6 +4,12 @@ import type { CommonResponse } from "@/src/api/types";
 import type { RecommendCriteria, RecommendResponse } from "./types";
 
 /**
+ * AI 추천 응답이 오래 걸리는 편이라 클라이언트 전역 timeout(10s) 대신
+ * 이 요청만 넉넉히 잡는다.
+ */
+const RECOMMEND_TIMEOUT_MS = 90_000;
+
+/**
  * POST /api/recommend/courses
  * - 사용자가 "일정 생성" / "다시받기"를 눌렀을 때만 호출한다.
  * - CommonResponse.data 가 null 이면 서버 오류로 취급하고 message 를 throw.
@@ -18,6 +24,7 @@ export async function recommendCourses(
   const res = await api.post<CommonResponse<RecommendResponse>>(
     "/api/recommend/courses",
     criteria,
+    { timeout: RECOMMEND_TIMEOUT_MS },
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;

@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
+import { describeRecommendError } from "@/src/features/course/errors";
 import {
   formatFare,
   formatIsoToHhmm,
@@ -54,7 +55,7 @@ export default function ResultScreen() {
     [baseCriteria, page],
   );
 
-  const { data, isLoading, isError, refetch } = useRecommendCourses(criteria);
+  const { data, error, isLoading, isError, refetch } = useRecommendCourses(criteria);
   const prefetchNext = usePrefetchNextRecommendPage();
 
   // 응답이 오면 다음 page 를 백그라운드에서 미리 가져와둔다.
@@ -110,7 +111,10 @@ export default function ResultScreen() {
           <ActivityIndicator color="#111827" />
         </View>
       ) : isError || !data ? (
-        <ErrorView onRetry={() => refetch()} />
+        <ErrorView
+          message={describeRecommendError(error)}
+          onRetry={() => refetch()}
+        />
       ) : (
         <>
           <ScrollView
@@ -225,7 +229,13 @@ export default function ResultScreen() {
   );
 }
 
-function ErrorView({ onRetry }: { onRetry: () => void }) {
+function ErrorView({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
   return (
     <View className="flex-1 items-center justify-center px-6">
       <Text
@@ -233,6 +243,16 @@ function ErrorView({ onRetry }: { onRetry: () => void }) {
         style={{ fontSize: moderateScale(16) }}
       >
         추천을 불러오지 못했어요
+      </Text>
+      <Text
+        className="text-gray-500 text-center"
+        style={{
+          fontSize: moderateScale(13),
+          marginTop: verticalScale(6),
+        }}
+        selectable
+      >
+        {message}
       </Text>
       <Pressable
         onPress={onRetry}

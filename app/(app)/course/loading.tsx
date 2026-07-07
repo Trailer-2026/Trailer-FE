@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/src/components/Text";
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
 import { StepHeader } from "@/src/features/course/components/StepHeader";
+import { describeRecommendError } from "@/src/features/course/errors";
 import { useRecommendCourses } from "@/src/features/course/queries";
 import { buildRecommendCriteria, useCourseStore } from "@/src/features/course/store";
 
@@ -23,7 +24,7 @@ export default function LoadingScreen() {
     }
   }, []);
 
-  const { data, isError, refetch, isFetching } = useRecommendCourses(criteria);
+  const { data, error, isError, refetch, isFetching } = useRecommendCourses(criteria);
 
   // 프로그레스는 순수 시각 효과. 데이터 도착 여부와 별개로 진행.
   useEffect(() => {
@@ -54,6 +55,12 @@ export default function LoadingScreen() {
           <>
             <Text className="text-base font-semibold text-gray-900">
               추천을 불러오지 못했어요
+            </Text>
+            <Text
+              className="mt-2 text-sm text-gray-500 text-center"
+              selectable
+            >
+              {describeRecommendError(error)}
             </Text>
             <Pressable
               onPress={() => refetch()}
