@@ -1,6 +1,11 @@
 import { create } from "zustand";
 
+import type { StationResponse } from "@/src/features/station/types";
+
 export type PassengerKey = "adult" | "teen" | "child";
+
+/** course 스토어에서 다루는 역 선택값. 미선택 상태를 표현하기 위해 null 을 허용한다. */
+export type SelectedStation = Pick<StationResponse, "station_idx" | "station_name">;
 
 export const TRAVEL_STYLES = [
   "#자연힐링",
@@ -12,8 +17,8 @@ export const TRAVEL_STYLES = [
 export type TravelStyle = (typeof TRAVEL_STYLES)[number];
 
 type CourseState = {
-  origin: string;
-  destination: string;
+  origin: SelectedStation | null;
+  destination: SelectedStation | null;
   roundTrip: boolean;
   departDate: Date;
   returnDate: Date;
@@ -22,8 +27,8 @@ type CourseState = {
 };
 
 type CourseActions = {
-  setOrigin: (v: string) => void;
-  setDestination: (v: string) => void;
+  setOrigin: (v: SelectedStation | null) => void;
+  setDestination: (v: SelectedStation | null) => void;
   swapOriginDestination: () => void;
   setRoundTrip: (v: boolean) => void;
   setDepartDate: (v: Date) => void;
@@ -38,8 +43,8 @@ const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
 const initialState: CourseState = {
-  origin: "서울",
-  destination: "부산",
+  origin: null,
+  destination: null,
   roundTrip: true,
   departDate: today,
   returnDate: tomorrow,

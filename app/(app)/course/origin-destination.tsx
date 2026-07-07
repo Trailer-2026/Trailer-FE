@@ -7,10 +7,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/src/components/Text";
 import { DatePickerModal } from "@/src/features/course/components/DatePickerModal";
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
+import { StationPickerModal } from "@/src/features/course/components/StationPickerModal";
 import { StepDots } from "@/src/features/course/components/StepDots";
 import { StepHeader } from "@/src/features/course/components/StepHeader";
 import { addMonths, formatKoreanDate, startOfDay } from "@/src/features/course/date";
-import { useCourseStore } from "@/src/features/course/store";
+import { useCourseStore, type SelectedStation } from "@/src/features/course/store";
+
+type StationTarget = "origin" | "destination";
 
 export default function OriginDestinationScreen() {
   const origin = useCourseStore((s) => s.origin);
@@ -18,6 +21,8 @@ export default function OriginDestinationScreen() {
   const roundTrip = useCourseStore((s) => s.roundTrip);
   const departDate = useCourseStore((s) => s.departDate);
   const returnDate = useCourseStore((s) => s.returnDate);
+  const setOrigin = useCourseStore((s) => s.setOrigin);
+  const setDestination = useCourseStore((s) => s.setDestination);
   const swap = useCourseStore((s) => s.swapOriginDestination);
   const setRoundTrip = useCourseStore((s) => s.setRoundTrip);
   const setDepartDate = useCourseStore((s) => s.setDepartDate);
@@ -26,9 +31,17 @@ export default function OriginDestinationScreen() {
   const [datePickerFor, setDatePickerFor] = useState<"depart" | "return" | null>(
     null,
   );
+  const [stationPickerFor, setStationPickerFor] = useState<StationTarget | null>(
+    null,
+  );
 
   const today = startOfDay(new Date());
   const maxDate = addMonths(today, 1); // 오늘 기준 한 달까지 선택 가능
+
+  const canProceed = !!origin && !!destination;
+
+  const activeStation = stationPickerFor === "origin" ? origin : destination;
+  const otherStation = stationPickerFor === "origin" ? destination : origin;
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
@@ -57,7 +70,11 @@ export default function OriginDestinationScreen() {
 
         <View className="mt-6 bg-gray-100 rounded-2xl p-5">
           <Text className="text-sm font-medium text-gray-500 mb-2">출발지</Text>
-          <LocationSelect value={origin} />
+          <LocationSelect
+            value={origin?.station_name ?? null}
+            placeholder="출발지 선택"
+            onPress={() => setStationPickerFor("origin")}
+          />
 
           <View className="items-center my-3">
             <Pressable
@@ -69,7 +86,11 @@ export default function OriginDestinationScreen() {
           </View>
 
           <Text className="text-sm font-medium text-gray-500 mb-2">도착지</Text>
-          <LocationSelect value={destination} />
+          <LocationSelect
+            value={destination?.station_name ?? null}
+            placeholder="도착지 선택"
+            onPress={() => setStationPickerFor("destination")}
+          />
         </View>
 
         <View className="mt-8">
@@ -95,6 +116,7 @@ export default function OriginDestinationScreen() {
         <PrimaryButton
           label="다음"
           onPress={() => router.push("/course/passengers")}
+          disabled={!canProceed}
         />
       </View>
 
@@ -115,14 +137,45 @@ export default function OriginDestinationScreen() {
           }
         }}
       />
+
+      <StationPickerModal
+        visible={stationPickerFor !== null}
+        title={stationPickerFor === "destination" ? "도착지" : "출발지"}
+        selectedIdx={activeStation?.station_idx ?? null}
+        excludeIdx={otherStation?.station_idx ?? null}
+        onClose={() => setStationPickerFor(null)}
+        onSelect={(s: SelectedStation) => {
+          if (stationPickerFor === "destination") setDestination(s);
+          else setOrigin(s);
+        }}
+      />
     </SafeAreaView>
   );
 }
 
-function LocationSelect({ value }: { value: string }) {
+function LocationSelect({
+  value,
+  placeholder,
+  onPress,
+}: {
+  value: string | null;
+  placeholder: string;
+  onPress: () => void;
+}) {
   return (
-    <Pressable className="bg-white border border-gray-200 rounded-xl px-4 h-14 flex-row items-center justify-between">
-      <Text className="text-lg font-semibold text-gray-900">{value}</Text>
+    <Pressable
+      onPress={onPress}
+      className="bg-white border border-gray-200 rounded-xl px-4 h-14 flex-row items-center justify-between"
+    >
+      <Text
+        className={
+          value
+            ? "text-lg font-semibold text-gray-900"
+            : "text-lg font-semibold text-gray-400"
+        }
+      >
+        {value ?? placeholder}
+      </Text>
       <Feather name="chevron-down" size={20} color="#4B5563" />
     </Pressable>
   );
