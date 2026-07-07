@@ -1,5 +1,6 @@
 import { api } from "@/src/api/client";
-import type { CommonResponse, TokenResponse, UserProfile } from "./types";
+import type { CommonResponse } from "@/src/api/types";
+import type { TokenResponse, UserProfile } from "./types";
 
 const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK_AUTH === "true";
 

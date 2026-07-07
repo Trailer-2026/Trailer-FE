@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import 'react-native-reanimated';
 import "../global.css";
 
+import { queryClient } from "@/src/api/query-client";
 import { useAuthStore } from "@/src/features/auth/store";
 import {
   setupForegroundHandler,
@@ -14,6 +15,7 @@ import {
 import { setupTokenRefresh } from "@/src/features/notification/fcm";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 // 앱이 켜질 때 스플래시 스크린을 유지하고, 소셜 로그인 SDK를 초기화합니다.
 SplashScreen.preventAutoHideAsync();
@@ -65,7 +67,7 @@ export default function RootLayout() {
   if (isBootstrapping || !fontsLoaded) return null;
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!isAuthenticated}>
           <Stack.Screen name="(onboarding)" />
@@ -76,6 +78,6 @@ export default function RootLayout() {
         </Stack.Protected>
       </Stack>
       <StatusBar style="auto" />
-    </>
+    </QueryClientProvider>
   );
 }
