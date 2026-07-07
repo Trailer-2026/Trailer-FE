@@ -66,9 +66,15 @@ export default function StylesScreen() {
 
       <View className="px-5 pb-4">
         <StepDots total={3} index={2} />
+        {styles.length === 0 ? (
+          <Text className="text-center text-sm text-gray-500 mb-2">
+            여행스타일을 1개 이상 선택해주세요
+          </Text>
+        ) : null}
         <PrimaryButton
-          label="다음"
+          label="일정 생성"
           onPress={() => router.push("/course/loading")}
+          disabled={styles.length === 0}
         />
       </View>
     </SafeAreaView>
