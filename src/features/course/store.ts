@@ -9,32 +9,21 @@ export type PassengerKey = "adult" | "teen" | "child";
 /** course 스토어에서 다루는 역 선택값. 미선택 상태를 표현하기 위해 null 을 허용한다. */
 export type SelectedStation = Pick<StationResponse, "station_idx" | "station_name">;
 
-export const TRAVEL_STYLES = [
-  "#자연힐링",
-  "#도시탐방",
-  "#액티비티",
-  "#문화예술",
-] as const;
-
-export type TravelStyle = (typeof TRAVEL_STYLES)[number];
-
 /**
- * UI 태그 → 서버 Theme enum 매핑.
+ * 여행스타일 픽커에서 보여줄 카드 목록.
+ * label 은 UI 표기, theme 는 그대로 서버에 보낼 enum 값.
  * 서버 enum: NATURE/OCEAN/HISTORY/CITY/HEALING/FOOD/CULTURE/THEME_PARK
- * TODO(design): 액티비티 태그는 확정된 enum 이 없어 임시로 THEME_PARK 로 보냄. 기획 확정 시 조정.
  */
-export function mapStyleToTheme(style: TravelStyle): Theme {
-  switch (style) {
-    case "#자연힐링":
-      return "HEALING";
-    case "#도시탐방":
-      return "CITY";
-    case "#문화예술":
-      return "CULTURE";
-    case "#액티비티":
-      return "THEME_PARK";
-  }
-}
+export const TRAVEL_STYLES: readonly { theme: Theme; label: string }[] = [
+  { theme: "NATURE", label: "산 · 자연" },
+  { theme: "OCEAN", label: "바다 · 해안" },
+  { theme: "HISTORY", label: "역사 · 유적" },
+  { theme: "CITY", label: "도시 · 쇼핑" },
+  { theme: "HEALING", label: "힐링 · 온천" },
+  { theme: "FOOD", label: "맛집 탐방" },
+  { theme: "CULTURE", label: "문화 · 예술" },
+  { theme: "THEME_PARK", label: "테마파크" },
+];
 
 /** Date → "YYYYMMDD". 서버 go_date / back_date 포맷. */
 export function toYyyymmdd(d: Date): string {
@@ -51,7 +40,7 @@ type CourseState = {
   departDate: Date;
   returnDate: Date;
   passengers: Record<PassengerKey, number>;
-  styles: TravelStyle[];
+  styles: Theme[];
 };
 
 type CourseActions = {
@@ -62,7 +51,7 @@ type CourseActions = {
   setDepartDate: (v: Date) => void;
   setReturnDate: (v: Date) => void;
   setPassenger: (key: PassengerKey, delta: number) => void;
-  toggleStyle: (style: TravelStyle) => void;
+  toggleStyle: (theme: Theme) => void;
   reset: () => void;
 };
 
@@ -99,11 +88,11 @@ export const useCourseStore = create<CourseState & CourseActions>((set) => ({
       return { passengers: { ...s.passengers, [key]: next } };
     }),
 
-  toggleStyle: (style) =>
+  toggleStyle: (theme) =>
     set((s) => ({
-      styles: s.styles.includes(style)
-        ? s.styles.filter((x) => x !== style)
-        : [...s.styles, style],
+      styles: s.styles.includes(theme)
+        ? s.styles.filter((x) => x !== theme)
+        : [...s.styles, theme],
     })),
 
   reset: () => set(initialState),
@@ -139,7 +128,7 @@ export function buildRecommendCriteria(
       youth: state.passengers.teen,
       child: state.passengers.child,
     },
-    themes: state.styles.map(mapStyleToTheme),
+    themes: state.styles,
     max_travel_minutes: null,
     via_station_idx: null,
     use_naeilpass: false,

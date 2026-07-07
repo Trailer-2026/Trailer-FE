@@ -1,14 +1,12 @@
 import { router } from "expo-router";
-import { Pressable, View } from "react-native";
-import { Text } from "@/src/components/Text";
+import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Text } from "@/src/components/Text";
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
 import { StepDots } from "@/src/features/course/components/StepDots";
 import { StepHeader } from "@/src/features/course/components/StepHeader";
 import { TRAVEL_STYLES, useCourseStore } from "@/src/features/course/store";
-
-const GRID_SLOTS = 6;
 
 export default function StylesScreen() {
   const styles = useCourseStore((s) => s.styles);
@@ -26,42 +24,45 @@ export default function StylesScreen() {
           다중 선택이 가능해요
         </Text>
 
-        <View className="mt-6 flex-row flex-wrap -mx-1.5">
-          {Array.from({ length: GRID_SLOTS }).map((_, i) => {
-            const value = TRAVEL_STYLES[i];
-            const selected = value ? styles.includes(value) : false;
-            return (
-              <View key={i} className="w-1/2 px-1.5 mb-4">
-                <Pressable
-                  disabled={!value}
-                  onPress={() => value && toggleStyle(value)}
-                  className={`h-36 rounded-2xl items-center justify-center border ${
-                    selected
-                      ? "border-gray-800 bg-gray-100"
-                      : "border-gray-200 bg-white"
-                  }`}
-                  style={{
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: selected ? 0.1 : 0.05,
-                    shadowRadius: 6,
-                    elevation: selected ? 3 : 1,
-                  }}
-                >
-                  {value ? (
+        {/* 8개 카드 4행. 화면이 작은 기기에서 잘리지 않도록 ScrollView 로 감싼다. */}
+        <ScrollView
+          className="mt-6"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 8 }}
+        >
+          <View className="flex-row flex-wrap -mx-1.5">
+            {TRAVEL_STYLES.map(({ theme, label }) => {
+              const selected = styles.includes(theme);
+              return (
+                <View key={theme} className="w-1/2 px-1.5 mb-4">
+                  <Pressable
+                    onPress={() => toggleStyle(theme)}
+                    className={`h-28 rounded-2xl items-center justify-center border ${
+                      selected
+                        ? "border-gray-800 bg-gray-100"
+                        : "border-gray-200 bg-white"
+                    }`}
+                    style={{
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: selected ? 0.1 : 0.05,
+                      shadowRadius: 6,
+                      elevation: selected ? 3 : 1,
+                    }}
+                  >
                     <Text
                       className={`text-base font-semibold ${
                         selected ? "text-gray-900" : "text-gray-600"
                       }`}
                     >
-                      {value}
+                      {label}
                     </Text>
-                  ) : null}
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
 
       <View className="px-5 pb-4">
