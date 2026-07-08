@@ -3,11 +3,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import { useState, type ComponentType } from "react";
 import {
+  ActivityIndicator,
   Image,
   ImageBackground,
   Pressable,
   ScrollView,
-  Switch,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,6 +18,15 @@ import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
 import SubwayIcon from "@/src/components/icons/SubwayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import {
+  formatTravelPeriod,
+  travelStatusLabel,
+} from "@/src/features/travel/format";
+import { useCurrentTravel } from "@/src/features/travel/queries";
+import type {
+  HomeTravelCard,
+  TravelStatus,
+} from "@/src/features/travel/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // Figma 내보내기 아이콘 에셋 (Metro 는 대소문자 구분 — 실제 파일명 케이스와 정확히 일치시킬 것)
@@ -53,13 +62,6 @@ const FEED_CARDS = [
   { id: "3", caption: "여수 밤바다 즐기기" },
 ];
 
-// 내 여행(승차권 보유 시 1개만 노출) — 그라데이션 카드
-const MY_TRIP = {
-  title: "부산 여행",
-  status: "여행중",
-  period: "07.03(토) ~ 07.05(월)",
-};
-
 // 안드로이드 카드 입체감용 공통 스타일 (NativeWind shadow-* 가 흐릿하게 보이는 문제 보완)
 const CARD_ELEVATION = {
   elevation: 4,
@@ -67,13 +69,10 @@ const CARD_ELEVATION = {
 } as const;
 
 export default function HomeScreen() {
-  // Zustand 연동 전, 로컬 상태로 티켓 보유 여부 분기
-  const [hasTicket, setHasTicket] = useState(false);
+  const { data: currentTravel, isLoading } = useCurrentTravel();
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      <DebugToggle value={hasTicket} onChange={setHasTicket} />
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: verticalScale(32) }}
@@ -81,7 +80,13 @@ export default function HomeScreen() {
         <Header />
 
         <View style={{ marginTop: verticalScale(8) }}>
-          {hasTicket ? <TicketHero /> : <PromoHero />}
+          {isLoading ? (
+            <HeroPlaceholder />
+          ) : currentTravel ? (
+            <CurrentTravelHero travel={currentTravel} />
+          ) : (
+            <PromoHero />
+          )}
         </View>
 
         <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(24) }}>
@@ -97,35 +102,9 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* 승차권 보유 시: 하단 탭바 위에 떠 있는 내 여행 카드 (피드 위로 겹침) */}
-      {hasTicket ? <MyTripCard /> : null}
+      {/* 진행중·예정 여행이 있으면 하단 탭바 위에 떠 있는 요약 카드 */}
+      {currentTravel ? <CurrentTravelFloatingCard travel={currentTravel} /> : null}
     </SafeAreaView>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* 임시 디버그 토글 (티켓 없음 ↔ 티켓 있음)                            */
-/* ------------------------------------------------------------------ */
-function DebugToggle({
-  value,
-  onChange,
-}: {
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <View
-      className="flex-row items-center justify-between bg-yellow-50 border-b border-yellow-200"
-      style={{
-        paddingHorizontal: scale(20),
-        paddingVertical: verticalScale(6),
-      }}
-    >
-      <Text className="text-gray-600" style={{ fontSize: moderateScale(12) }}>
-        [임시] 티켓 상태: {value ? "있음" : "없음"}
-      </Text>
-      <Switch value={value} onValueChange={onChange} />
-    </View>
   );
 }
 
@@ -164,7 +143,21 @@ function Header() {
 }
 
 /* ------------------------------------------------------------------ */
-/* State A: 티켓 없음 — 프로모션 히어로                                 */
+/* 로딩 중 히어로 자리 (스켈레톤)                                       */
+/* ------------------------------------------------------------------ */
+function HeroPlaceholder() {
+  return (
+    <View
+      className="items-center justify-center bg-gray-100"
+      style={{ height: verticalScale(198) }}
+    >
+      <ActivityIndicator color="#9CA3AF" />
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* State A: 여행 없음 — 프로모션 히어로                                 */
 /* ------------------------------------------------------------------ */
 function PromoHero() {
   return (
@@ -325,108 +318,127 @@ function PromoHero() {
 }
 
 /* ------------------------------------------------------------------ */
-/* State B: 티켓 있음 — 예약 승차권 카드                                */
+/* State B: 여행 있음 — 현재 여행 히어로                                 */
+/*   title, 기간, status 배지, cover_image_url (없으면 placeholder)     */
 /* ------------------------------------------------------------------ */
-function TicketHero() {
+function CurrentTravelHero({ travel }: { travel: HomeTravelCard }) {
   return (
-    <View style={{ height: verticalScale(227), paddingHorizontal: scale(20) }}>
-      <Text
-        className="text-gray-900 font-bold"
-        style={{ fontSize: moderateScale(15), marginBottom: verticalScale(12) }}
+    <Pressable
+      onPress={() => {
+        // TODO(travel-detail): travel_idx 로 상세 화면 이동 (다음 범위).
+      }}
+    >
+      <TravelCoverImage
+        uri={travel.cover_image_url}
+        style={{ height: verticalScale(198), ...CARD_ELEVATION }}
       >
-        승차권 2매가 예약되었어요.
-      </Text>
-
-      <View style={{ flex: 1 }}>
-        <View
-          className="bg-white overflow-hidden"
-          style={{ flex: 1, borderRadius: scale(16), ...CARD_ELEVATION }}
-        >
-        {/* 상단 민트 바 */}
+        {/* 어둡게 오버레이 — 텍스트 가독성 */}
         <View
           style={{
-            backgroundColor: "#81E4D0",
-            paddingHorizontal: scale(14),
-            paddingVertical: verticalScale(8),
+            ...StyleSheetAbsolute,
+            backgroundColor: "rgba(0,0,0,0.35)",
           }}
-        >
-          <Text
-            className="text-white font-semibold"
-            style={{ fontSize: moderateScale(12) }}
-          >
-            내일로 2.0 선택 3일권 YOUTH
-          </Text>
-        </View>
-
-        {/* 본문: 출발 → 도착 (카드 잔여 높이 채움) */}
+        />
         <View
-          className="flex-row items-center justify-center"
           style={{
-            flex: 1,
-            gap: scale(18),
+            position: "absolute",
+            left: scale(20),
+            right: scale(20),
+            bottom: verticalScale(18),
           }}
         >
-          <View className="items-center">
-            <Text
-              className="text-gray-400"
-              style={{ fontSize: moderateScale(11) }}
-            >
-              출발
-            </Text>
-            <Text
-              className="text-gray-900 font-bold"
-              style={{ fontSize: moderateScale(24), marginTop: verticalScale(2) }}
-            >
-              서울
-            </Text>
-          </View>
-
-          <MaterialCommunityIcons
-            name="arrow-right"
-            size={moderateScale(30)}
-            color="#5E84F4"
-          />
-
-          <View className="items-center">
-            <Text
-              className="text-gray-400"
-              style={{ fontSize: moderateScale(11) }}
-            >
-              도착
-            </Text>
-            <Text
-              className="text-gray-900 font-bold"
-              style={{ fontSize: moderateScale(24), marginTop: verticalScale(2) }}
-            >
-              부산
-            </Text>
-          </View>
-        </View>
-      </View>
-
-        {/* 카드 우측 상단 코너에 겹쳐진 배지 (35 x 35) */}
-        <View
-          className="absolute items-center justify-center"
-          style={{
-            top: -verticalScale(14),
-            right: -scale(10),
-            width: scale(35),
-            height: scale(35),
-            borderRadius: scale(35) / 2,
-            backgroundColor: "#5E84F4",
-            borderWidth: scale(2),
-            borderColor: "#FFFFFF",
-            ...CARD_ELEVATION,
-          }}
-        >
+          <StatusBadge status={travel.status} />
           <Text
             className="text-white font-bold"
-            style={{ fontSize: moderateScale(14) }}
+            style={{
+              fontSize: moderateScale(20),
+              marginTop: verticalScale(8),
+            }}
+            numberOfLines={2}
           >
-            2
+            {travel.title}
+          </Text>
+          <Text
+            className="text-white"
+            style={{
+              fontSize: moderateScale(13),
+              marginTop: verticalScale(4),
+              opacity: 0.9,
+            }}
+          >
+            {formatTravelPeriod(travel.start_date, travel.end_date)}
           </Text>
         </View>
-      </View>
+      </TravelCoverImage>
+    </Pressable>
+  );
+}
+
+const StyleSheetAbsolute = {
+  position: "absolute" as const,
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+};
+
+/** cover_image_url 이 있으면 원격 이미지, 없거나 로드 실패 시 Main.png 배경. */
+function TravelCoverImage({
+  uri,
+  style,
+  children,
+}: {
+  uri: string | null;
+  style: object;
+  children?: React.ReactNode;
+}) {
+  const [failed, setFailed] = useState(false);
+  const useRemote = !!uri && !failed;
+  return (
+    <View className="overflow-hidden" style={style}>
+      {useRemote ? (
+        <ImageBackground
+          source={{ uri: uri! }}
+          resizeMode="cover"
+          style={{ flex: 1 }}
+          onError={() => setFailed(true)}
+        >
+          {children}
+        </ImageBackground>
+      ) : (
+        <ImageBackground
+          source={ICONS.main}
+          resizeMode="cover"
+          style={{ flex: 1 }}
+        >
+          {children}
+        </ImageBackground>
+      )}
+    </View>
+  );
+}
+
+function StatusBadge({ status }: { status: TravelStatus }) {
+  const bg: Record<TravelStatus, string> = {
+    PLANNED: "#5E84F4",
+    ONGOING: "#22C55E",
+    COMPLETED: "#6B7280",
+  };
+  return (
+    <View
+      className="self-start rounded-full"
+      style={{
+        backgroundColor: bg[status],
+        paddingHorizontal: scale(10),
+        paddingVertical: verticalScale(3),
+      }}
+    >
+      <Text
+        className="text-white font-semibold"
+        style={{ fontSize: moderateScale(11) }}
+      >
+        {travelStatusLabel(status)}
+      </Text>
     </View>
   );
 }
@@ -579,9 +591,9 @@ function FeedCard({ caption }: { caption: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 내 여행 카드 (승차권 보유 시 1개만) — 그라데이션 320 x 77            */
+/* 현재 여행 요약 카드 (하단 플로팅, 320 x 77) — 그라데이션              */
 /* ------------------------------------------------------------------ */
-function MyTripCard() {
+function CurrentTravelFloatingCard({ travel }: { travel: HomeTravelCard }) {
   return (
     <View
       style={{
@@ -593,45 +605,62 @@ function MyTripCard() {
         zIndex: 20,
       }}
     >
-      <LinearGradient
-        colors={["#668DFF", "#81D0E4"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{
-          height: verticalScale(77),
-          flexDirection: "row",
-          alignItems: "center",
-          borderRadius: scale(16),
-          paddingHorizontal: scale(14),
-          gap: scale(12),
-          elevation: 8,
-          shadowColor: "#000",
+      <Pressable
+        onPress={() => {
+          // TODO(travel-detail): travel_idx 로 상세 화면 이동 (다음 범위).
         }}
       >
-        <View
-          className="bg-white rounded-full"
-          style={{ width: scale(48), height: scale(48) }}
-        />
-        <View className="flex-1">
-          <Text
-            className="text-white font-medium"
-            style={{ fontSize: moderateScale(17) }}
+        <LinearGradient
+          colors={["#668DFF", "#81D0E4"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{
+            height: verticalScale(77),
+            flexDirection: "row",
+            alignItems: "center",
+            borderRadius: scale(16),
+            paddingHorizontal: scale(14),
+            gap: scale(12),
+            elevation: 8,
+            shadowColor: "#000",
+          }}
+        >
+          <View
+            className="bg-white rounded-full overflow-hidden"
+            style={{ width: scale(48), height: scale(48) }}
           >
-            {MY_TRIP.title}
-          </Text>
-          <Text
-            className="text-white"
-            style={{ fontSize: moderateScale(14), marginTop: verticalScale(2) }}
-          >
-            {MY_TRIP.status} | {MY_TRIP.period}
-          </Text>
-        </View>
-        <MaterialCommunityIcons
-          name="calendar-blank-outline"
-          size={moderateScale(22)}
-          color="#FFFFFF"
-        />
-      </LinearGradient>
+            {travel.cover_image_url ? (
+              <Image
+                source={{ uri: travel.cover_image_url }}
+                resizeMode="cover"
+                style={{ width: "100%", height: "100%" }}
+              />
+            ) : null}
+          </View>
+          <View className="flex-1">
+            <Text
+              className="text-white font-medium"
+              numberOfLines={1}
+              style={{ fontSize: moderateScale(17) }}
+            >
+              {travel.title}
+            </Text>
+            <Text
+              className="text-white"
+              numberOfLines={1}
+              style={{ fontSize: moderateScale(14), marginTop: verticalScale(2) }}
+            >
+              {travelStatusLabel(travel.status)} |{" "}
+              {formatTravelPeriod(travel.start_date, travel.end_date)}
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name="calendar-blank-outline"
+            size={moderateScale(22)}
+            color="#FFFFFF"
+          />
+        </LinearGradient>
+      </Pressable>
     </View>
   );
 }
