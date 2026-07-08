@@ -1,8 +1,10 @@
 import Feather from "@expo/vector-icons/Feather";
+import { isAxiosError } from "axios";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -31,6 +33,7 @@ import {
   type PlaceInfo,
   type Segment,
 } from "@/src/features/course/types";
+import { useCreateTravel } from "@/src/features/travel/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // http:// 이미지가 안드로이드 cleartext 로 막히거나 서버가 null 로 줄 때의 대체 이미지.
@@ -57,6 +60,7 @@ export default function ResultScreen() {
 
   const { data, error, isLoading, isError, refetch } = useRecommendCourses(criteria);
   const prefetchNext = usePrefetchNextRecommendPage();
+  const createTravel = useCreateTravel();
 
   // 응답이 오면 다음 page 를 백그라운드에서 미리 가져와둔다.
   useEffect(() => {
@@ -215,12 +219,35 @@ export default function ResultScreen() {
               </Text>
             </Pressable>
             <PrimaryButton
-              label="이 일정 선택하기"
+              label={createTravel.isPending ? "저장 중…" : "이 일정 선택하기"}
               onPress={() => {
-                // TODO(TRA-29 후속): 선택한 일정을 내 일정 스토어/서버에 저장.
-                // 이번 범위는 UI 배치만.
+                if (!activeItin) return;
+                createTravel.mutate(activeItin.plan_id, {
+                  onSuccess: () => {
+                    // 저장 완료 → 홈으로. 홈 카드는 mutation 이 invalidate 로 갱신.
+                    router.replace("/");
+                  },
+                  onError: (err) => {
+                    // 400: plan_id 캐시 만료. 다시 추천받기 유도.
+                    if (isAxiosError(err) && err.response?.status === 400) {
+                      Alert.alert(
+                        "추천이 만료됐어요",
+                        "다시 추천받아 주세요.",
+                        [
+                          { text: "취소", style: "cancel" },
+                          {
+                            text: "다시 추천받기",
+                            onPress: () => refetch(),
+                          },
+                        ],
+                      );
+                      return;
+                    }
+                    Alert.alert("저장 실패", describeRecommendError(err));
+                  },
+                });
               }}
-              disabled={!activeItin}
+              disabled={!activeItin || createTravel.isPending}
             />
           </View>
         </>
