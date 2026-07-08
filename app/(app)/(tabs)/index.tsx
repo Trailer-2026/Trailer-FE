@@ -654,10 +654,10 @@ function CurrentTravelFloatingCard({ travel }: { travel: HomeTravelCard }) {
               {formatTravelPeriod(travel.start_date, travel.end_date)}
             </Text>
           </View>
-          <MaterialCommunityIcons
-            name="calendar-blank-outline"
-            size={moderateScale(22)}
+          <CalendarGridIcon
             color="#FFFFFF"
+            width={moderateScale(22)}
+            height={moderateScale(22)}
           />
         </LinearGradient>
       </Pressable>
