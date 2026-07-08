@@ -56,6 +56,8 @@ export type TrainInfo = {
   arr_time: string;
   duration_minutes: number;
   fare: number;
+  stop_station_count: number;
+  stop_stations: string[];
 };
 
 export type PlaceInfo = {
@@ -96,6 +98,12 @@ export type Segment = {
 };
 
 export type Itinerary = {
+  /** 저장 요청(POST /api/travels) 시 서버에 보내는 캐시 키. 응답 시점에 서버가 발급. */
+  plan_id: string;
+  plan_label: string;
+  title: string;
+  main_themes: string[];
+  cover_image_url: string | null;
   label: string;
   route_type: string;
   via_station_idx: number | null;
