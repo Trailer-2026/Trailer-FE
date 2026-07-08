@@ -1,3 +1,4 @@
+import Feather from "@expo/vector-icons/Feather";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
@@ -18,6 +19,9 @@ import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
 import SubwayIcon from "@/src/components/icons/SubwayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import type { Theme } from "@/src/features/course/types";
+import { useThemedPlaces } from "@/src/features/place/queries";
+import type { ThemePlaceCard } from "@/src/features/place/types";
 import {
   formatTravelPeriod,
   travelStatusLabel,
@@ -99,6 +103,10 @@ export default function HomeScreen() {
 
         <View style={{ marginTop: verticalScale(14) }}>
           <FeedCarousel />
+        </View>
+
+        <View style={{ marginTop: verticalScale(28) }}>
+          <ThemedPlacesSection />
         </View>
       </ScrollView>
 
@@ -662,5 +670,302 @@ function CurrentTravelFloatingCard({ travel }: { travel: HomeTravelCard }) {
         </LinearGradient>
       </Pressable>
     </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 테마별 여행지 섹션 (GET /api/places/themed)                          */
+/* ------------------------------------------------------------------ */
+
+// 응답의 theme 를 한글 라벨로. 서버가 새 enum 을 추가하면 여기도 반영.
+const THEME_KO: Record<Theme, string> = {
+  NATURE: "산 · 자연",
+  OCEAN: "바다 · 해안",
+  HISTORY: "역사 · 유적",
+  CITY: "도시 · 쇼핑",
+  HEALING: "힐링 · 온천",
+  FOOD: "맛집 탐방",
+  CULTURE: "문화 · 예술",
+  THEME_PARK: "테마파크",
+};
+
+function ThemedPlacesSection() {
+  // 최초 진입은 NATURE 고정. '다른 테마' 누르면 undefined 로 전환 → 서버 랜덤.
+  const [theme, setTheme] = useState<Theme | undefined>("NATURE");
+  const { data, isLoading, isError, isFetching, refetch } = useThemedPlaces(theme);
+
+  const onPressAnother = () => {
+    // 이미 랜덤 모드면 refetch 로 새 랜덤 결과.
+    // 고정 테마였으면 state 를 undefined 로 바꿔 queryKey 전환.
+    if (theme === undefined) {
+      refetch();
+    } else {
+      setTheme(undefined);
+    }
+  };
+
+  return (
+    <View>
+      {/* 섹션 헤더 */}
+      <View
+        className="flex-row items-center justify-between"
+        style={{ paddingHorizontal: scale(20) }}
+      >
+        <Text
+          className="text-gray-900 font-bold"
+          style={{ fontSize: moderateScale(20) }}
+        >
+          테마별 여행지
+        </Text>
+        <Pressable
+          onPress={onPressAnother}
+          disabled={isFetching}
+          className="flex-row items-center"
+          style={{ gap: scale(4), opacity: isFetching ? 0.5 : 1 }}
+          hitSlop={8}
+        >
+          <Feather
+            name="refresh-cw"
+            size={moderateScale(13)}
+            color="#5E84F4"
+          />
+          <Text
+            className="font-semibold"
+            style={{ fontSize: moderateScale(13), color: "#5E84F4" }}
+          >
+            다른 테마
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* 배너 */}
+      <View
+        style={{ paddingHorizontal: scale(20), marginTop: verticalScale(12) }}
+      >
+        {isLoading ? (
+          <ThemedBannerPlaceholder />
+        ) : isError || !data ? (
+          <ThemedErrorRow onRetry={() => refetch()} />
+        ) : (
+          <ThemedBanner
+            title={data.title}
+            themeLabel={THEME_KO[data.theme]}
+            imageUri={data.banner_image_url}
+          />
+        )}
+      </View>
+
+      {/* 관광지 카드 목록 */}
+      {data && !isLoading && !isError ? (
+        data.places.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: scale(20),
+              gap: scale(12),
+              marginTop: verticalScale(12),
+            }}
+            style={{ marginTop: verticalScale(12) }}
+          >
+            {data.places.map((p, i) => (
+              <ThemedPlaceCard key={`${p.name}-${i}`} place={p} />
+            ))}
+          </ScrollView>
+        ) : (
+          <Text
+            className="text-gray-500"
+            style={{
+              paddingHorizontal: scale(20),
+              marginTop: verticalScale(12),
+              fontSize: moderateScale(13),
+            }}
+          >
+            추천할 관광지가 없어요
+          </Text>
+        )
+      ) : null}
+    </View>
+  );
+}
+
+function ThemedBanner({
+  title,
+  themeLabel,
+  imageUri,
+}: {
+  title: string;
+  themeLabel: string;
+  imageUri: string | null;
+}) {
+  return (
+    <View
+      className="overflow-hidden"
+      style={{
+        height: verticalScale(140),
+        borderRadius: scale(16),
+        ...CARD_ELEVATION,
+      }}
+    >
+      <ThemedRemoteImage
+        uri={imageUri}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.32)",
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            left: scale(16),
+            right: scale(16),
+            bottom: verticalScale(14),
+          }}
+        >
+          <View
+            className="self-start rounded-full"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.9)",
+              paddingHorizontal: scale(10),
+              paddingVertical: verticalScale(3),
+            }}
+          >
+            <Text
+              className="font-semibold"
+              style={{ fontSize: moderateScale(11), color: "#111827" }}
+            >
+              #{themeLabel}
+            </Text>
+          </View>
+          <Text
+            className="text-white font-bold"
+            style={{
+              fontSize: moderateScale(18),
+              marginTop: verticalScale(6),
+            }}
+            numberOfLines={2}
+          >
+            {title}
+          </Text>
+        </View>
+      </ThemedRemoteImage>
+    </View>
+  );
+}
+
+function ThemedBannerPlaceholder() {
+  return (
+    <View
+      className="items-center justify-center bg-gray-100"
+      style={{ height: verticalScale(140), borderRadius: scale(16) }}
+    >
+      <ActivityIndicator color="#9CA3AF" />
+    </View>
+  );
+}
+
+function ThemedErrorRow({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View
+      className="items-center justify-center bg-gray-50"
+      style={{ height: verticalScale(140), borderRadius: scale(16) }}
+    >
+      <Text
+        className="text-gray-500"
+        style={{ fontSize: moderateScale(13) }}
+      >
+        테마별 여행지를 불러오지 못했어요
+      </Text>
+      <Pressable
+        onPress={onRetry}
+        className="mt-3 bg-gray-800 rounded-full"
+        style={{
+          paddingHorizontal: scale(16),
+          paddingVertical: verticalScale(6),
+        }}
+      >
+        <Text
+          className="text-white font-semibold"
+          style={{ fontSize: moderateScale(12) }}
+        >
+          다시 시도
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ThemedPlaceCard({ place }: { place: ThemePlaceCard }) {
+  return (
+    <View
+      className="overflow-hidden bg-white"
+      style={{
+        width: scale(150),
+        borderRadius: scale(14),
+        ...CARD_ELEVATION,
+      }}
+    >
+      <ThemedRemoteImage
+        uri={place.image_url}
+        style={{ width: "100%", height: verticalScale(110) }}
+      />
+      <View style={{ padding: scale(10) }}>
+        <Text
+          className="font-semibold text-gray-900"
+          numberOfLines={1}
+          style={{ fontSize: moderateScale(14) }}
+        >
+          {place.name}
+        </Text>
+        <Text
+          className="text-gray-500"
+          numberOfLines={1}
+          style={{
+            fontSize: moderateScale(12),
+            marginTop: verticalScale(2),
+          }}
+        >
+          {place.region}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * 테마 섹션용 원격 이미지. uri 가 null 이거나 로드 실패 시 Main.png 로 폴백.
+ * (안드로이드 cleartext 는 app.config 에서 이미 허용)
+ */
+function ThemedRemoteImage({
+  uri,
+  style,
+  children,
+}: {
+  uri: string | null;
+  style: object;
+  children?: React.ReactNode;
+}) {
+  const [failed, setFailed] = useState(false);
+  const useRemote = !!uri && !failed;
+  if (useRemote) {
+    return (
+      <ImageBackground
+        source={{ uri: uri! }}
+        resizeMode="cover"
+        style={style}
+        onError={() => setFailed(true)}
+      >
+        {children}
+      </ImageBackground>
+    );
+  }
+  return (
+    <ImageBackground source={ICONS.main} resizeMode="cover" style={style}>
+      {children}
+    </ImageBackground>
   );
 }
