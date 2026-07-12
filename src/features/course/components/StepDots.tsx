@@ -11,8 +11,8 @@ export function StepDots({ total, index }: Props) {
       {Array.from({ length: total }).map((_, i) => (
         <View
           key={i}
-          className={`h-2 rounded-full ${
-            i === index ? "w-5 bg-gray-800" : "w-2 bg-gray-300"
+          className={`h-2 w-2 rounded-full ${
+            i === index ? "bg-gray-800" : "bg-gray-300"
           }`}
         />
       ))}

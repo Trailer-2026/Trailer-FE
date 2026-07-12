@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type { StationResponse } from "@/src/features/station/types";
 
+import { addDays } from "./date";
 import type { RecommendCriteria, Theme } from "./types";
 
 export type PassengerKey = "adult" | "teen" | "child";
@@ -36,9 +37,10 @@ export function toYyyymmdd(d: Date): string {
 type CourseState = {
   origin: SelectedStation | null;
   destination: SelectedStation | null;
-  roundTrip: boolean;
+  viaStation: SelectedStation | null;
   departDate: Date;
-  returnDate: Date;
+  /** 여행 숙박 수. 당일치기=0, 1박2일=1 … 도착일 = departDate + nights. 미선택 시 null. */
+  nights: number | null;
   passengers: Record<PassengerKey, number>;
   styles: Theme[];
 };
@@ -46,10 +48,9 @@ type CourseState = {
 type CourseActions = {
   setOrigin: (v: SelectedStation | null) => void;
   setDestination: (v: SelectedStation | null) => void;
-  swapOriginDestination: () => void;
-  setRoundTrip: (v: boolean) => void;
+  setViaStation: (v: SelectedStation | null) => void;
   setDepartDate: (v: Date) => void;
-  setReturnDate: (v: Date) => void;
+  setNights: (v: number) => void;
   setPassenger: (key: PassengerKey, delta: number) => void;
   toggleStyle: (theme: Theme) => void;
   reset: () => void;
@@ -57,15 +58,14 @@ type CourseActions = {
 
 const now = new Date();
 const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
 const initialState: CourseState = {
   origin: null,
   destination: null,
-  roundTrip: true,
+  viaStation: null,
   departDate: today,
-  returnDate: tomorrow,
-  passengers: { adult: 1, teen: 0, child: 0 },
+  nights: null,
+  passengers: { adult: 0, teen: 0, child: 0 },
   styles: [],
 };
 
@@ -74,17 +74,13 @@ export const useCourseStore = create<CourseState & CourseActions>((set) => ({
 
   setOrigin: (v) => set({ origin: v }),
   setDestination: (v) => set({ destination: v }),
-
-  swapOriginDestination: () =>
-    set((s) => ({ origin: s.destination, destination: s.origin })),
-
-  setRoundTrip: (v) => set({ roundTrip: v }),
+  setViaStation: (v) => set({ viaStation: v }),
   setDepartDate: (v) => set({ departDate: v }),
-  setReturnDate: (v) => set({ returnDate: v }),
+  setNights: (v) => set({ nights: v }),
 
   setPassenger: (key, delta) =>
     set((s) => {
-      const next = Math.max(key === "adult" ? 1 : 0, s.passengers[key] + delta);
+      const next = Math.max(0, s.passengers[key] + delta);
       return { passengers: { ...s.passengers, [key]: next } };
     }),
 
@@ -102,26 +98,28 @@ export const useCourseStore = create<CourseState & CourseActions>((set) => ({
  * 현재 store 상태 → 서버 요청 바디로 조립.
  * - 출발지 미선택 상태에서 호출하면 throw. UI 단계에서 검증하고 부를 것.
  * - 도착지 미선택 시 dest_station_idx = null (AI 자동추천).
- * - 왕복=false 여도 서버 스키마상 back_date 는 필수라 depart 로 채움.
- * - go_time / back_time / max_travel_minutes / via_station_idx 는 아직 UI 미노출 → null.
+ * - 도착일(back_date) = 출발일 + nights (당일치기=0). nights 미선택 시 0(당일) 취급.
+ * - round_trip 은 항상 true(가서 여행 후 돌아오는 왕복 일정).
+ * - go_time / back_time / max_travel_minutes 는 아직 UI 미노출 → null.
  */
 export function buildRecommendCriteria(
   state: Pick<
     CourseState,
-    "origin" | "destination" | "roundTrip" | "departDate" | "returnDate" | "passengers" | "styles"
+    "origin" | "destination" | "viaStation" | "departDate" | "nights" | "passengers" | "styles"
   >,
   page: number,
 ): RecommendCriteria {
   if (!state.origin) {
     throw new Error("출발지가 선택되지 않았습니다.");
   }
+  const nights = state.nights ?? 0;
   return {
     origin_station_idx: state.origin.station_idx,
     dest_station_idx: state.destination?.station_idx ?? null,
-    round_trip: state.roundTrip,
+    round_trip: true,
     go_date: toYyyymmdd(state.departDate),
     go_time: null,
-    back_date: toYyyymmdd(state.roundTrip ? state.returnDate : state.departDate),
+    back_date: toYyyymmdd(addDays(state.departDate, nights)),
     back_time: null,
     party: {
       adult: state.passengers.adult,
@@ -130,7 +128,7 @@ export function buildRecommendCriteria(
     },
     themes: state.styles,
     max_travel_minutes: null,
-    via_station_idx: null,
+    via_station_idx: state.viaStation?.station_idx ?? null,
     use_naeilpass: false,
     page,
   };

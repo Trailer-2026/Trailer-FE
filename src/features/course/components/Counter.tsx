@@ -10,40 +10,50 @@ type Props = {
   onChange: (delta: number) => void;
 };
 
-const BTN = {
-  width: scale(35),
-  height: scale(35),
-  borderRadius: scale(35) / 2,
-  alignItems: "center",
-  justifyContent: "center",
-} as const;
+const SIZE = scale(35);
 
 export function Counter({ value, min = 0, onChange }: Props) {
   const minusDisabled = value <= min;
+  // 1 이상 선택 시 부호·테두리·숫자를 강조색으로.
+  const active = value >= 1;
+  const accent = "#5E84F4";
+  const symbolColor = active ? accent : "#5F5F5F"; // 미선택 부호색
+  const borderColor = active ? accent : "#D1D5DB"; // 미선택 테두리 회색
+
+  const btnStyle = {
+    width: SIZE,
+    height: SIZE,
+    borderRadius: SIZE / 2,
+    borderWidth: moderateScale(1.5),
+    borderColor,
+    alignItems: "center",
+    justifyContent: "center",
+  } as const;
+
   return (
-    <View className="flex-row items-center" style={{ gap: scale(12) }}>
+    <View className="flex-row items-center" style={{ gap: scale(14) }}>
       <Pressable
         onPress={() => !minusDisabled && onChange(-1)}
         disabled={minusDisabled}
         hitSlop={8}
-        style={{ ...BTN, backgroundColor: minusDisabled ? "#C3D2FB" : "#668DFF" }}
+        style={btnStyle}
       >
-        <Feather name="minus" size={moderateScale(18)} color="#FFFFFF" />
+        <Feather name="minus" size={moderateScale(18)} color={symbolColor} />
       </Pressable>
 
       <Text
-        className="font-medium text-gray-900 text-center"
-        style={{ fontSize: moderateScale(20), width: scale(24) }}
+        className="font-semibold text-center"
+        style={{
+          fontSize: moderateScale(20),
+          width: scale(24),
+          color: active ? accent : "#111827",
+        }}
       >
         {value}
       </Text>
 
-      <Pressable
-        onPress={() => onChange(1)}
-        hitSlop={8}
-        style={{ ...BTN, backgroundColor: "#668DFF" }}
-      >
-        <Feather name="plus" size={moderateScale(18)} color="#FFFFFF" />
+      <Pressable onPress={() => onChange(1)} hitSlop={8} style={btnStyle}>
+        <Feather name="plus" size={moderateScale(18)} color={symbolColor} />
       </Pressable>
     </View>
   );

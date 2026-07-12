@@ -38,9 +38,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        // 앱 진입 버퍼링 화면 색.
+        backgroundColor: "#7292EE",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#7292EE",
         },
       },
     ],

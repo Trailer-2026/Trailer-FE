@@ -1,4 +1,3 @@
-import Feather from "@expo/vector-icons/Feather";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
@@ -16,7 +15,7 @@ import type { SvgProps } from "react-native-svg";
 
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
 import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
-import SubwayIcon from "@/src/components/icons/SubwayIcon";
+import ThemeSwapIcon from "@/src/components/icons/ThemeSwapIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
 import type { Theme } from "@/src/features/course/types";
@@ -46,15 +45,19 @@ const TOOLTIP_COLOR = "#5E84F4"; // AI 일정 만들기 말풍선
 type QuickMenuKey = "ticket" | "train" | "compass" | "food";
 type SvgIcon = ComponentType<SvgProps>;
 
+// 열차위치 아이콘 (PNG 에셋). 원본 SVG 가 fill-opacity 0.52 라 동일 적용.
+const TRAIN_LOC_IMG = require("../../../assets/images/main/train-location.png");
+
 const QUICK_MENU: {
   key: QuickMenuKey;
   label: string;
   Svg?: SvgIcon;
+  img?: number;
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   size: number; // Figma px 기준 아이콘 크기
 }[] = [
   { key: "ticket", label: "승차권 예매", Svg: TicketIcon, size: 37 },
-  { key: "train", label: "열차위치", Svg: SubwayIcon, size: 39 },
+  { key: "train", label: "열차위치", img: TRAIN_LOC_IMG, size: 37 },
   { key: "compass", label: "", icon: "compass-outline", size: 26 },
   { key: "food", label: "", icon: "silverware-fork-knife", size: 26 },
 ];
@@ -130,7 +133,7 @@ function Header() {
       }}
     >
       <Text
-        className="font-medium text-gray-900"
+        className="font-bold text-gray-900"
         style={{ fontSize: moderateScale(17) }}
       >
         트레일러
@@ -469,7 +472,17 @@ function QuickMenu() {
                 borderRadius: scale(12),
               }}
             >
-              {Icon ? (
+              {item.img ? (
+                <Image
+                  source={item.img}
+                  resizeMode="contain"
+                  style={{
+                    width: moderateScale(item.size),
+                    height: moderateScale(item.size),
+                    opacity: 0.52,
+                  }}
+                />
+              ) : Icon ? (
                 <Icon
                   width={moderateScale(item.size)}
                   height={moderateScale(item.size)}
@@ -498,7 +511,7 @@ function QuickMenu() {
 
         if (item.key === "ticket") {
           return (
-            <Link key={item.key} href="/course/origin-destination" asChild>
+            <Link key={item.key} href="/course/intro" asChild>
               <Pressable>{tile}</Pressable>
             </Link>
           );
@@ -677,22 +690,13 @@ function CurrentTravelFloatingCard({ travel }: { travel: HomeTravelCard }) {
 /* 테마별 여행지 섹션 (GET /api/places/themed)                          */
 /* ------------------------------------------------------------------ */
 
-// 응답의 theme 를 한글 라벨로. 서버가 새 enum 을 추가하면 여기도 반영.
-const THEME_KO: Record<Theme, string> = {
-  NATURE: "산 · 자연",
-  OCEAN: "바다 · 해안",
-  HISTORY: "역사 · 유적",
-  CITY: "도시 · 쇼핑",
-  HEALING: "힐링 · 온천",
-  FOOD: "맛집 탐방",
-  CULTURE: "문화 · 예술",
-  THEME_PARK: "테마파크",
-};
+// 배너 상단 고정 문구 (title 은 서버 응답을 그대로 노출)
+const THEMED_EYEBROW = "지금 당장 떠나요";
 
 function ThemedPlacesSection() {
   // 최초 진입은 NATURE 고정. '다른 테마' 누르면 undefined 로 전환 → 서버 랜덤.
   const [theme, setTheme] = useState<Theme | undefined>("NATURE");
-  const { data, isLoading, isError, isFetching, refetch } = useThemedPlaces(theme);
+  const { data, isLoading, isFetching, refetch } = useThemedPlaces(theme);
 
   const onPressAnother = () => {
     // 이미 랜덤 모드면 refetch 로 새 랜덤 결과.
@@ -724,10 +728,9 @@ function ThemedPlacesSection() {
           style={{ gap: scale(4), opacity: isFetching ? 0.5 : 1 }}
           hitSlop={8}
         >
-          <Feather
-            name="refresh-cw"
-            size={moderateScale(13)}
-            color="#5E84F4"
+          <ThemeSwapIcon
+            width={moderateScale(20)}
+            height={moderateScale(20)}
           />
           <Text
             className="font-semibold"
@@ -738,130 +741,121 @@ function ThemedPlacesSection() {
         </Pressable>
       </View>
 
-      {/* 배너 */}
-      <View
-        style={{ paddingHorizontal: scale(20), marginTop: verticalScale(12) }}
-      >
-        {isLoading ? (
-          <ThemedBannerPlaceholder />
-        ) : isError || !data ? (
-          <ThemedErrorRow onRetry={() => refetch()} />
-        ) : (
-          <ThemedBanner
+      {/* 본문: 히어로 배너 + 이를 덮는 라운드 시트(관광지 리스트) */}
+      {/* data 우선 — NATURE 는 시드가 있어 항상 즉시 렌더되고, 백그라운드 갱신
+          실패(isError)에도 기존 데이터를 유지한다. 시드 없는 랜덤 테마만
+          로딩/에러 상태를 노출. */}
+      <View style={{ marginTop: verticalScale(12) }}>
+        {data ? (
+          <ThemedPlacesContent
             title={data.title}
-            themeLabel={THEME_KO[data.theme]}
             imageUri={data.banner_image_url}
+            places={data.places}
           />
+        ) : isLoading ? (
+          <ThemedPlacesPlaceholder />
+        ) : (
+          <View style={{ paddingHorizontal: scale(20) }}>
+            <ThemedErrorRow onRetry={() => refetch()} />
+          </View>
         )}
       </View>
-
-      {/* 관광지 카드 목록 */}
-      {data && !isLoading && !isError ? (
-        data.places.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: scale(20),
-              gap: scale(12),
-              marginTop: verticalScale(12),
-            }}
-            style={{ marginTop: verticalScale(12) }}
-          >
-            {data.places.map((p, i) => (
-              <ThemedPlaceCard key={`${p.name}-${i}`} place={p} />
-            ))}
-          </ScrollView>
-        ) : (
-          <Text
-            className="text-gray-500"
-            style={{
-              paddingHorizontal: scale(20),
-              marginTop: verticalScale(12),
-              fontSize: moderateScale(13),
-            }}
-          >
-            추천할 관광지가 없어요
-          </Text>
-        )
-      ) : null}
     </View>
   );
 }
 
-function ThemedBanner({
+/**
+ * 히어로 배너(풀블리드) + 하단을 덮는 흰색 라운드 시트에 관광지 세로 리스트.
+ * 시트가 배너 하단을 살짝 덮어(음수 marginTop) 곡선이 이미지 위로 올라오는 형태.
+ */
+function ThemedPlacesContent({
   title,
-  themeLabel,
   imageUri,
+  places,
 }: {
   title: string;
-  themeLabel: string;
   imageUri: string | null;
+  places: ThemePlaceCard[];
 }) {
   return (
-    <View
-      className="overflow-hidden"
-      style={{
-        height: verticalScale(140),
-        borderRadius: scale(16),
-        ...CARD_ELEVATION,
-      }}
-    >
-      <ThemedRemoteImage
-        uri={imageUri}
-        style={{ width: "100%", height: "100%" }}
-      >
-        <View
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.32)",
-          }}
-        />
-        <View
-          style={{
-            position: "absolute",
-            left: scale(16),
-            right: scale(16),
-            bottom: verticalScale(14),
-          }}
+    <View>
+      {/* 히어로 배너 */}
+      <View style={{ height: verticalScale(200), ...CARD_ELEVATION }}>
+        <ThemedRemoteImage
+          uri={imageUri}
+          style={{ width: "100%", height: "100%" }}
         >
+          {/* 하단 어둡게 — 텍스트 가독성 */}
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.55)"]}
+            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+          />
           <View
-            className="self-start rounded-full"
             style={{
-              backgroundColor: "rgba(255,255,255,0.9)",
-              paddingHorizontal: scale(10),
-              paddingVertical: verticalScale(3),
+              position: "absolute",
+              left: scale(20),
+              right: scale(20),
+              bottom: verticalScale(40),
             }}
           >
             <Text
-              className="font-semibold"
-              style={{ fontSize: moderateScale(11), color: "#111827" }}
+              className="text-white font-bold"
+              style={{ fontSize: moderateScale(17) }}
             >
-              #{themeLabel}
+              {THEMED_EYEBROW}
+            </Text>
+            <Text
+              className="text-white font-bold"
+              style={{ fontSize: moderateScale(17), marginTop: verticalScale(4) }}
+              numberOfLines={2}
+            >
+              {title}
             </Text>
           </View>
+        </ThemedRemoteImage>
+      </View>
+
+      {/* 배너 하단을 덮는 라운드 시트 */}
+      <View
+        className="bg-white"
+        style={{
+          marginTop: -verticalScale(24),
+          borderTopLeftRadius: scale(24),
+          borderTopRightRadius: scale(24),
+          paddingHorizontal: scale(20),
+          paddingTop: verticalScale(22),
+        }}
+      >
+        {places.length > 0 ? (
+          places.map((p, i) => (
+            <ThemedPlaceRow
+              key={`${p.name}-${i}`}
+              place={p}
+              last={i === places.length - 1}
+            />
+          ))
+        ) : (
           <Text
-            className="text-white font-bold"
-            style={{
-              fontSize: moderateScale(18),
-              marginTop: verticalScale(6),
-            }}
-            numberOfLines={2}
+            className="text-gray-500"
+            style={{ fontSize: moderateScale(13) }}
           >
-            {title}
+            추천할 관광지가 없어요
           </Text>
-        </View>
-      </ThemedRemoteImage>
+        )}
+      </View>
     </View>
   );
 }
 
-function ThemedBannerPlaceholder() {
+function ThemedPlacesPlaceholder() {
   return (
     <View
       className="items-center justify-center bg-gray-100"
-      style={{ height: verticalScale(140), borderRadius: scale(16) }}
+      style={{
+        height: verticalScale(200),
+        marginHorizontal: scale(20),
+        borderRadius: scale(16),
+      }}
     >
       <ActivityIndicator color="#9CA3AF" />
     </View>
@@ -899,38 +893,53 @@ function ThemedErrorRow({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function ThemedPlaceCard({ place }: { place: ThemePlaceCard }) {
+/** 썸네일(좌) + 이름 + 지역 태그(우) 한 줄 카드. */
+function ThemedPlaceRow({
+  place,
+  last,
+}: {
+  place: ThemePlaceCard;
+  last: boolean;
+}) {
   return (
     <View
-      className="overflow-hidden bg-white"
-      style={{
-        width: scale(150),
-        borderRadius: scale(14),
-        ...CARD_ELEVATION,
-      }}
+      className="flex-row items-center"
+      style={{ marginBottom: last ? 0 : verticalScale(18) }}
     >
-      <ThemedRemoteImage
-        uri={place.image_url}
-        style={{ width: "100%", height: verticalScale(110) }}
-      />
-      <View style={{ padding: scale(10) }}>
+      <View
+        className="overflow-hidden"
+        style={{ width: scale(80), height: scale(80), borderRadius: scale(14) }}
+      >
+        <ThemedRemoteImage
+          uri={place.image_url}
+          style={{ width: "100%", height: "100%" }}
+        />
+      </View>
+      <View className="flex-1" style={{ marginLeft: scale(16) }}>
         <Text
-          className="font-semibold text-gray-900"
+          className="text-gray-900 font-bold"
           numberOfLines={1}
-          style={{ fontSize: moderateScale(14) }}
+          style={{ fontSize: moderateScale(18) }}
         >
           {place.name}
         </Text>
-        <Text
-          className="text-gray-500"
-          numberOfLines={1}
+        <View
+          className="self-start bg-gray-100"
           style={{
-            fontSize: moderateScale(12),
-            marginTop: verticalScale(2),
+            marginTop: verticalScale(8),
+            paddingHorizontal: scale(10),
+            paddingVertical: verticalScale(4),
+            borderRadius: scale(8),
           }}
         >
-          {place.region}
-        </Text>
+          <Text
+            className="text-gray-500"
+            numberOfLines={1}
+            style={{ fontSize: moderateScale(12) }}
+          >
+            {place.region}
+          </Text>
+        </View>
       </View>
     </View>
   );

@@ -11,6 +11,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
+import ChevronDownIcon from "@/src/components/icons/ChevronDownIcon";
+import SearchIcon from "@/src/components/icons/SearchIcon";
 import type { SelectedStation } from "@/src/features/course/store";
 import { useStations } from "@/src/features/station/queries";
 import type {
@@ -48,7 +50,6 @@ type Props = {
 
 export function StationPickerModal({
   visible,
-  title,
   selectedIdx,
   excludeIdx,
   onClose,
@@ -107,107 +108,121 @@ export function StationPickerModal({
             height: verticalScale(560),
           }}
         >
-          <View
-            className="flex-row items-center justify-between"
-            style={{ marginBottom: verticalScale(12) }}
+          {/* 상단 닫기 핸들 (아래꺾쇠) */}
+          <Pressable
+            onPress={onClose}
+            hitSlop={16}
+            className="items-center"
+            style={{
+              marginBottom: verticalScale(14),
+              paddingVertical: verticalScale(4),
+            }}
           >
-            <Text
-              className="font-bold text-gray-900"
-              style={{ fontSize: moderateScale(16) }}
-            >
-              {title}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Feather name="x" size={moderateScale(22)} color="#111827" />
-            </Pressable>
-          </View>
+            <ChevronDownIcon
+              width={moderateScale(20)}
+              height={moderateScale(11)}
+            />
+          </Pressable>
 
           {/* 검색 입력 */}
           <View
-            className="flex-row items-center bg-gray-100 rounded-xl"
+            className="flex-row items-center"
             style={{
-              paddingHorizontal: scale(12),
               height: verticalScale(44),
               marginBottom: verticalScale(10),
             }}
           >
-            <Feather name="search" size={moderateScale(16)} color="#6B7280" />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="역명 검색"
-              placeholderTextColor="#9CA3AF"
+              placeholder="역 명을 입력해주세요"
+              placeholderTextColor="#C5C5C5"
               autoCorrect={false}
               autoCapitalize="none"
               returnKeyType="search"
               className="flex-1 text-gray-900"
-              style={{
-                fontSize: moderateScale(14),
-                marginLeft: scale(8),
-                padding: 0,
-              }}
+              style={{ fontSize: moderateScale(15), padding: 0 }}
             />
             {query.length > 0 ? (
-              <Pressable onPress={() => setQuery("")} hitSlop={10}>
+              <Pressable
+                onPress={() => setQuery("")}
+                hitSlop={10}
+                style={{ marginRight: scale(10) }}
+              >
                 <Feather
                   name="x-circle"
                   size={moderateScale(16)}
-                  color="#9CA3AF"
+                  color="#C5C5C5"
                 />
               </Pressable>
             ) : null}
+            <SearchIcon
+              width={moderateScale(20)}
+              height={moderateScale(20)}
+              style={{ marginRight: scale(15) }}
+            />
           </View>
 
-          {/* 초성 chip 행 */}
-          <View
-            className="flex-row flex-wrap"
-            style={{ marginBottom: verticalScale(10), gap: scale(6) }}
-          >
-            {INITIALS.map((c) => {
-              const isSel = initial === c;
-              return (
-                <Pressable
-                  key={c}
-                  onPress={() => setInitial(isSel ? null : c)}
-                  className={isSel ? "bg-gray-800" : "bg-gray-100"}
-                  style={{
-                    minWidth: scale(32),
-                    height: verticalScale(30),
-                    borderRadius: scale(15),
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingHorizontal: scale(8),
-                  }}
-                >
-                  <Text
-                    className={
-                      isSel ? "text-white font-semibold" : "text-gray-700"
-                    }
-                    style={{ fontSize: moderateScale(13) }}
+          {/* 목록 + 우측 초성 인덱스 */}
+          <View className="flex-1 flex-row">
+            <View className="flex-1">
+              <StationList
+                list={list}
+                selectedIdx={selectedIdx}
+                isLoading={isLoading}
+                isError={isError}
+                isFiltering={isFiltering}
+                isRefetching={isRefetching}
+                onRetry={refetch}
+                onSelect={(s) => {
+                  onSelect({
+                    station_idx: s.station_idx,
+                    station_name: s.station_name,
+                  });
+                  onClose();
+                }}
+              />
+            </View>
+
+            {/* 우측 세로 초성 인덱스 */}
+            <View
+              style={{
+                width: scale(44),
+                marginLeft: scale(8),
+                backgroundColor: "#F1F4FB",
+                borderRadius: scale(8),
+                paddingVertical: verticalScale(12),
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              {INITIALS.map((c) => {
+                const isSel = initial === c;
+                return (
+                  <Pressable
+                    key={c}
+                    onPress={() => setInitial(isSel ? null : c)}
+                    hitSlop={6}
+                    style={{
+                      width: "100%",
+                      alignItems: "center",
+                      paddingVertical: verticalScale(2),
+                    }}
                   >
-                    {c}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      className={isSel ? "font-bold" : "font-medium"}
+                      style={{
+                        fontSize: moderateScale(15),
+                        color: isSel ? "#111827" : "#9CA3AF",
+                      }}
+                    >
+                      {c}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-
-          <StationList
-            list={list}
-            selectedIdx={selectedIdx}
-            isLoading={isLoading}
-            isError={isError}
-            isFiltering={isFiltering}
-            isRefetching={isRefetching}
-            onRetry={refetch}
-            onSelect={(s) => {
-              onSelect({
-                station_idx: s.station_idx,
-                station_name: s.station_name,
-              });
-              onClose();
-            }}
-          />
         </Pressable>
       </Pressable>
     </Modal>
@@ -235,6 +250,22 @@ function StationList({
   onRetry,
   onSelect,
 }: ListProps) {
+  // 커스텀 스크롤 바 계산용: 보이는 높이(track) / 전체 콘텐츠 높이 / 현재 스크롤 위치.
+  const [trackH, setTrackH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
+
+  const showBar = trackH > 0 && contentH > trackH;
+  const thumbH = showBar
+    ? Math.max(scale(24), (trackH / contentH) * trackH)
+    : 0;
+  const maxScroll = contentH - trackH;
+  const thumbY =
+    showBar && maxScroll > 0
+      ? (Math.min(Math.max(scrollY, 0), maxScroll) / maxScroll) *
+        (trackH - thumbH)
+      : 0;
+
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -282,31 +313,60 @@ function StationList({
   }
 
   return (
-    <FlatList
-      data={list}
-      keyExtractor={(s) => String(s.station_idx)}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      renderItem={({ item }) => {
-        const isSel = item.station_idx === selectedIdx;
-        return (
-          <Pressable
-            onPress={() => onSelect(item)}
-            className="flex-row items-center justify-between border-b border-gray-100"
-            style={{ paddingVertical: verticalScale(14) }}
-          >
-            <Text
-              className={isSel ? "font-bold text-gray-900" : "text-gray-800"}
-              style={{ fontSize: moderateScale(16) }}
+    <View style={{ flex: 1 }} onLayout={(e) => setTrackH(e.nativeEvent.layout.height)}>
+      <FlatList
+        data={list}
+        keyExtractor={(s) => String(s.station_idx)}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y)}
+        onContentSizeChange={(_w, h) => setContentH(h)}
+        renderItem={({ item }) => {
+          const isSel = item.station_idx === selectedIdx;
+          return (
+            <Pressable
+              onPress={() => onSelect(item)}
+              className="flex-row items-center justify-between"
+              style={{ paddingVertical: verticalScale(14) }}
             >
-              {item.station_name}
-            </Text>
-            {isSel ? (
-              <Feather name="check" size={moderateScale(18)} color="#0F766E" />
-            ) : null}
-          </Pressable>
-        );
-      }}
-    />
+              <Text
+                className={isSel ? "font-bold text-gray-900" : "text-gray-800"}
+                style={{ fontSize: moderateScale(16) }}
+              >
+                {item.station_name}
+              </Text>
+              {isSel ? (
+                <Feather name="check" size={moderateScale(18)} color="#0F766E" />
+              ) : null}
+            </Pressable>
+          );
+        }}
+      />
+
+      {/* 전체 역 대비 현재 위치를 나타내는 커스텀 스크롤 바 */}
+      {showBar ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            right: scale(2),
+            top: 0,
+            bottom: 0,
+          }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              top: thumbY,
+              width: scale(4),
+              height: thumbH,
+              borderRadius: 999,
+              backgroundColor: "#5F5F5F",
+            }}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }

@@ -37,8 +37,15 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const { isAuthenticated, isBootstrapping, bootstrap } = useAuthStore();
+  // 가변폰트 하나로는 안드로이드에서 중간 weight 가 렌더링되지 않아,
+  // weight 별 정적 폰트를 각각 로드한다. (매핑은 src/components/Text.tsx)
   const [fontsLoaded] = useFonts({
-    Pretendard: require("../assets/fonts/PretendardVariable.ttf"),
+    "Pretendard-Regular": require("../assets/fonts/Pretendard-Regular.otf"),
+    "Pretendard-Medium": require("../assets/fonts/Pretendard-Medium.otf"),
+    "Pretendard-SemiBold": require("../assets/fonts/Pretendard-SemiBold.otf"),
+    // 600(SemiBold)과 700(Bold) 사이 중간 굵기. 가변폰트에서 wght=650 으로 추출한 정적 파일.
+    "Pretendard-650": require("../assets/fonts/Pretendard-650.ttf"),
+    "Pretendard-Bold": require("../assets/fonts/Pretendard-Bold.otf"),
   });
 
   useEffect(() => {
