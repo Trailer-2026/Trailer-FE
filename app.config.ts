@@ -38,9 +38,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        // 앱 진입 버퍼링 화면 색.
+        backgroundColor: "#7292EE",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#7292EE",
         },
       },
     ],
@@ -59,6 +60,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         android: {
           extraMavenRepos: ["https://devrepo.kakao.com/nexus/content/groups/public/"],
+          // 추천 API 응답의 place/lodging image_url 이 http:// 스킴으로 오는 경우가 많아
+          // 안드로이드 cleartext 차단을 풀어준다. 실패해도 RemoteImage 가 placeholder 로 대체.
+          usesCleartextTraffic: true,
         },
       },
     ],

@@ -18,10 +18,15 @@ import { api } from "@/src/api/client";
 
 const FCM_TOKEN_ENDPOINT = "/api/fcm/token";
 
+// 앱 세션 동안 마지막으로 서버에 등록한 토큰. 같은 토큰의 반복 등록(로그인 여러 번 등)을
+// 건너뛰기 위한 캐시. 앱 재시작 시 초기화되므로 재실행마다 최소 1회는 등록된다.
+let lastRegisteredToken: string | null = null;
+
 /** 서버에 토큰 등록 (백엔드가 upsert 처리 → 중복 전송 안전). access token 인증 필요. */
 async function postToken(token: string): Promise<void> {
   // 기존 axios client 사용 → 요청 인터셉터가 Authorization: Bearer 자동 첨부
   await api.post(FCM_TOKEN_ENDPOINT, { token });
+  lastRegisteredToken = token;
 }
 
 /**
@@ -76,8 +81,9 @@ export async function registerFcmToken(): Promise<void> {
   try {
     const token = await getFcmToken();
     if (!token) return;
+    // 같은 토큰이면 이미 등록됨 → 재전송 생략.
+    if (token === lastRegisteredToken) return;
     await postToken(token);
-    console.log("[fcm] 토큰 등록 완료");
   } catch (e) {
     console.log("[fcm] 토큰 등록 실패:", e);
   }
@@ -89,6 +95,7 @@ export async function registerFcmToken(): Promise<void> {
  */
 export function setupTokenRefresh(): () => void {
   return onTokenRefresh(getMessaging(getApp()), async (token) => {
+    if (token === lastRegisteredToken) return;
     try {
       await postToken(token);
       console.log("[fcm] 갱신 토큰 재등록 완료");

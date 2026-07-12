@@ -10,49 +10,51 @@ import { StepHeader } from "@/src/features/course/components/StepHeader";
 import { PassengerKey, useCourseStore } from "@/src/features/course/store";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-const ROWS: { key: PassengerKey; title: string; sub: string; min: number }[] = [
-  { key: "adult", title: "성인", sub: "만 18세 이상", min: 1 },
-  { key: "teen", title: "청소년", sub: "만 18세 미만", min: 0 },
-  { key: "child", title: "어린이", sub: "만 12세 미만", min: 0 },
+const ROWS: { key: PassengerKey; title: string; sub: string }[] = [
+  { key: "adult", title: "성인", sub: "만 18세 이상" },
+  { key: "teen", title: "청소년", sub: "만 18세 미만" },
+  { key: "child", title: "어린이", sub: "만 12세 미만" },
 ];
 
 export default function PassengersScreen() {
   const passengers = useCourseStore((s) => s.passengers);
   const setPassenger = useCourseStore((s) => s.setPassenger);
 
+  const total = passengers.adult + passengers.teen + passengers.child;
+  const canProceed = total > 0;
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
-      <StepHeader progress={2 / 3} />
+      <StepHeader step={3} steps={4} />
 
       <View className="flex-1 px-5">
-        <Text className="mt-2 text-2xl font-extrabold text-gray-900">
-          여행인원 선택
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(20), marginTop: verticalScale(8) }}
+        >
+          여행인원
         </Text>
 
-        <View style={{ marginTop: verticalScale(24), gap: verticalScale(14) }}>
+        <View style={{ marginTop: verticalScale(24), gap: verticalScale(16) }}>
           {ROWS.map((row) => (
             <View
               key={row.key}
-              className="flex-row items-center justify-between bg-white border border-gray-200 rounded-2xl"
+              className="flex-row items-center justify-between bg-white border border-gray-200"
               style={{
-                height: verticalScale(76),
-                paddingHorizontal: scale(16),
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 4,
-                elevation: 1,
+                height: verticalScale(82),
+                borderRadius: scale(28),
+                paddingHorizontal: scale(22),
               }}
             >
               <View>
                 <Text
-                  className="font-medium text-gray-900"
+                  className="font-semibold text-gray-900"
                   style={{ fontSize: moderateScale(18) }}
                 >
                   {row.title}
                 </Text>
                 <Text
-                  className="font-medium"
+                  className="font-semibold"
                   style={{
                     fontSize: moderateScale(12),
                     color: "#ADADAD",
@@ -64,7 +66,7 @@ export default function PassengersScreen() {
               </View>
               <Counter
                 value={passengers[row.key]}
-                min={row.min}
+                min={0}
                 onChange={(delta) => setPassenger(row.key, delta)}
               />
             </View>
@@ -73,10 +75,19 @@ export default function PassengersScreen() {
       </View>
 
       <View className="px-5 pb-4">
-        <StepDots total={3} index={1} />
+        <StepDots total={4} index={2} />
+        {!canProceed ? (
+          <Text
+            className="text-center text-gray-500 font-semibold"
+            style={{ fontSize: moderateScale(13), marginBottom: verticalScale(8) }}
+          >
+            여행 인원을 1명 이상 선택해주세요
+          </Text>
+        ) : null}
         <PrimaryButton
           label="다음"
           onPress={() => router.push("/course/styles")}
+          disabled={!canProceed}
         />
       </View>
     </SafeAreaView>

@@ -113,7 +113,7 @@ function EmptyState() {
         아직 추가된 일정이 없어요
       </Text>
       <Pressable
-        onPress={() => router.navigate("/course/origin-destination")}
+        onPress={() => router.navigate("/course/intro")}
         className="items-center justify-center rounded-2xl"
         style={{
           paddingHorizontal: scale(24),

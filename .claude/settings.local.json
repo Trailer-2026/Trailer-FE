@@ -40,7 +40,32 @@
       "PowerShell(npx expo install expo-linear-gradient)",
       "PowerShell(npx expo install react-native-svg)",
       "PowerShell(git branch --show-current; \"---- 로컬 vs 원격 차이 ----\"; git log --oneline origin/feat/TRA-23..HEAD 2>&1; \"---- 미커밋 변경 개수 ----\"; \\(git status --porcelain | Measure-Object -Line\\).Lines)",
-      "PowerShell(\"---- status ----\")"
+      "PowerShell(\"---- status ----\")",
+      "PowerShell(Set-Location C:\\\\dev\\\\trailer-app; npx tsc --noEmit; Write-Output \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(npm run *)",
+      "Bash(git *)",
+      "Bash(curl -sL \"https://api.github.com/repos/orioncactus/pretendard/contents/packages/pretendard/dist/public/static?ref=main\")",
+      "Bash(python --version)",
+      "Bash(py --version)",
+      "Bash(python -c \"import fontTools; print\\('fonttools', fontTools.version\\)\")",
+      "Bash(py -c \"import fontTools; print\\('fonttools', fontTools.version\\)\")",
+      "Bash(python -m pip install --quiet fonttools)",
+      "Bash(python -)",
+      "Bash(netstat -ano)",
+      "PowerShell(Get-Process -Id 29552)",
+      "Bash(adb devices *)",
+      "Bash(adb kill-server *)",
+      "Bash(adb start-server *)",
+      "Bash(python -m pip install --quiet pillow)",
+      "Bash(find \"C:/Users/byeon/AppData/Local/Temp/claude\" -type f \\\\\\( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" \\\\\\) -newermt \"2026-07-10 00:00\" 2>/dev/null | head -20 *)",
+      "Read(//c/Users/byeon/AppData/Local/Temp/claude/**)",
+      "Bash(find assets *)",
+      "Bash(ls -la assets/images/style/)",
+      "Bash(cat babel.config.js)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-reanimated/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native/package.json'\\).version\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"from PIL import Image; im=Image.open\\('assets/images/style/google.png'\\); print\\('size',im.size,'mode',im.mode\\)\")"
     ]
   }
 }

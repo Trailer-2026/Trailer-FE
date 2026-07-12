@@ -1,151 +1,155 @@
-import Feather from "@expo/vector-icons/Feather";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
-import { DatePickerModal } from "@/src/features/course/components/DatePickerModal";
 import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
+import { StationPickerModal } from "@/src/features/course/components/StationPickerModal";
+import SelectChevronIcon from "@/src/components/icons/SelectChevronIcon";
 import { StepDots } from "@/src/features/course/components/StepDots";
 import { StepHeader } from "@/src/features/course/components/StepHeader";
-import { addMonths, formatKoreanDate, startOfDay } from "@/src/features/course/date";
-import { useCourseStore } from "@/src/features/course/store";
+import { useCourseStore, type SelectedStation } from "@/src/features/course/store";
+import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+
+type StationTarget = "origin" | "destination" | "via";
 
 export default function OriginDestinationScreen() {
   const origin = useCourseStore((s) => s.origin);
   const destination = useCourseStore((s) => s.destination);
-  const roundTrip = useCourseStore((s) => s.roundTrip);
-  const departDate = useCourseStore((s) => s.departDate);
-  const returnDate = useCourseStore((s) => s.returnDate);
-  const swap = useCourseStore((s) => s.swapOriginDestination);
-  const setRoundTrip = useCourseStore((s) => s.setRoundTrip);
-  const setDepartDate = useCourseStore((s) => s.setDepartDate);
-  const setReturnDate = useCourseStore((s) => s.setReturnDate);
+  const viaStation = useCourseStore((s) => s.viaStation);
+  const setOrigin = useCourseStore((s) => s.setOrigin);
+  const setDestination = useCourseStore((s) => s.setDestination);
+  const setViaStation = useCourseStore((s) => s.setViaStation);
 
-  const [datePickerFor, setDatePickerFor] = useState<"depart" | "return" | null>(
-    null,
-  );
+  const [pickerFor, setPickerFor] = useState<StationTarget | null>(null);
 
-  const today = startOfDay(new Date());
-  const maxDate = addMonths(today, 1); // 오늘 기준 한 달까지 선택 가능
+  const canProceed = !!origin && !!destination;
+
+  const selectedFor = (t: StationTarget): SelectedStation | null =>
+    t === "origin" ? origin : t === "destination" ? destination : viaStation;
+
+  // 같은 역 중복 선택 방지용 — 픽커별로 반대편(주요) 역 하나를 숨긴다.
+  const excludeFor = (t: StationTarget): number | null =>
+    t === "origin"
+      ? destination?.station_idx ?? null
+      : origin?.station_idx ?? null;
+
+  const titleFor: Record<StationTarget, string> = {
+    origin: "출발지",
+    destination: "도착지",
+    via: "경유지",
+  };
+
+  const onSelectStation = (s: SelectedStation) => {
+    if (pickerFor === "origin") setOrigin(s);
+    else if (pickerFor === "destination") setDestination(s);
+    else if (pickerFor === "via") setViaStation(s);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
-      <StepHeader progress={1 / 3} />
+      <StepHeader step={1} steps={4} />
 
       <View className="flex-1 px-5">
-        <View className="flex-row items-center justify-between mt-2">
-          <Text className="text-2xl font-extrabold text-gray-900">승차권</Text>
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(20), marginTop: verticalScale(8) }}
+        >
+          출발지와 도착지
+        </Text>
+        <Text
+          className="text-gray-400 font-semibold"
+          style={{ fontSize: moderateScale(14), marginTop: verticalScale(6) }}
+        >
+          <Text style={{ color: "#EF4444" }}>(*)</Text>은 필수선택지입니다.
+        </Text>
 
-          <Pressable
-            onPress={() => setRoundTrip(!roundTrip)}
-            className="flex-row items-center gap-2"
-          >
-            <View
-              className={`w-5 h-5 rounded-md border items-center justify-center ${
-                roundTrip ? "bg-gray-800 border-gray-800" : "border-gray-400"
-              }`}
-            >
-              {roundTrip ? (
-                <Feather name="check" size={14} color="#FFFFFF" />
-              ) : null}
-            </View>
-            <Text className="text-sm text-gray-700">왕복</Text>
-          </Pressable>
-        </View>
-
-        <View className="mt-6 bg-gray-100 rounded-2xl p-5">
-          <Text className="text-sm font-medium text-gray-500 mb-2">출발지</Text>
-          <LocationSelect value={origin} />
-
-          <View className="items-center my-3">
-            <Pressable
-              onPress={swap}
-              className="w-14 h-9 rounded-full bg-gray-700 items-center justify-center"
-            >
-              <Feather name="repeat" size={16} color="#FFFFFF" />
-            </Pressable>
-          </View>
-
-          <Text className="text-sm font-medium text-gray-500 mb-2">도착지</Text>
-          <LocationSelect value={destination} />
-        </View>
-
-        <View className="mt-8">
-          <DateRow
-            label="가는날"
-            value={formatKoreanDate(departDate)}
-            onPress={() => setDatePickerFor("depart")}
+        <View style={{ marginTop: verticalScale(28), gap: verticalScale(20) }}>
+          <StationSelect
+            label="출발지"
+            required
+            value={origin?.station_name ?? null}
+            placeholder="출발지 선택"
+            onPress={() => setPickerFor("origin")}
           />
-          {roundTrip ? (
-            <View className="mt-6">
-              <DateRow
-                label="오는날"
-                value={formatKoreanDate(returnDate)}
-                onPress={() => setDatePickerFor("return")}
-              />
-            </View>
-          ) : null}
+          <StationSelect
+            label="도착지"
+            required
+            value={destination?.station_name ?? null}
+            placeholder="도착지 선택"
+            onPress={() => setPickerFor("destination")}
+          />
+          <StationSelect
+            label="경유지"
+            value={viaStation?.station_name ?? null}
+            placeholder="경유지 선택"
+            onPress={() => setPickerFor("via")}
+          />
         </View>
       </View>
 
       <View className="px-5 pb-4">
-        <StepDots total={3} index={0} />
+        <StepDots total={4} index={0} />
         <PrimaryButton
           label="다음"
-          onPress={() => router.push("/course/passengers")}
+          onPress={() => router.push("/course/period")}
+          disabled={!canProceed}
         />
       </View>
 
-      <DatePickerModal
-        visible={datePickerFor !== null}
-        title={datePickerFor === "return" ? "오는날" : "가는날"}
-        selected={datePickerFor === "return" ? returnDate : departDate}
-        minDate={datePickerFor === "return" ? departDate : today}
-        maxDate={maxDate}
-        onClose={() => setDatePickerFor(null)}
-        onSelect={(d) => {
-          if (datePickerFor === "return") {
-            setReturnDate(d);
-          } else {
-            setDepartDate(d);
-            // 가는날이 오는날보다 뒤면 오는날도 함께 맞춤
-            if (returnDate < d) setReturnDate(d);
-          }
-        }}
+      <StationPickerModal
+        visible={pickerFor !== null}
+        title={pickerFor ? titleFor[pickerFor] : ""}
+        selectedIdx={pickerFor ? selectedFor(pickerFor)?.station_idx ?? null : null}
+        excludeIdx={pickerFor ? excludeFor(pickerFor) : null}
+        onClose={() => setPickerFor(null)}
+        onSelect={onSelectStation}
       />
     </SafeAreaView>
   );
 }
 
-function LocationSelect({ value }: { value: string }) {
-  return (
-    <Pressable className="bg-white border border-gray-200 rounded-xl px-4 h-14 flex-row items-center justify-between">
-      <Text className="text-lg font-semibold text-gray-900">{value}</Text>
-      <Feather name="chevron-down" size={20} color="#4B5563" />
-    </Pressable>
-  );
-}
-
-function DateRow({
+function StationSelect({
   label,
+  required,
   value,
+  placeholder,
   onPress,
 }: {
   label: string;
-  value: string;
+  required?: boolean;
+  value: string | null;
+  placeholder: string;
   onPress: () => void;
 }) {
   return (
     <View>
-      <Text className="text-sm font-bold text-gray-500">{label}</Text>
+      <Text
+        className="font-semibold"
+        style={{ fontSize: moderateScale(14), color: "#6A6A6A", marginBottom: verticalScale(8) }}
+      >
+        {required ? <Text style={{ color: "#EF4444" }}>*</Text> : null}
+        {label}
+      </Text>
       <Pressable
         onPress={onPress}
-        className="flex-row items-center justify-between mt-2"
+        className="flex-row items-center justify-between border border-gray-200 bg-white rounded-2xl"
+        style={{
+          height: verticalScale(58),
+          paddingHorizontal: scale(18),
+        }}
       >
-        <Text className="text-lg text-gray-900">{value}</Text>
-        <Feather name="chevron-right" size={20} color="#9CA3AF" />
+        <Text
+          className={value ? "font-semibold text-gray-900" : "font-normal text-gray-400"}
+          style={{ fontSize: moderateScale(14) }}
+        >
+          {value ?? placeholder}
+        </Text>
+        <SelectChevronIcon
+          width={moderateScale(12)}
+          height={moderateScale(7)}
+        />
       </Pressable>
     </View>
   );

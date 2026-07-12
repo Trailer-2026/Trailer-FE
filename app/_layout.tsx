@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import 'react-native-reanimated';
 import "../global.css";
 
+import { queryClient } from "@/src/api/query-client";
 import { useAuthStore } from "@/src/features/auth/store";
 import {
   setupForegroundHandler,
@@ -14,6 +15,7 @@ import {
 import { setupTokenRefresh } from "@/src/features/notification/fcm";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 // 앱이 켜질 때 스플래시 스크린을 유지하고, 소셜 로그인 SDK를 초기화합니다.
 SplashScreen.preventAutoHideAsync();
@@ -35,8 +37,15 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const { isAuthenticated, isBootstrapping, bootstrap } = useAuthStore();
+  // 가변폰트 하나로는 안드로이드에서 중간 weight 가 렌더링되지 않아,
+  // weight 별 정적 폰트를 각각 로드한다. (매핑은 src/components/Text.tsx)
   const [fontsLoaded] = useFonts({
-    Pretendard: require("../assets/fonts/PretendardVariable.ttf"),
+    "Pretendard-Regular": require("../assets/fonts/Pretendard-Regular.otf"),
+    "Pretendard-Medium": require("../assets/fonts/Pretendard-Medium.otf"),
+    "Pretendard-SemiBold": require("../assets/fonts/Pretendard-SemiBold.otf"),
+    // 600(SemiBold)과 700(Bold) 사이 중간 굵기. 가변폰트에서 wght=650 으로 추출한 정적 파일.
+    "Pretendard-650": require("../assets/fonts/Pretendard-650.ttf"),
+    "Pretendard-Bold": require("../assets/fonts/Pretendard-Bold.otf"),
   });
 
   useEffect(() => {
@@ -65,7 +74,7 @@ export default function RootLayout() {
   if (isBootstrapping || !fontsLoaded) return null;
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!isAuthenticated}>
           <Stack.Screen name="(onboarding)" />
@@ -76,6 +85,6 @@ export default function RootLayout() {
         </Stack.Protected>
       </Stack>
       <StatusBar style="auto" />
-    </>
+    </QueryClientProvider>
   );
 }

@@ -2,7 +2,7 @@ import * as React from "react";
 import Svg, { Path, type SvgProps } from "react-native-svg";
 
 const BackIcon = ({ color = "#6E6E6E", ...props }: SvgProps) => (
-  <Svg width={14} height={20} fill="none" {...props}>
+  <Svg width={14} height={20} viewBox="0 0 14 20" fill="none" {...props}>
     <Path
       stroke={color}
       strokeLinecap="round"
