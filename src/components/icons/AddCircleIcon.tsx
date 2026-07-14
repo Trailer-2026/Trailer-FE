@@ -1,10 +1,13 @@
 import * as React from "react";
 import Svg, { Path, type SvgProps } from "react-native-svg";
 
-const AddCircleIcon = (props: SvgProps) => (
+// color 미지정 시 기존 다크 그레이 유지(밝은 배경용). 릴스처럼 어두운 배경에선 흰색을 넘긴다.
+type Props = SvgProps & { color?: string };
+
+const AddCircleIcon = ({ color = "#353535", ...props }: Props) => (
   <Svg width={30} height={30} fill="none" {...props}>
     <Path
-      stroke="#353535"
+      stroke={color}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={1.2}
