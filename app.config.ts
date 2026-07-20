@@ -47,6 +47,31 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     "expo-secure-store",
     [
+      "expo-image-picker",
+      {
+        // 릴스 영상 만들기 — 갤러리에서 사진/영상 선택 + 직접 촬영
+        photosPermission: "여행 영상을 만들 사진과 영상을 선택하려면 갤러리 접근이 필요해요.",
+        cameraPermission: "여행 영상을 만들 사진·영상을 촬영하려면 카메라 접근이 필요해요.",
+      },
+    ],
+    [
+      "expo-media-library",
+      {
+        // 갤러리 사진의 원본 위치(EXIF GPS)를 읽으려면 접근 권한 + 위치 메타데이터 권한이 필요.
+        // 안드로이드 시스템 피커는 위치를 지우고 넘기므로, 여기서 원본 asset 을 다시 조회한다.
+        photosPermission: "촬영 위치를 함께 기록하려면 사진 접근 권한이 필요해요.",
+        savePhotosPermission: "촬영한 사진을 갤러리에 저장하려면 권한이 필요해요.",
+        isAccessMediaLocationEnabled: true, // → ACCESS_MEDIA_LOCATION 권한 추가
+      },
+    ],
+    [
+      "expo-location",
+      {
+        // 직접 촬영 시 현재 위치를 함께 기록
+        locationWhenInUsePermission: "촬영하는 사진에 여행 위치를 기록하려면 위치 접근이 필요해요.",
+      },
+    ],
+    [
       "@react-native-kakao/core",
       {
         nativeAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ?? "",
