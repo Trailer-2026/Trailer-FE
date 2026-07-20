@@ -1,4 +1,5 @@
 import { router, usePathname, type Href } from "expo-router";
+import type { ComponentType } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,7 +15,15 @@ import { moderateScale, verticalScale } from "@/src/utils/responsive";
  * (탭 레이아웃 app/(app)/(tabs)/_layout.tsx 과 순서·아이콘·색상 동일)
  * 탭 안 화면이 아니라 활성 표시는 없고, 탭 아이콘 누르면 해당 탭으로 이동한다.
  */
-const TABS: { path: Href; Icon: typeof HomeIcon; w: number; h: number }[] = [
+// 아이콘마다 추가 prop(filled 등)이 달라서 typeof HomeIcon 으로 고정하지 않고,
+// 여기서 실제로 넘기는 prop 만으로 타입을 잡는다.
+type TabIcon = ComponentType<{
+  color?: string;
+  width?: number;
+  height?: number;
+}>;
+
+const TABS: { path: Href; Icon: TabIcon; w: number; h: number }[] = [
   { path: "/", Icon: HomeIcon, w: 22, h: 22 },
   { path: "/feed", Icon: PlayIcon, w: 22, h: 22 },
   { path: "/calendar", Icon: CalendarGridIcon, w: 22, h: 22 },
