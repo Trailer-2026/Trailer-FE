@@ -18,6 +18,17 @@ type Props = {
   onToggleLike: (reelsIdx: number) => void;
 };
 
+/**
+ * 액션바 아이콘 크기 — Figma 원본 치수(비율 유지)에 공통 배율을 곱한다.
+ * 세 아이콘을 한꺼번에 키우거나 줄이려면 ICON_SCALE 만 조정하면 된다.
+ */
+const ICON_SCALE = 1.15;
+const ICON = {
+  heart: { w: 24 * ICON_SCALE, h: 21 * ICON_SCALE },
+  comment: { w: 23 * ICON_SCALE, h: 23 * ICON_SCALE },
+  share: { w: 27 * ICON_SCALE, h: 28 * ICON_SCALE },
+};
+
 /** 1000 이상은 "1.2천"으로 축약 — 액션바 폭이 좁아 자릿수를 제한한다. */
 function formatCount(n: number) {
   if (n < 1000) return String(n);
@@ -68,8 +79,8 @@ export default function ReelsCard({ reels, height, onToggleLike }: Props) {
           accessibilityLabel={reels.liked ? "좋아요 취소" : "좋아요"}
         >
           <HeartIcon
-            width={moderateScale(28)}
-            height={moderateScale(28)}
+            width={moderateScale(ICON.heart.w)}
+            height={moderateScale(ICON.heart.h)}
             color={reels.liked ? "#FF4D6D" : "#FFFFFF"}
             filled={reels.liked}
           />
@@ -91,8 +102,8 @@ export default function ReelsCard({ reels, height, onToggleLike }: Props) {
           accessibilityLabel="댓글 보기"
         >
           <CommentIcon
-            width={moderateScale(28)}
-            height={moderateScale(28)}
+            width={moderateScale(ICON.comment.w)}
+            height={moderateScale(ICON.comment.h)}
             color="#FFFFFF"
           />
           <Text
@@ -112,8 +123,8 @@ export default function ReelsCard({ reels, height, onToggleLike }: Props) {
           accessibilityLabel="공유"
         >
           <ShareIcon
-            width={moderateScale(26)}
-            height={moderateScale(26)}
+            width={moderateScale(ICON.share.w)}
+            height={moderateScale(ICON.share.h)}
             color="#FFFFFF"
           />
         </Pressable>

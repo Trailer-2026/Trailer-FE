@@ -1,4 +1,6 @@
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, View, type LayoutChangeEvent } from "react-native";
@@ -12,16 +14,17 @@ import { useReelsStore } from "@/src/features/reels/store";
 import type { Reels } from "@/src/features/reels/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-// "내 여행영상 만들기" 말풍선. 꼬리 제외 본체 108 x 30.
-// 꼬리는 본체 오른쪽 위에서 + 아이콘을 향해 비스듬히 뻗는다.
-const TOOLTIP_COLOR = "#5E84F4";
-const TOOLTIP_WIDTH = 108;
-const TOOLTIP_HEIGHT = 30;
-const TOOLTIP_RIGHT = 14; // 본체 오른쪽 끝과 화면 우측 사이 간격
-const TAIL_WIDTH = 17;
-const TAIL_HEIGHT = 21;
-// 꼬리 꼭짓점을 + 아이콘 중앙보다 이만큼 더 오른쪽으로 (0 이면 정확히 중앙)
-const TAIL_SHIFT = 5;
+/**
+ * "내 여행영상 만들기" 말풍선 — 꼬리·글씨까지 포함된 이미지 에셋.
+ * (Metro 는 대소문자를 구분하므로 실제 파일명과 정확히 일치시킬 것)
+ *
+ * 원본 432 x 172 중 본체(알약)가 432 x 120, 꼬리 꼭짓점은 오른쪽 끝에서 54.5px.
+ * 0.25 배로 렌더하면 본체가 정확히 108 x 30 이 된다.
+ */
+const TOOLTIP_IMG = require("../../../assets/images/style/message.png");
+const TOOLTIP_W = 108; // 432 * 0.25 — 본체 폭과 동일
+const TOOLTIP_H = 43; // 172 * 0.25 — 꼬리 포함 전체 높이
+const TAIL_APEX_FROM_RIGHT = 13.6; // 54.5 * 0.25 — 이미지 우측 끝 ~ 꼬리 꼭짓점
 
 export default function FeedTab() {
   const insets = useSafeAreaInsets();
@@ -118,8 +121,7 @@ export default function FeedTab() {
             <Pressable
               className="active:opacity-60"
               hitSlop={moderateScale(8)}
-              // TODO(영상 제작): 내 여행영상 만들기 플로우 진입 — 이번 범위 밖.
-              onPress={() => {}}
+              onPress={() => router.push("/reels/create")}
               accessibilityRole="button"
               accessibilityLabel="내 여행영상 만들기"
             >
@@ -132,56 +134,21 @@ export default function FeedTab() {
           </View>
         </View>
 
-        {/* "내 여행영상 만들기" 말풍선 — 본체는 오른쪽에 붙이고,
-            꼬리만 오른쪽 위로 뻗어 + 아이콘 중앙을 가리킨다. */}
-        <View
-          className="absolute items-end"
-          style={{
-            top: verticalScale(6) + moderateScale(30) + verticalScale(4),
-            right: scale(TOOLTIP_RIGHT),
-          }}
+        {/* "내 여행영상 만들기" 말풍선 (이미지). 꼬리 꼭짓점이 + 아이콘 중앙에 오도록
+            이미지 우측 여백(TAIL_APEX_FROM_RIGHT)만큼 되밀어 배치한다. */}
+        <Image
+          source={TOOLTIP_IMG}
+          contentFit="contain"
           pointerEvents="none"
-        >
-          {/* 꼬리(17 x 21): borderRight 0 인 직각삼각형이라 꼭짓점이 오른쪽 끝에
-              생기고, 빗변이 왼쪽 아래로 기울어 위로 쭉 뻗는 모양이 된다.
-              꼭짓점은 + 아이콘 중앙에서 TAIL_SHIFT 만큼 오른쪽. */}
-          <View
-            style={{
-              width: 0,
-              height: 0,
-              marginRight:
-                scale(20) +
-                moderateScale(30) / 2 -
-                scale(TOOLTIP_RIGHT) -
-                scale(TAIL_SHIFT),
-              marginBottom: -1, // 본체와의 이음새 제거
-              borderLeftWidth: scale(TAIL_WIDTH),
-              borderRightWidth: 0,
-              borderBottomWidth: verticalScale(TAIL_HEIGHT),
-              borderLeftColor: "transparent",
-              borderBottomColor: TOOLTIP_COLOR,
-            }}
-          />
-          <View
-            className="items-center justify-center"
-            style={{
-              width: scale(TOOLTIP_WIDTH),
-              height: verticalScale(TOOLTIP_HEIGHT),
-              backgroundColor: TOOLTIP_COLOR,
-              borderRadius: verticalScale(TOOLTIP_HEIGHT) / 2,
-              elevation: 8,
-              shadowColor: "#000",
-            }}
-          >
-            <Text
-              className="font-semibold text-white"
-              numberOfLines={1}
-              style={{ fontSize: moderateScale(12) }}
-            >
-              내 여행영상 만들기
-            </Text>
-          </View>
-        </View>
+          style={{
+            position: "absolute",
+            top: verticalScale(6) + moderateScale(30) + verticalScale(4),
+            right:
+              scale(20) + moderateScale(30) / 2 - scale(TAIL_APEX_FROM_RIGHT),
+            width: scale(TOOLTIP_W),
+            height: scale(TOOLTIP_H), // 가로세로 같은 배율 — 비율 왜곡 방지
+          }}
+        />
       </View>
     </View>
   );
