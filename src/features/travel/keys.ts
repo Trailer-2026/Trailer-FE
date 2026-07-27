@@ -5,4 +5,5 @@
 export const travelKeys = {
   all: ["travels"] as const,
   current: () => [...travelKeys.all, "current"] as const,
+  past: () => [...travelKeys.all, "past"] as const,
 };

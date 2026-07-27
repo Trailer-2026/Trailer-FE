@@ -95,6 +95,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   experiments: {
     typedRoutes: true,
-    reactCompiler: true,
+    // React Compiler 는 빌드 때만 켠다. 개발(expo start)에선 babel 변환 비용 때문에
+    // 첫 번들이 느려져서 끈다. expo start → NODE_ENV=development(off),
+    // expo export·EAS build → NODE_ENV=production(on).
+    reactCompiler:
+      process.env.NODE_ENV === "production" ||
+      process.env.EAS_BUILD === "true",
   },
 });

@@ -16,6 +16,15 @@ export function formatTravelPeriod(startIso: string, endIso: string): string {
   return `${formatShortDate(startIso)} ~ ${formatShortDate(endIso)}`;
 }
 
+/** "2026-06-30" → "2026.06.30" (여행 조회 카드용 날짜 표기) */
+export function formatDotDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}.${m}.${day}`;
+}
+
 export function travelStatusLabel(status: TravelStatus): string {
   switch (status) {
     case "PLANNED":
