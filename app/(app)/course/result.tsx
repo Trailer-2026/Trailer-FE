@@ -1,4 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
+import { isAxiosError } from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -36,6 +37,8 @@ import {
   type Segment,
   type TrainInfo,
 } from "@/src/features/course/types";
+import { useInAppNotifications } from "@/src/features/notification/inapp-store";
+import { useCreateTravel } from "@/src/features/travel/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // http:// 이미지가 안드로이드 cleartext 로 막히거나 서버가 null 로 줄 때의 대체 이미지.
@@ -97,6 +100,8 @@ export default function ResultScreen() {
 
   const { data, error, isLoading, isError, refetch } = useRecommendCourses(criteria);
   const prefetchNext = usePrefetchNextRecommendPage();
+  const addNotification = useInAppNotifications((s) => s.add);
+  const createTravel = useCreateTravel();
 
   // 응답이 오면 다음 page 를 백그라운드에서 미리 가져와둔다.
   useEffect(() => {
@@ -142,6 +147,34 @@ export default function ResultScreen() {
   const selectPlan = (i: number) => {
     setPlanIdx(i);
     carouselRef.current?.scrollTo({ x: i * SNAP, animated: true });
+  };
+
+  // "이 여행 담기" — 서버에 여행 저장(POST) → 성공 시 인앱 알림 추가 후 홈으로.
+  // 홈의 예정 여행 카드는 useCreateTravel 이 travels/current 를 invalidate 해 자동 갱신된다.
+  const onSaveTravel = () => {
+    if (!activePlan || createTravel.isPending) return;
+    const title =
+      activePlan.title ||
+      activePlan.route_type ||
+      activePlan.label ||
+      "추천 코스";
+    createTravel.mutate(activePlan.plan_id, {
+      onSuccess: () => {
+        addNotification(`'${title}'이 추가되었습니다`);
+        router.replace("/"); // 메인(홈)으로
+      },
+      onError: (err) => {
+        // 400: plan_id 캐시 만료 → 다시 추천받기 유도
+        if (isAxiosError(err) && err.response?.status === 400) {
+          Alert.alert("추천이 만료됐어요", "다시 추천받아 주세요.", [
+            { text: "취소", style: "cancel" },
+            { text: "다시 추천받기", onPress: () => refetch() },
+          ]);
+          return;
+        }
+        Alert.alert("저장 실패", describeRecommendError(err));
+      },
+    });
   };
 
   return (
@@ -343,10 +376,8 @@ export default function ResultScreen() {
             }}
           >
             <Pressable
-              onPress={() =>
-                Alert.alert("이 여행을 담았어요", "마이페이지에서 확인할 수 있어요.")
-              }
-              disabled={!activePlan}
+              onPress={onSaveTravel}
+              disabled={!activePlan || createTravel.isPending}
               className="w-full items-center justify-center rounded-2xl"
               style={{
                 height: verticalScale(50),
@@ -360,7 +391,7 @@ export default function ResultScreen() {
                   color: activePlan ? "#FFFFFF" : "#9CA3AF",
                 }}
               >
-                이 여행 담기
+                {createTravel.isPending ? "저장 중…" : "이 여행 담기"}
               </Text>
             </Pressable>
           </View>

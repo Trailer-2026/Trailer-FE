@@ -6,25 +6,24 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackIcon from "@/src/components/icons/BackIcon";
 import BellIcon from "@/src/components/icons/BellIcon";
 import { Text } from "@/src/components/Text";
+import { useInAppNotifications } from "@/src/features/notification/inapp-store";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
 
-const NOTIFICATIONS = [
-  {
-    id: "1",
-    message: "'부산 관광지 코스 여행'이 일정에 추가되었어요",
-    time: "14분전",
-  },
-  {
-    id: "2",
-    message: "'부산 관광지 코스 여행'이 일정에 추가되었어요",
-    time: "14분전",
-  },
-];
+/** createdAt(epoch ms) → "방금 전" / "N분 전" / "N시간 전" / "N일 전". */
+function relativeTime(createdAt: number): string {
+  const min = Math.floor((Date.now() - createdAt) / 60000);
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  return `${Math.floor(hr / 24)}일 전`;
+}
 
 export default function NotificationsTab() {
   const [collapsed, setCollapsed] = useState(false);
+  const items = useInAppNotifications((s) => s.items);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -158,54 +157,49 @@ export default function NotificationsTab() {
           </View>
         </View>
 
-        {/* 알림 리스트 */}
-        <View style={{ marginTop: verticalScale(20) }}>
-          {NOTIFICATIONS.map((item) => (
-            <View
-              key={item.id}
-              className="flex-row items-center"
-              style={{
-                paddingHorizontal: scale(20),
-                paddingVertical: verticalScale(14),
-                gap: scale(12),
-              }}
-            >
-              {/* 아바타 */}
+        {/* 알림 리스트 (여행 담기 등 인앱 알림 — 세션 메모리, 저장 안 함) */}
+        {items.length > 0 ? (
+          <View style={{ marginTop: verticalScale(20) }}>
+            {items.map((item) => (
               <View
-                className="rounded-full"
+                key={item.id}
+                className="flex-row items-center"
                 style={{
-                  width: scale(44),
-                  height: scale(44),
-                  backgroundColor: "#EAF0FF",
+                  paddingHorizontal: scale(20),
+                  paddingVertical: verticalScale(14),
+                  gap: scale(12),
                 }}
-              />
-
-              {/* 문구 + 시간 */}
-              <View style={{ flex: 1 }}>
-                <Text
-                  className="text-gray-900"
+              >
+                {/* 아바타 */}
+                <View
+                  className="rounded-full"
                   style={{
-                    fontSize: moderateScale(14),
-                    lineHeight: moderateScale(20),
+                    width: scale(44),
+                    height: scale(44),
+                    backgroundColor: "#EAF0FF",
                   }}
-                >
-                  {item.message}
-                  <Text className="text-gray-400"> {item.time}</Text>
-                </Text>
-              </View>
+                />
 
-              {/* 썸네일 */}
-              <View
-                style={{
-                  width: scale(56),
-                  height: scale(56),
-                  borderRadius: scale(10),
-                  backgroundColor: "#EDEFF3",
-                }}
-              />
-            </View>
-          ))}
-        </View>
+                {/* 문구 + 시간 */}
+                <View style={{ flex: 1 }}>
+                  <Text
+                    className="text-gray-900"
+                    style={{
+                      fontSize: moderateScale(14),
+                      lineHeight: moderateScale(20),
+                    }}
+                  >
+                    {item.message}
+                    <Text className="text-gray-400">
+                      {" "}
+                      {relativeTime(item.createdAt)}
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
