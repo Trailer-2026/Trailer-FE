@@ -6,8 +6,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import { formatLongDate } from "@/src/features/travel/format";
 import PastTravelSections from "@/src/features/travel/components/PastTravelSections";
-import TravelDetailView from "@/src/features/travel/components/TravelDetailView";
 import {
   useCurrentTravel,
   usePastTravels,
@@ -30,9 +30,6 @@ type Tab = "upcoming" | "past";
 export default function CalendarTab() {
   const [tab, setTab] = useState<Tab>("upcoming");
   const { data: current, isLoading: currentLoading } = useCurrentTravel();
-
-  // 프로모 배너는 예정된 여행이 없을 때(계획 시작 유도)만 노출 — 목업 기준.
-  const showBanner = tab === "upcoming" && !currentLoading && !current;
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -62,7 +59,7 @@ export default function CalendarTab() {
         </Pressable>
       </View>
 
-      {showBanner ? <PromoBanner /> : null}
+      <PromoBanner />
 
       {/* 알약 서브탭 */}
       <View
@@ -225,11 +222,100 @@ function UpcomingTab({
   }
 
   return (
-    <TravelDetailView
-      travelIdx={current.travel_idx}
-      coverImageUrl={current.cover_image_url}
+    <UpcomingTravelCard
+      travel={current}
+      onPress={() =>
+        router.push({
+          pathname: "/travel/[travelIdx]",
+          params: {
+            travelIdx: current.travel_idx,
+            cover: current.cover_image_url ?? "",
+          },
+        })
+      }
     />
   );
+}
+
+/** D-day 배지 + 제목 + 기간 카드. 누르면 일정표 상세로 이동. */
+function UpcomingTravelCard({
+  travel,
+  onPress,
+}: {
+  travel: HomeTravelCard;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(6) }}>
+      <Pressable
+        onPress={onPress}
+        className="active:opacity-80"
+        style={{
+          borderWidth: 1,
+          borderColor: "#C7D6F5",
+          borderRadius: scale(16),
+          backgroundColor: "#FBFCFF",
+          paddingHorizontal: scale(18),
+          paddingVertical: verticalScale(18),
+        }}
+      >
+        <View className="flex-row items-center justify-between">
+          <View
+            className="rounded-full"
+            style={{
+              backgroundColor: ACCENT,
+              paddingHorizontal: scale(12),
+              paddingVertical: verticalScale(4),
+            }}
+          >
+            <Text
+              className="text-white font-bold"
+              style={{ fontSize: moderateScale(13) }}
+            >
+              {dDayLabel(travel)}
+            </Text>
+          </View>
+          <Pressable
+            // TODO(travel-menu): 여행 편집/삭제 메뉴(현재 무동작).
+            onPress={() => {}}
+            hitSlop={10}
+            className="active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="여행 메뉴"
+          >
+            <Feather name="more-vertical" size={moderateScale(18)} color="#9CA3AF" />
+          </Pressable>
+        </View>
+
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(18), marginTop: verticalScale(12) }}
+          numberOfLines={1}
+        >
+          {travel.title}
+        </Text>
+        <Text
+          className="text-gray-500"
+          style={{ fontSize: moderateScale(13), marginTop: verticalScale(6) }}
+        >
+          {formatLongDate(travel.start_date)} ~ {formatLongDate(travel.end_date)}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** 출발일까지 남은 일수 배지. 여행중이면 "여행중". */
+function dDayLabel(travel: HomeTravelCard): string {
+  if (travel.status === "ONGOING") return "여행중";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(`${travel.start_date}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return "예정";
+  const diff = Math.round((start.getTime() - today.getTime()) / 86400000);
+  if (diff > 0) return `D-${diff}`;
+  if (diff === 0) return "D-DAY";
+  return "여행중";
 }
 
 /* ------------------------------------------------------------------ */
