@@ -4,6 +4,7 @@ import {
   createTravel,
   getCurrentTravel,
   getPastTravels,
+  getTravelDetail,
   likeTravel,
   unlikeTravel,
 } from "./api";
@@ -88,6 +89,20 @@ export function useToggleTravelLike() {
         setLikedInPast(cur, data.travel_idx, data.liked),
       );
     },
+  });
+}
+
+/**
+ * 여행 1건 일정표 상세 조회.
+ * - travelIdx 가 없으면 비활성(enabled:false) — 예정된 여행이 없을 때 등.
+ * - 404/401 은 호출부(TravelDetailView)에서 isAxiosError status 로 분기.
+ */
+export function useTravelDetail(travelIdx?: number) {
+  return useQuery({
+    queryKey: travelKeys.detail(travelIdx ?? -1),
+    queryFn: () => getTravelDetail(travelIdx!),
+    enabled: travelIdx != null,
+    staleTime: 1000 * 60, // 1분
   });
 }
 

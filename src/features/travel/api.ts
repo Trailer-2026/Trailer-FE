@@ -5,6 +5,7 @@ import type {
   HomeTravelCard,
   PastTravelListResponse,
   TravelCreateRequest,
+  TravelDetail,
   TravelLikeResponse,
   TravelResponse,
 } from "./types";
@@ -48,6 +49,20 @@ export async function getPastTravels(): Promise<PastTravelListResponse> {
   );
   // 없어도 data 는 빈 배열로 오지만, 방어적으로 null 이면 빈 목록으로 취급.
   return res.data.data ?? { travels: [], total: 0 };
+}
+
+/**
+ * GET /api/travels/{travel_idx} — 여행 1건 일정표 상세(일자별 타임라인).
+ * 404: 존재하지 않거나 본인 여행 아님 / 401: 인증 필요(client.ts 인터셉터 처리).
+ */
+export async function getTravelDetail(
+  travelIdx: number,
+): Promise<TravelDetail> {
+  const res = await api.get<CommonResponse<TravelDetail>>(
+    `/api/travels/${travelIdx}`,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
 }
 
 /**

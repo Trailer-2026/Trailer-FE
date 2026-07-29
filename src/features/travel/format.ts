@@ -25,6 +25,26 @@ export function formatDotDate(iso: string): string {
   return `${d.getFullYear()}.${m}.${day}`;
 }
 
+/**
+ * 일정표 상세의 시각 필드는 ISO datetime 이 아니라 "HH:MM:SS" 문자열이다.
+ * 추천 결과의 ISO 포맷터(new Date 파싱)를 쓰면 안 되고 앞 5자리(HH:MM)만 취한다.
+ */
+export function formatClockTime(hms: string | null | undefined): string {
+  if (!hms) return "";
+  const m = /^(\d{1,2}):(\d{2})/.exec(hms);
+  if (!m) return "";
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+
+/** "2026-07-08" → "07.08 (수)" — 일정표 상세 DAY 헤더 날짜 표기. */
+export function formatDayDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${mo}.${day} (${WEEKDAYS[d.getDay()]})`;
+}
+
 export function travelStatusLabel(status: TravelStatus): string {
   switch (status) {
     case "PLANNED":
