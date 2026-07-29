@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
@@ -10,6 +10,7 @@ import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
 import { captureFromCamera, promptMediaSource } from "@/src/features/reels/capture";
 import DraggableTimeline from "@/src/features/reels/components/DraggableTimeline";
+import RenderOptions from "@/src/features/reels/components/RenderOptions";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import {
   SECONDS_PER_PHOTO,
@@ -17,7 +18,14 @@ import {
   formatTimelineLabel,
   totalDurationSeconds,
 } from "@/src/features/reels/media";
+import { describeRenderError } from "@/src/features/video/errors";
+import { DEFAULT_RENDER_OPTIONS } from "@/src/features/video/options";
+import { useRenderPhotosOnly } from "@/src/features/video/queries";
+import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+
+/** 사진→영상 렌더에 필요한 최소 사진 수(서버도 2장 미만이면 400). */
+const MIN_PHOTOS = 2;
 
 const ACCENT = "#5E84F4"; // + 버튼
 const THUMB_W = 78;
@@ -40,6 +48,18 @@ export default function ReelsEditScreen() {
   const selected =
     assets.find((a) => a.uri === selectedUri) ?? assets[0] ?? null;
 
+  // 렌더 옵션(테마/조명/엔진/인트로/아웃트로). quick·bgm 은 기본값 고정.
+  const [options, setOptions] = useState<RenderOptionsValue>(
+    DEFAULT_RENDER_OPTIONS,
+  );
+  const patchOptions = (patch: Partial<RenderOptionsValue>) =>
+    setOptions((prev) => ({ ...prev, ...patch }));
+
+  const render = useRenderPhotosOnly();
+
+  // photos-only 렌더 대상은 사진만. 영상이 섞여 있어도 사진만 추려 보낸다.
+  const photos = assets.filter((a) => a.kind === "image");
+
   const onAddMore = async () => {
     const source = await promptMediaSource();
     if (source === "camera") {
@@ -51,17 +71,29 @@ export default function ReelsEditScreen() {
   };
 
   const onCreate = () => {
-    // TODO(백엔드 업로드): 여기서 assets 를 순서대로 서버에 전송한다.
-    //   - 각 항목의 uri 를 multipart/form-data 로 업로드 (파일 + taken_at + latitude/longitude)
-    //   - 응답으로 reels_idx 를 받아 피드로 이동
-    //   - 업로드 진행률 표시 화면 필요
-    //   현재는 API 스펙이 없어 선택 결과만 확인시킨다.
-    Alert.alert(
-      "생성하기",
-      `사진 ${assets.length}장으로 영상을 만듭니다.\n(백엔드 업로드는 다음 단계에서 연결됩니다)`,
+    if (render.isPending) return;
+    // 사전 검증 — 서버도 2장 미만이면 400 이지만 먼저 막아 요청을 아낀다.
+    if (photos.length < MIN_PHOTOS) {
+      Alert.alert(
+        "사진이 부족해요",
+        `영상으로 만들려면 사진이 최소 ${MIN_PHOTOS}장 필요해요.`,
+      );
+      return;
+    }
+    // 순서는 백엔드가 EXIF 촬영시각으로 정렬하므로 드래그 순서를 강제하지 않는다.
+    render.mutate(
+      { photos, options },
+      {
+        onSuccess: (status) => {
+          router.push(`/reels/progress?job_id=${status.job_id}`);
+        },
+        // 400(GPS 부족·같은 장소·알 수 없는 옵션 등)은 서버 메시지를 그대로 노출.
+        onError: (err) => Alert.alert("영상 만들기 실패", describeRenderError(err)),
+      },
     );
   };
 
+  const canCreate = photos.length >= MIN_PHOTOS && !render.isPending;
   const totalSeconds = totalDurationSeconds(assets);
 
   return (
@@ -93,10 +125,10 @@ export default function ReelsEditScreen() {
 
         <Pressable
           onPress={onCreate}
-          disabled={assets.length === 0}
+          disabled={!canCreate}
           hitSlop={12}
           className="active:opacity-60"
-          style={{ opacity: assets.length === 0 ? 0.4 : 1 }}
+          style={{ opacity: canCreate ? 1 : 0.4 }}
           accessibilityRole="button"
           accessibilityLabel="영상 생성하기"
         >
@@ -104,7 +136,7 @@ export default function ReelsEditScreen() {
             className="font-semibold text-white"
             style={{ fontSize: moderateScale(15) }}
           >
-            생성하기
+            {render.isPending ? "만드는 중…" : "생성하기"}
           </Text>
         </Pressable>
       </View>
@@ -143,6 +175,18 @@ export default function ReelsEditScreen() {
           0:00 / {formatClock(totalSeconds)}
         </Text>
       </View>
+
+      {/* 렌더 옵션 — 화면이 작아도 눌러 스크롤할 수 있게 높이를 제한한다. */}
+      <ScrollView
+        style={{ maxHeight: verticalScale(180) }}
+        contentContainerStyle={{
+          paddingHorizontal: scale(20),
+          paddingBottom: verticalScale(14),
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <RenderOptions value={options} onChange={patchOptions} />
+      </ScrollView>
 
       {/* 하단 타임라인: + 추가 버튼 + 드래그로 순서 바꾸는 썸네일 목록 */}
       <View
