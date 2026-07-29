@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ImageBackground,
   Pressable,
   ScrollView,
@@ -16,9 +17,12 @@ import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
+import { describeScheduleError } from "../errors";
 import { formatClockTime, formatDayDate, formatLongDate } from "../format";
-import { useTravelDetail } from "../queries";
+import { useDeleteSchedule, useTravelDetail } from "../queries";
 import type { TravelDay, TravelDetail, TravelScheduleItem } from "../types";
+import AddScheduleModal from "./schedule/AddScheduleModal";
+import EditScheduleModal from "./schedule/EditScheduleModal";
 
 const ACCENT = "#5E84F4";
 const CARD_BG = "#F4F4F6";
@@ -50,6 +54,39 @@ export default function TravelDetailView({
   onBack?: () => void;
 }) {
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
+
+  // 추가 모달 상태(선택된 day_no 프리필용), 편집 대상.
+  const [addState, setAddState] = useState<{ dayNo?: number } | null>(null);
+  const [editTarget, setEditTarget] = useState<{
+    item: TravelScheduleItem;
+    dayNo: number;
+  } | null>(null);
+  const del = useDeleteSchedule(travelIdx);
+
+  // 항목 길게 누르면 편집/삭제 선택.
+  const openItemMenu = (item: TravelScheduleItem, dayNo: number) => {
+    Alert.alert(item.title || "일정", undefined, [
+      { text: "편집", onPress: () => setEditTarget({ item, dayNo }) },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () =>
+          Alert.alert("일정을 삭제할까요?", "삭제하면 되돌릴 수 없어요.", [
+            { text: "취소", style: "cancel" },
+            {
+              text: "삭제",
+              style: "destructive",
+              onPress: () =>
+                del.mutate(item.schedule_idx, {
+                  onError: (e) =>
+                    Alert.alert("삭제 실패", describeScheduleError(e)),
+                }),
+            },
+          ]),
+      },
+      { text: "취소", style: "cancel" },
+    ]);
+  };
 
   if (isLoading) {
     return (
@@ -94,32 +131,65 @@ export default function TravelDetailView({
   const cover = coverImageUrl ?? firstItemImage(data);
 
   return (
-    <ScrollView
-      className="flex-1 bg-white"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: verticalScale(32) }}
-    >
-      <Hero travel={data} coverUri={cover} onBack={onBack} />
+    <>
+      <ScrollView
+        className="flex-1 bg-white"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: verticalScale(32) }}
+      >
+        <Hero travel={data} coverUri={cover} onBack={onBack} />
 
-      {/* KTX 티켓 정보 추가하기 — 히어로 하단에 겹쳐 뜨는 카드(현재 무동작) */}
-      <TicketAddCard />
+        {/* KTX 티켓 정보 추가하기 — 히어로 하단에 겹쳐 뜨는 카드(현재 무동작) */}
+        <TicketAddCard />
 
-      <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(8) }}>
-        {data.days.length === 0 ? (
-          <Text
-            className="text-center text-gray-400"
-            style={{
-              fontSize: moderateScale(14),
-              paddingVertical: verticalScale(40),
-            }}
-          >
-            등록된 일정이 없어요
-          </Text>
-        ) : (
-          data.days.map((day) => <DaySection key={day.day_no} day={day} />)
-        )}
-      </View>
-    </ScrollView>
+        <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(8) }}>
+          {data.days.length === 0 ? (
+            <EmptyDays onAdd={() => setAddState({})} />
+          ) : (
+            data.days.map((day) => (
+              <DaySection
+                key={day.day_no}
+                day={day}
+                onAdd={() => setAddState({ dayNo: day.day_no })}
+                onItemMenu={(item) => openItemMenu(item, day.day_no)}
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      <AddScheduleModal
+        visible={!!addState}
+        onClose={() => setAddState(null)}
+        travelIdx={travelIdx}
+        days={data.days}
+        initialDayNo={addState?.dayNo}
+      />
+      {editTarget ? (
+        <EditScheduleModal
+          visible
+          onClose={() => setEditTarget(null)}
+          travelIdx={travelIdx}
+          item={editTarget.item}
+          dayNo={editTarget.dayNo}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** 일정이 하나도 없을 때 — 안내 + 추가 버튼. */
+function EmptyDays({ onAdd }: { onAdd: () => void }) {
+  return (
+    <View style={{ paddingVertical: verticalScale(32), alignItems: "center" }}>
+      <Text
+        className="text-gray-400"
+        style={{ fontSize: moderateScale(14), marginBottom: verticalScale(16) }}
+      >
+        등록된 일정이 없어요
+      </Text>
+      <AddButton onPress={onAdd} />
+    </View>
   );
 }
 
@@ -259,7 +329,15 @@ function toRows(items: TravelScheduleItem[]): Row[] {
   return out;
 }
 
-function DaySection({ day }: { day: TravelDay }) {
+function DaySection({
+  day,
+  onAdd,
+  onItemMenu,
+}: {
+  day: TravelDay;
+  onAdd: () => void;
+  onItemMenu: (item: TravelScheduleItem) => void;
+}) {
   const rows = toRows(day.items);
   // 승차/장소 노드에만 순번을 매기고 하차는 빈 노드로 둔다.
   let seq = 0;
@@ -301,32 +379,39 @@ function DaySection({ day }: { day: TravelDay }) {
             row={row}
             number={number}
             isLast={i === rows.length - 1}
+            onLongPress={() => onItemMenu(row.item)}
           />
         );
       })}
 
-      {/* 일정 추가 (현재 무동작) */}
-      <Pressable
-        // TODO(schedule-add): 일정 항목 추가 플로우 연결(현재 무동작).
-        className="items-center justify-center bg-white active:opacity-70"
-        style={{
-          marginTop: verticalScale(4),
-          height: verticalScale(46),
-          borderRadius: scale(10),
-          borderWidth: 1,
-          borderColor: "#E5E7EB",
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="일정 추가"
-      >
-        <Text
-          className="font-medium text-gray-600"
-          style={{ fontSize: moderateScale(14) }}
-        >
-          일정 추가
-        </Text>
-      </Pressable>
+      <AddButton onPress={onAdd} />
     </View>
+  );
+}
+
+/** 일정 추가 버튼(흰색 아웃라인). 길게 눌러 편집/삭제 안내도 겸한다. */
+function AddButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="items-center justify-center bg-white active:opacity-70"
+      style={{
+        marginTop: verticalScale(4),
+        height: verticalScale(46),
+        borderRadius: scale(10),
+        borderWidth: 1,
+        borderColor: "#E5E7EB",
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="일정 추가"
+    >
+      <Text
+        className="font-medium"
+        style={{ fontSize: moderateScale(14), color: ACCENT }}
+      >
+        + 일정 추가
+      </Text>
+    </Pressable>
   );
 }
 
@@ -334,10 +419,12 @@ function TimelineRow({
   row,
   number,
   isLast,
+  onLongPress,
 }: {
   row: Row;
   number: number | null;
   isLast: boolean;
+  onLongPress: () => void;
 }) {
   return (
     <View style={{ flexDirection: "row" }}>
@@ -367,8 +454,13 @@ function TimelineRow({
         ) : null}
       </View>
 
-      {/* 카드 */}
-      <View style={{ flex: 1, paddingBottom: verticalScale(12) }}>
+      {/* 카드 — 길게 눌러 편집/삭제 */}
+      <Pressable
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        className="active:opacity-80"
+        style={{ flex: 1, paddingBottom: verticalScale(12) }}
+      >
         {row.t === "board" ? (
           <BoardCard item={row.item} />
         ) : row.t === "alight" ? (
@@ -376,7 +468,7 @@ function TimelineRow({
         ) : (
           <PlaceCard item={row.item} />
         )}
-      </View>
+      </Pressable>
     </View>
   );
 }
