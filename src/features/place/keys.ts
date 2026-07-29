@@ -8,4 +8,5 @@ export const placeKeys = {
   all: ["places"] as const,
   themed: (theme?: Theme) =>
     [...placeKeys.all, "themed", theme ?? "random"] as const,
+  search: (query: string) => [...placeKeys.all, "search", query] as const,
 };

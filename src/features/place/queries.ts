@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import type { Theme } from "@/src/features/course/types";
+import { useDebouncedValue } from "@/src/utils/useDebouncedValue";
 
-import { getThemedPlaces } from "./api";
+import { getThemedPlaces, searchPlaces } from "./api";
 import { placeKeys } from "./keys";
 import { NATURE_SEED } from "./seed";
 
@@ -26,5 +27,21 @@ export function useThemedPlaces(theme?: Theme) {
     staleTime: theme ? FIXED_STALE_MS : 0,
     initialData: isNature ? NATURE_SEED : undefined,
     initialDataUpdatedAt: isNature ? 0 : undefined,
+  });
+}
+
+/**
+ * 장소 검색(일정 추가용).
+ * - 입력값을 debounce(350ms)해 키 입력마다 요청이 나가지 않게 한다.
+ * - 검색어가 비면 비활성(enabled:false).
+ * - 502 등 실패는 호출부에서 error 로 "장소 검색 실패" 안내.
+ */
+export function usePlaceSearch(query: string) {
+  const debounced = useDebouncedValue(query.trim(), 350);
+  return useQuery({
+    queryKey: placeKeys.search(debounced),
+    queryFn: () => searchPlaces(debounced),
+    enabled: debounced.length >= 1,
+    staleTime: 1000 * 60,
   });
 }

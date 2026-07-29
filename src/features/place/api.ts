@@ -2,7 +2,7 @@ import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
 import type { Theme } from "@/src/features/course/types";
 
-import type { ThemedPlacesResponse } from "./types";
+import type { PlaceSearchResult, ThemedPlacesResponse } from "./types";
 
 /**
  * GET /api/places/themed
@@ -19,4 +19,19 @@ export async function getThemedPlaces(
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
+}
+
+/**
+ * GET /api/places/search?query={검색어} — 카카오 로컬 장소 검색.
+ * 502: 카카오 호출 실패 → 호출부에서 "장소 검색에 실패했어요" 안내.
+ */
+export async function searchPlaces(
+  query: string,
+): Promise<PlaceSearchResult[]> {
+  const res = await api.get<CommonResponse<{ places: PlaceSearchResult[] }>>(
+    "/api/places/search",
+    { params: { query } },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data.places;
 }
