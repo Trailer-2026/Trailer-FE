@@ -1,5 +1,4 @@
 import Feather from "@expo/vector-icons/Feather";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
@@ -14,23 +13,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
-import { formatDotDate, travelStatusLabel } from "@/src/features/travel/format";
+import PastTravelSections from "@/src/features/travel/components/PastTravelSections";
+import TravelListCard from "@/src/features/travel/components/TravelListCard";
 import {
   useCurrentTravel,
   usePastTravels,
   useToggleTravelLike,
 } from "@/src/features/travel/queries";
-import type {
-  HomeTravelCard,
-  PastTravelCard,
-} from "@/src/features/travel/types";
+import type { PastTravelCard } from "@/src/features/travel/types";
 import { useMyProfile } from "@/src/features/user/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#668DFF";
 const HEADER_BG = "#EDF0FB";
-const HEART_ON = "#FF3B5C";
-const HEART_OFF = "#C4C9D4";
 
 // 헤더 배경 + 통계 칩 아이콘 (Figma 에셋)
 const MY_BG = require("../../../../assets/images/style/my_background.png");
@@ -56,17 +51,10 @@ export default function TravelsScreen() {
   const pastTravels = past.data?.travels ?? [];
   const nickname = profile?.nickname ?? "여행자";
 
-  // 좋아요한 여행은 "주요 여행", 나머지는 "지난 여행"으로 분리
-  const majorTravels = pastTravels.filter((t) => t.liked);
-  const pastOnly = pastTravels.filter((t) => !t.liked);
-
   function handleToggleLike(t: PastTravelCard) {
     toggleLike.mutate(
       { travelIdx: t.travel_idx, currentlyLiked: t.liked },
-      {
-        onError: () =>
-          Alert.alert("오류", "잠시 후 다시 시도해 주세요."),
-      },
+      { onError: () => Alert.alert("오류", "잠시 후 다시 시도해 주세요.") },
     );
   }
 
@@ -145,50 +133,11 @@ export default function TravelsScreen() {
             <NewTravelCard onPress={() => router.push("/course/intro")} />
           )}
 
-          {/* 주요 여행 (좋아요한 여행) */}
-          {majorTravels.length > 0 ? (
-            <>
-              <SectionTitle>주요 여행</SectionTitle>
-              {majorTravels.map((t) => (
-                <TravelListCard
-                  key={t.travel_idx}
-                  travel={t}
-                  liked={t.liked}
-                  onToggleLike={() => handleToggleLike(t)}
-                />
-              ))}
-            </>
-          ) : null}
-
-          {/* 지난 여행 */}
-          {pastOnly.length > 0 ? (
-            <>
-              <SectionTitle>지난 여행</SectionTitle>
-              {pastOnly.map((t) => (
-                <TravelListCard
-                  key={t.travel_idx}
-                  travel={t}
-                  liked={t.liked}
-                  onToggleLike={() => handleToggleLike(t)}
-                />
-              ))}
-            </>
-          ) : majorTravels.length === 0 ? (
-            <>
-              <SectionTitle>지난 여행</SectionTitle>
-              <View
-                className="items-center justify-center"
-                style={{ paddingVertical: verticalScale(48) }}
-              >
-                <Text
-                  className="text-gray-400"
-                  style={{ fontSize: moderateScale(14) }}
-                >
-                  아직 지난 여행이 없어요
-                </Text>
-              </View>
-            </>
-          ) : null}
+          {/* 다녀온 여행 (주요/지난) — 일정 탭과 공통 컴포넌트 */}
+          <PastTravelSections
+            travels={pastTravels}
+            onToggleLike={handleToggleLike}
+          />
         </ScrollView>
       )}
     </View>
@@ -235,107 +184,6 @@ function StatPill({
       >
         {value}
       </Text>
-    </View>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* 섹션 제목 (주요 여행 / 지난 여행)                                     */
-/* ------------------------------------------------------------------ */
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <Text
-      className="font-bold text-gray-900"
-      style={{
-        fontSize: moderateScale(16),
-        marginTop: verticalScale(24),
-        marginBottom: verticalScale(4),
-      }}
-    >
-      {children}
-    </Text>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* 여행 카드 (썸네일 + 날짜 + 제목 + 상태 배지 + 하트)                    */
-/*   liked 를 넘기면 하트 표시. onToggleLike 가 있으면 눌러서 좋아요 토글.  */
-/*   현재 여행엔 liked 가 없어 하트 자체를 렌더하지 않는다.                */
-/* ------------------------------------------------------------------ */
-function TravelListCard({
-  travel,
-  liked,
-  onToggleLike,
-}: {
-  travel: HomeTravelCard | PastTravelCard;
-  liked?: boolean;
-  onToggleLike?: () => void;
-}) {
-  return (
-    <View
-      className="flex-row items-center"
-      style={{ paddingVertical: verticalScale(12), gap: scale(14) }}
-    >
-      {/* 썸네일 (여행 첫 일정 대표 이미지) */}
-      <View
-        className="bg-gray-100 overflow-hidden items-center justify-center"
-        style={{ width: scale(73), height: scale(73), borderRadius: scale(12) }}
-      >
-        {travel.cover_image_url ? (
-          <Image
-            source={{ uri: travel.cover_image_url }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-          />
-        ) : (
-          <Feather name="image" size={moderateScale(24)} color="#C4C9D4" />
-        )}
-      </View>
-
-      {/* 날짜 · 제목 · 상태 배지 */}
-      <View style={{ flex: 1 }}>
-        <Text className="text-gray-400" style={{ fontSize: moderateScale(13) }}>
-          {formatDotDate(travel.end_date)}
-        </Text>
-        <Text
-          className="font-bold text-gray-900"
-          numberOfLines={1}
-          style={{ fontSize: moderateScale(18), marginTop: verticalScale(2) }}
-        >
-          {travel.title}
-        </Text>
-        <View
-          className="self-start bg-gray-100"
-          style={{
-            marginTop: verticalScale(6),
-            paddingHorizontal: scale(8),
-            paddingVertical: verticalScale(3),
-            borderRadius: scale(6),
-          }}
-        >
-          <Text
-            className="text-gray-500"
-            style={{ fontSize: moderateScale(11) }}
-          >
-            {travelStatusLabel(travel.status)}
-          </Text>
-        </View>
-      </View>
-
-      {/* 하트 — 눌러서 좋아요 토글. liked 없으면(현재 여행) 렌더 안 함 */}
-      {liked !== undefined ? (
-        <Pressable
-          onPress={onToggleLike}
-          disabled={!onToggleLike}
-          hitSlop={10}
-        >
-          <MaterialCommunityIcons
-            name={liked ? "heart" : "heart-outline"}
-            size={moderateScale(24)}
-            color={liked ? HEART_ON : HEART_OFF}
-          />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
