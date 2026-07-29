@@ -33,11 +33,12 @@ export const ENGINE_OPTIONS: { value: VideoEngine; label: string }[] = [
 
 /**
  * 렌더 옵션 기본값.
- * - engine: 개발 중엔 로컬 렌더를 기본으로.
+ * - engine: modal(GPU) 이 실제 동작·최적화된 렌더 경로다. local 은 백엔드 머신에서
+ *   GPU 없이 직접 렌더라 느리거나 미구성일 수 있어 기본은 modal.
  * - quick: true 고정(빠른 렌더). bgm: "" 무음.
  */
 export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
-  engine: "local",
+  engine: "modal",
   theme: "default",
   light_preset: "",
   intro: false,
