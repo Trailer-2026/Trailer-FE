@@ -406,10 +406,10 @@ function AddButton({ onPress }: { onPress: () => void }) {
       accessibilityLabel="일정 추가"
     >
       <Text
-        className="font-medium"
-        style={{ fontSize: moderateScale(14), color: ACCENT }}
+        className="font-medium text-gray-600"
+        style={{ fontSize: moderateScale(14) }}
       >
-        + 일정 추가
+        일정 추가
       </Text>
     </Pressable>
   );
