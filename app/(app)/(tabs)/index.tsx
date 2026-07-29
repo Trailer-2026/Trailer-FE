@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { useState, type ComponentType } from "react";
 import {
   ActivityIndicator,
@@ -335,9 +335,8 @@ function PromoHero() {
 function CurrentTravelHero({ travel }: { travel: HomeTravelCard }) {
   return (
     <Pressable
-      onPress={() => {
-        // TODO(travel-detail): travel_idx 로 상세 화면 이동 (다음 범위).
-      }}
+      // 세 번째 탭 '예정된 여행'으로 이동 — 그 탭이 현재 여행 상세를 보여준다.
+      onPress={() => router.navigate("/calendar")}
     >
       <TravelCoverImage
         uri={travel.cover_image_url}
@@ -627,9 +626,8 @@ function CurrentTravelFloatingCard({ travel }: { travel: HomeTravelCard }) {
       }}
     >
       <Pressable
-        onPress={() => {
-          // TODO(travel-detail): travel_idx 로 상세 화면 이동 (다음 범위).
-        }}
+        // 세 번째 탭 '예정된 여행'으로 이동 — 그 탭이 현재 여행 상세를 보여준다.
+        onPress={() => router.navigate("/calendar")}
       >
         <LinearGradient
           colors={["#668DFF", "#81D0E4"]}
