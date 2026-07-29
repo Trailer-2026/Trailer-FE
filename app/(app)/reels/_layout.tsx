@@ -12,6 +12,8 @@ export default function ReelsLayout() {
       <Stack.Screen name="create" />
       <Stack.Screen name="gallery" />
       <Stack.Screen name="edit" />
+      {/* 렌더 진행률 → 완료. 추적은 전역(RenderTracker)이 하므로 화면을 떠나도 된다. */}
+      <Stack.Screen name="progress" />
     </Stack>
   );
 }
