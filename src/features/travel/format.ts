@@ -36,13 +36,20 @@ export function formatClockTime(hms: string | null | undefined): string {
   return `${m[1].padStart(2, "0")}:${m[2]}`;
 }
 
-/** "2026-07-08" → "07.08 (수)" — 일정표 상세 DAY 헤더 날짜 표기. */
+/** "2026-07-03" → "7/3(금)" — 일정표 상세 DAY 헤더 날짜 표기(앞자리 0 없음). */
 export function formatDayDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`;
+}
+
+/** "2026-07-03" → "2026.07.03(금)" — 일정표 상세 히어로 기간 표기. */
+export function formatLongDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${mo}.${day} (${WEEKDAYS[d.getDay()]})`;
+  return `${d.getFullYear()}.${mo}.${day}(${WEEKDAYS[d.getDay()]})`;
 }
 
 export function travelStatusLabel(status: TravelStatus): string {

@@ -1,46 +1,53 @@
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import Feather from "@expo/vector-icons/Feather";
 import { isAxiosError } from "axios";
 import { Image } from "expo-image";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  ImageBackground,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 
+import BackIcon from "@/src/components/icons/BackIcon";
+import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-import {
-  formatClockTime,
-  formatDayDate,
-  formatTravelPeriod,
-  travelStatusLabel,
-} from "../format";
+import { formatClockTime, formatDayDate, formatLongDate } from "../format";
 import { useTravelDetail } from "../queries";
-import type {
-  TravelDay,
-  TravelDetail,
-  TravelScheduleItem,
-  TravelStatus,
-} from "../types";
+import type { TravelDay, TravelDetail, TravelScheduleItem } from "../types";
 
-/* 추천 결과 타임라인과 동일한 다크 팔레트 재사용 */
-const DARK_BG = "#1A1A1A";
-const DARK_TEXT = "#FFFFFF";
-const DARK_SUB = "#A1A1AA";
-const DARK_DIM = "#6E6E73";
-const DARK_LINE = "#3A3A3C";
 const ACCENT = "#5E84F4";
-const PLACE = "#B0E6DB";
+const CARD_BG = "#F4F4F6";
+const RAIL_LINE = "#D9DCE1";
+const NODE_RING = "#C3CFEA";
+const HOLLOW_RING = "#D1D5DB";
+
+const KTX_LOGO = require("../../../../assets/images/style/ktx.png");
+const PLACEHOLDER = require("../../../../assets/images/Main.png");
 
 const RAIL_W = scale(30);
 const RAIL_GAP = scale(12);
 
 /**
- * 여행 1건의 일정표 상세(일자별 타임라인).
+ * 여행 1건의 일정표 상세(히어로 + 일자별 타임라인).
  * 일정 탭 '예정된 여행'(인라인)과 다녀온 여행 상세 화면(푸시)이 공통으로 사용한다.
- * 로딩/에러(404·401)/빈 일정까지 자체 처리한다.
+ *
+ * - coverImageUrl: 히어로 배경(TravelDetail 응답엔 커버가 없어 호출부가 넘긴다).
+ *   없으면 일정 항목 이미지 → placeholder 순으로 대체.
+ * - onBack: 주면 히어로 위에 뒤로 버튼을 얹는다(푸시 화면용). 인라인 탭에선 생략.
  */
 export default function TravelDetailView({
   travelIdx,
+  coverImageUrl,
+  onBack,
 }: {
   travelIdx: number;
+  coverImageUrl?: string | null;
+  onBack?: () => void;
 }) {
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
 
@@ -84,31 +91,24 @@ export default function TravelDetailView({
     );
   }
 
+  const cover = coverImageUrl ?? firstItemImage(data);
+
   return (
     <ScrollView
       className="flex-1 bg-white"
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: verticalScale(24) }}
+      contentContainerStyle={{ paddingBottom: verticalScale(32) }}
     >
-      <DetailHeader travel={data} />
+      <Hero travel={data} coverUri={cover} onBack={onBack} />
 
-      {/* 일자별 타임라인 (다크 시트) */}
-      <View
-        style={{
-          marginTop: verticalScale(16),
-          backgroundColor: DARK_BG,
-          borderTopLeftRadius: scale(24),
-          borderTopRightRadius: scale(24),
-          paddingHorizontal: scale(20),
-          paddingTop: verticalScale(24),
-          paddingBottom: verticalScale(32),
-        }}
-      >
+      {/* KTX 티켓 정보 추가하기 — 히어로 하단에 겹쳐 뜨는 카드(현재 무동작) */}
+      <TicketAddCard />
+
+      <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(8) }}>
         {data.days.length === 0 ? (
           <Text
-            className="text-center"
+            className="text-center text-gray-400"
             style={{
-              color: DARK_SUB,
               fontSize: moderateScale(14),
               paddingVertical: verticalScale(40),
             }}
@@ -116,9 +116,7 @@ export default function TravelDetailView({
             등록된 일정이 없어요
           </Text>
         ) : (
-          data.days.map((day, i) => (
-            <DaySection key={day.day_no} day={day} first={i === 0} />
-          ))
+          data.days.map((day) => <DaySection key={day.day_no} day={day} />)
         )}
       </View>
     </ScrollView>
@@ -126,297 +124,430 @@ export default function TravelDetailView({
 }
 
 /* ------------------------------------------------------------------ */
-/* 헤더 — 제목 / 기간 / 지역 / 상태 배지                                 */
+/* 히어로 — 커버 이미지 + 제목/기간 오버레이 (+ 뒤로)                    */
 /* ------------------------------------------------------------------ */
-function DetailHeader({ travel }: { travel: TravelDetail }) {
+function Hero({
+  travel,
+  coverUri,
+  onBack,
+}: {
+  travel: TravelDetail;
+  coverUri: string | null;
+  onBack?: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  const source = coverUri && !failed ? { uri: coverUri } : PLACEHOLDER;
+
   return (
-    <View
-      style={{
-        paddingHorizontal: scale(20),
-        paddingTop: verticalScale(16),
-      }}
-    >
-      <StatusBadge status={travel.status} />
-      <Text
-        className="font-bold text-gray-900"
-        style={{ fontSize: moderateScale(22), marginTop: verticalScale(10) }}
-        numberOfLines={2}
+    <View style={{ height: verticalScale(210) }}>
+      <ImageBackground
+        source={source}
+        resizeMode="cover"
+        style={{ flex: 1 }}
+        onError={() => setFailed(true)}
       >
-        {travel.title}
-      </Text>
-      <Text
-        className="text-gray-500"
-        style={{ fontSize: moderateScale(14), marginTop: verticalScale(6) }}
-      >
-        {formatTravelPeriod(travel.start_date, travel.end_date)}
-        {travel.region ? ` · ${travel.region}` : ""}
-      </Text>
+        <LinearGradient
+          colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.35)"]}
+          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+        />
+
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              left: scale(20),
+              top: verticalScale(12),
+              width: scale(28),
+              height: scale(28),
+              justifyContent: "center",
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로"
+          >
+            <BackIcon
+              color="#FFFFFF"
+              width={moderateScale(12)}
+              height={moderateScale(17)}
+            />
+          </Pressable>
+        ) : null}
+
+        <View
+          style={{
+            position: "absolute",
+            left: scale(20),
+            right: scale(20),
+            bottom: verticalScale(30),
+          }}
+        >
+          <Text
+            className="text-white font-bold"
+            style={{ fontSize: moderateScale(22) }}
+            numberOfLines={2}
+          >
+            {travel.title}
+          </Text>
+          <Text
+            className="text-white"
+            style={{
+              fontSize: moderateScale(13),
+              marginTop: verticalScale(6),
+              opacity: 0.95,
+            }}
+          >
+            {formatLongDate(travel.start_date)} ~ {formatLongDate(travel.end_date)}
+          </Text>
+        </View>
+      </ImageBackground>
     </View>
   );
 }
 
-function StatusBadge({ status }: { status: TravelStatus }) {
-  const bg: Record<TravelStatus, string> = {
-    PLANNED: "#5E84F4",
-    ONGOING: "#22C55E",
-    COMPLETED: "#6B7280",
-  };
+function TicketAddCard() {
   return (
-    <View
-      className="self-start rounded-full"
-      style={{
-        backgroundColor: bg[status],
-        paddingHorizontal: scale(10),
-        paddingVertical: verticalScale(3),
-      }}
-    >
-      <Text
-        className="text-white font-semibold"
-        style={{ fontSize: moderateScale(11) }}
+    <View style={{ paddingHorizontal: scale(20), marginTop: -verticalScale(20) }}>
+      <Pressable
+        // TODO(ticket): KTX 승차권 정보 추가 플로우 연결(현재 무동작).
+        className="flex-row items-center bg-white active:opacity-80"
+        style={{
+          borderRadius: scale(12),
+          paddingHorizontal: scale(16),
+          height: verticalScale(52),
+          gap: scale(10),
+          elevation: 4,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 6,
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="KTX 티켓 정보 추가하기"
       >
-        {travelStatusLabel(status)}
-      </Text>
+        <TicketIcon width={moderateScale(22)} height={moderateScale(22)} />
+        <Text
+          className="flex-1 font-semibold text-gray-800"
+          style={{ fontSize: moderateScale(14) }}
+        >
+          KTX 티켓 정보 추가하기
+        </Text>
+        <Feather name="plus" size={moderateScale(20)} color={ACCENT} />
+      </Pressable>
     </View>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* DAY 섹션 — 헤더 + 항목 레일                                          */
+/* DAY 섹션 — Day 배지 + 날짜 + 번호 타임라인 + 일정 추가                */
 /* ------------------------------------------------------------------ */
-function DaySection({ day, first }: { day: TravelDay; first: boolean }) {
+type Row =
+  | { t: "board" | "alight"; item: TravelScheduleItem }
+  | { t: "place"; item: TravelScheduleItem };
+
+/** 일정 항목 → 타임라인 행으로 확장. train 은 승차/하차 2행, 그 외는 1행. */
+function toRows(items: TravelScheduleItem[]): Row[] {
+  const out: Row[] = [];
+  items.forEach((item) => {
+    if (item.kind === "train") {
+      out.push({ t: "board", item });
+      out.push({ t: "alight", item });
+    } else {
+      out.push({ t: "place", item });
+    }
+  });
+  return out;
+}
+
+function DaySection({ day }: { day: TravelDay }) {
+  const rows = toRows(day.items);
+  // 승차/장소 노드에만 순번을 매기고 하차는 빈 노드로 둔다.
+  let seq = 0;
+
   return (
-    <View style={{ marginTop: first ? 0 : verticalScale(28) }}>
+    <View style={{ marginTop: verticalScale(20) }}>
       <View
         className="flex-row items-center"
-        style={{ gap: scale(8), marginBottom: verticalScale(18) }}
+        style={{ gap: scale(8), marginBottom: verticalScale(14) }}
       >
-        <Text
-          className="font-bold"
-          style={{ color: DARK_TEXT, fontSize: moderateScale(18) }}
+        <View
+          className="rounded-md"
+          style={{
+            backgroundColor: ACCENT,
+            paddingHorizontal: scale(9),
+            paddingVertical: verticalScale(3),
+          }}
         >
-          DAY {day.day_no}
-        </Text>
-        <Text style={{ color: DARK_SUB, fontSize: moderateScale(14) }}>
+          <Text
+            className="text-white font-bold"
+            style={{ fontSize: moderateScale(13) }}
+          >
+            Day {day.day_no}
+          </Text>
+        </View>
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(16) }}
+        >
           {formatDayDate(day.date)}
         </Text>
       </View>
 
-      {day.items.map((item, i) => (
-        <TimelineRow
-          key={item.schedule_idx}
-          item={item}
-          isLast={i === day.items.length - 1}
-        />
-      ))}
+      {rows.map((row, i) => {
+        const number = row.t === "alight" ? null : ++seq;
+        return (
+          <TimelineRow
+            key={`${row.item.schedule_idx}-${row.t}`}
+            row={row}
+            number={number}
+            isLast={i === rows.length - 1}
+          />
+        );
+      })}
+
+      {/* 일정 추가 (현재 무동작) */}
+      <Pressable
+        // TODO(schedule-add): 일정 항목 추가 플로우 연결(현재 무동작).
+        className="items-center justify-center bg-white active:opacity-70"
+        style={{
+          marginTop: verticalScale(4),
+          height: verticalScale(46),
+          borderRadius: scale(10),
+          borderWidth: 1,
+          borderColor: "#E5E7EB",
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="일정 추가"
+      >
+        <Text
+          className="font-medium text-gray-600"
+          style={{ fontSize: moderateScale(14) }}
+        >
+          일정 추가
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
 function TimelineRow({
-  item,
+  row,
+  number,
   isLast,
 }: {
-  item: TravelScheduleItem;
+  row: Row;
+  number: number | null;
   isLast: boolean;
 }) {
-  const isTrain = item.kind === "train";
-  const tint = isTrain ? ACCENT : PLACE;
   return (
     <View style={{ flexDirection: "row" }}>
-      {/* 레일 (마커 + 연결선) */}
+      {/* 레일 (번호 노드 + 연결선) */}
       <View style={{ width: RAIL_W, alignItems: "center", marginRight: RAIL_GAP }}>
         <View
           className="items-center justify-center rounded-full"
           style={{
-            width: scale(30),
-            height: scale(30),
+            width: scale(28),
+            height: scale(28),
             borderWidth: 1.5,
-            borderColor: tint,
-            backgroundColor: DARK_BG,
+            borderColor: number != null ? NODE_RING : HOLLOW_RING,
+            backgroundColor: number != null ? "#FFFFFF" : "#EEF0F3",
           }}
         >
-          <MaterialCommunityIcons
-            name={isTrain ? "train" : "map-marker"}
-            size={moderateScale(16)}
-            color={tint}
-          />
+          {number != null ? (
+            <Text
+              className="font-bold"
+              style={{ fontSize: moderateScale(13), color: ACCENT }}
+            >
+              {number}
+            </Text>
+          ) : null}
         </View>
-        {!isLast ? <DottedLine /> : null}
+        {!isLast ? (
+          <View style={{ flex: 1, width: 2, backgroundColor: RAIL_LINE }} />
+        ) : null}
       </View>
 
-      {/* 본문 */}
-      <View style={{ flex: 1, paddingBottom: verticalScale(22) }}>
-        {isTrain ? <TrainBody item={item} /> : <PlaceItemBody item={item} />}
+      {/* 카드 */}
+      <View style={{ flex: 1, paddingBottom: verticalScale(12) }}>
+        {row.t === "board" ? (
+          <BoardCard item={row.item} />
+        ) : row.t === "alight" ? (
+          <AlightCard item={row.item} />
+        ) : (
+          <PlaceCard item={row.item} />
+        )}
       </View>
     </View>
   );
 }
 
-/** 세로 점선 — 노드 사이를 점 5개로 균등하게. */
-function DottedLine() {
+/* ------------------------------------------------------------------ */
+/* 카드 본문                                                            */
+/* ------------------------------------------------------------------ */
+function Card({ children }: { children: React.ReactNode }) {
   return (
     <View
       style={{
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: verticalScale(4),
+        backgroundColor: CARD_BG,
+        borderRadius: scale(12),
+        paddingHorizontal: scale(14),
+        paddingVertical: verticalScale(14),
       }}
     >
-      {Array.from({ length: 5 }).map((_, i) => (
-        <View
-          key={i}
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: 2.5,
-            backgroundColor: DARK_LINE,
-          }}
-        />
-      ))}
+      {children}
     </View>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 항목 본문                                                            */
-/* ------------------------------------------------------------------ */
-function TrainBody({ item }: { item: TravelScheduleItem }) {
-  const timeRange = formatTimeRange(item.start_time, item.end_time);
-  const seat = [item.car_no, item.seat_no].filter(Boolean).join(" ");
+function BoardCard({ item }: { item: TravelScheduleItem }) {
+  const dep = item.dep_station ?? "";
+  const arr = item.arr_station ?? "";
+  const start = formatClockTime(item.start_time);
+  const end = formatClockTime(item.end_time);
+  const route =
+    dep && arr && start && end ? `${dep} ${start} - ${arr} ${end}` : "";
+
   return (
-    <View>
-      <Text
-        className="font-bold"
-        style={{ fontSize: moderateScale(16), color: DARK_TEXT }}
-        numberOfLines={2}
-      >
-        {item.title}
-      </Text>
+    <Card>
+      {route ? (
+        <Text
+          className="font-semibold"
+          style={{ color: ACCENT, fontSize: moderateScale(12) }}
+        >
+          {route}
+        </Text>
+      ) : null}
 
       <View
         className="flex-row items-center"
-        style={{ gap: scale(6), marginTop: verticalScale(8) }}
+        style={{ gap: scale(6), marginTop: verticalScale(route ? 8 : 0) }}
       >
-        {item.train_grade ? (
-          <View
-            className="rounded-md"
-            style={{
-              backgroundColor: ACCENT,
-              paddingHorizontal: scale(9),
-              paddingVertical: verticalScale(2),
-            }}
-          >
-            <Text
-              className="font-bold"
-              style={{ fontSize: moderateScale(11), color: DARK_BG }}
-            >
-              {item.train_grade}
-            </Text>
-          </View>
-        ) : null}
-        {item.dep_station && item.arr_station ? (
-          <Text
-            className="font-semibold"
-            style={{ fontSize: moderateScale(13), color: ACCENT }}
-          >
-            {item.dep_station} → {item.arr_station}
-          </Text>
-        ) : null}
+        <Image
+          source={KTX_LOGO}
+          contentFit="contain"
+          style={{ width: moderateScale(44), height: moderateScale(16) }}
+        />
+        <Text
+          className="font-bold text-gray-900"
+          style={{ fontSize: moderateScale(16) }}
+          numberOfLines={1}
+        >
+          {dep ? `${dep} 승차` : item.title}
+        </Text>
       </View>
 
-      {timeRange ? (
-        <Text
-          style={{
-            color: DARK_SUB,
-            fontSize: moderateScale(12),
-            marginTop: verticalScale(8),
-          }}
+      {(item.train_grade || arr) ? (
+        <View
+          className="flex-row items-center"
+          style={{ gap: scale(6), marginTop: verticalScale(10) }}
         >
-          {timeRange}
-        </Text>
+          {item.train_grade ? (
+            <View
+              className="rounded-md"
+              style={{
+                backgroundColor: "#CBEFDC",
+                paddingHorizontal: scale(9),
+                paddingVertical: verticalScale(3),
+              }}
+            >
+              <Text
+                className="font-bold"
+                style={{ fontSize: moderateScale(11), color: "#128A54" }}
+              >
+                {item.train_grade}
+              </Text>
+            </View>
+          ) : null}
+          {arr ? (
+            <Text
+              className="font-semibold text-gray-500"
+              style={{ fontSize: moderateScale(13) }}
+            >
+              {arr}행
+            </Text>
+          ) : null}
+        </View>
       ) : null}
-
-      {seat ? (
-        <Text
-          style={{
-            color: DARK_DIM,
-            fontSize: moderateScale(12),
-            marginTop: verticalScale(4),
-          }}
-        >
-          {seat}
-        </Text>
-      ) : null}
-
-      {item.memo ? <Memo text={item.memo} /> : null}
-    </View>
+    </Card>
   );
 }
 
-function PlaceItemBody({ item }: { item: TravelScheduleItem }) {
-  const timeRange = formatTimeRange(item.start_time, item.end_time);
+function AlightCard({ item }: { item: TravelScheduleItem }) {
+  const end = formatClockTime(item.end_time);
+  const arr = item.arr_station ?? "";
   return (
-    <View>
+    <Card>
+      {end ? (
+        <Text
+          className="font-semibold"
+          style={{ color: ACCENT, fontSize: moderateScale(13) }}
+        >
+          {end}
+        </Text>
+      ) : null}
       <Text
-        className="font-bold"
-        style={{ fontSize: moderateScale(16), color: DARK_TEXT }}
+        className="font-bold text-gray-900"
+        style={{ fontSize: moderateScale(16), marginTop: verticalScale(end ? 4 : 0) }}
+      >
+        {arr ? `${arr} 하차` : item.title}
+      </Text>
+    </Card>
+  );
+}
+
+function PlaceCard({ item }: { item: TravelScheduleItem }) {
+  const start = formatClockTime(item.start_time);
+  return (
+    <Card>
+      {start ? (
+        <Text
+          className="font-semibold"
+          style={{ color: ACCENT, fontSize: moderateScale(13) }}
+        >
+          {start}
+        </Text>
+      ) : null}
+      <Text
+        className="font-bold text-gray-900"
+        style={{ fontSize: moderateScale(16), marginTop: verticalScale(start ? 4 : 0) }}
         numberOfLines={2}
       >
         {item.title}
       </Text>
-      {timeRange ? (
-        <Text
-          style={{
-            color: DARK_SUB,
-            fontSize: moderateScale(12),
-            marginTop: verticalScale(4),
-          }}
-        >
-          {timeRange}
-        </Text>
-      ) : null}
-
       {item.image_url ? (
         <Image
           source={{ uri: item.image_url }}
           contentFit="cover"
           style={{
             width: "100%",
-            height: verticalScale(150),
-            borderRadius: scale(14),
+            height: verticalScale(140),
+            borderRadius: scale(10),
             marginTop: verticalScale(10),
           }}
         />
       ) : null}
-
-      {item.memo ? <Memo text={item.memo} /> : null}
-    </View>
+      {item.memo ? (
+        <Text
+          className="text-gray-500"
+          style={{
+            fontSize: moderateScale(12),
+            marginTop: verticalScale(8),
+            lineHeight: moderateScale(17),
+          }}
+        >
+          {item.memo}
+        </Text>
+      ) : null}
+    </Card>
   );
 }
 
-function Memo({ text }: { text: string }) {
-  return (
-    <Text
-      style={{
-        color: DARK_DIM,
-        fontSize: moderateScale(12),
-        marginTop: verticalScale(8),
-        lineHeight: moderateScale(17),
-      }}
-    >
-      {text}
-    </Text>
-  );
-}
-
-/** "09:33 - 11:10" / 한쪽만 있으면 그쪽만. "HH:MM:SS" 입력. */
-function formatTimeRange(
-  start: string | null,
-  end: string | null,
-): string {
-  const s = formatClockTime(start);
-  const e = formatClockTime(end);
-  if (s && e) return `${s} - ${e}`;
-  return s || e || "";
+/** 커버 대체용 — 첫 일정 항목 이미지. */
+function firstItemImage(detail: TravelDetail): string | null {
+  for (const day of detail.days) {
+    for (const item of day.items) {
+      if (item.image_url) return item.image_url;
+    }
+  }
+  return null;
 }
