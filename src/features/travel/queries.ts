@@ -1,15 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  createSchedule,
   createTravel,
+  deleteSchedule,
   getCurrentTravel,
   getPastTravels,
   getTravelDetail,
   likeTravel,
   unlikeTravel,
+  updateSchedule,
 } from "./api";
 import { travelKeys } from "./keys";
-import type { PastTravelListResponse } from "./types";
+import type {
+  PastTravelListResponse,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
+} from "./types";
 
 /** past 목록 캐시에서 특정 여행의 liked 를 갱신하는 헬퍼. */
 function setLikedInPast(
@@ -103,6 +110,51 @@ export function useTravelDetail(travelIdx?: number) {
     queryFn: () => getTravelDetail(travelIdx!),
     enabled: travelIdx != null,
     staleTime: 1000 * 60, // 1분
+  });
+}
+
+/**
+ * 일정 항목 추가/편집/삭제. 성공 시 해당 여행의 상세(detail)를 invalidate 해
+ * 타임라인이 자동 갱신되게 한다.
+ */
+export function useCreateSchedule(travelIdx: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ScheduleCreateRequest) =>
+      createSchedule(travelIdx, body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: travelKeys.detail(travelIdx),
+      }),
+  });
+}
+
+export function useUpdateSchedule(travelIdx: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      scheduleIdx,
+      body,
+    }: {
+      scheduleIdx: number;
+      body: ScheduleUpdateRequest;
+    }) => updateSchedule(travelIdx, scheduleIdx, body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: travelKeys.detail(travelIdx),
+      }),
+  });
+}
+
+export function useDeleteSchedule(travelIdx: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scheduleIdx: number) =>
+      deleteSchedule(travelIdx, scheduleIdx),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: travelKeys.detail(travelIdx),
+      }),
   });
 }
 
