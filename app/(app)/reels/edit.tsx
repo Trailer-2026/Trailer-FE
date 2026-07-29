@@ -18,6 +18,7 @@ import {
   formatTimelineLabel,
   totalDurationSeconds,
 } from "@/src/features/reels/media";
+import { useActiveRenderStore } from "@/src/features/video/active-render-store";
 import { describeRenderError } from "@/src/features/video/errors";
 import { DEFAULT_RENDER_OPTIONS } from "@/src/features/video/options";
 import { useRenderPhotosOnly } from "@/src/features/video/queries";
@@ -56,6 +57,7 @@ export default function ReelsEditScreen() {
     setOptions((prev) => ({ ...prev, ...patch }));
 
   const render = useRenderPhotosOnly();
+  const startTracking = useActiveRenderStore((s) => s.start);
 
   // photos-only 렌더 대상은 사진만. 영상이 섞여 있어도 사진만 추려 보낸다.
   const photos = assets.filter((a) => a.kind === "image");
@@ -85,6 +87,8 @@ export default function ReelsEditScreen() {
       { photos, options },
       {
         onSuccess: (status) => {
+          // 전역 추적 시작 → 진행률 화면을 떠나도 완료를 감지해 배너로 알림.
+          startTracking(status.job_id);
           router.push(`/reels/progress?job_id=${status.job_id}`);
         },
         // 400(GPS 부족·같은 장소·알 수 없는 옵션 등)은 서버 메시지를 그대로 노출.

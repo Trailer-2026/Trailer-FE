@@ -12,8 +12,8 @@ export default function ReelsLayout() {
       <Stack.Screen name="create" />
       <Stack.Screen name="gallery" />
       <Stack.Screen name="edit" />
-      {/* 렌더 진행률 → 완료. 뒤로가기 제스처로 이탈해 폴링이 끊기지 않게 잠근다. */}
-      <Stack.Screen name="progress" options={{ gestureEnabled: false }} />
+      {/* 렌더 진행률 → 완료. 추적은 전역(RenderTracker)이 하므로 화면을 떠나도 된다. */}
+      <Stack.Screen name="progress" />
     </Stack>
   );
 }

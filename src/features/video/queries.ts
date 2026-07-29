@@ -26,7 +26,10 @@ export function useRenderStatus(jobId: string | null) {
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "done" || status === "failed" ? false : POLL_INTERVAL_MS;
+      if (status === "done" || status === "failed") return false;
+      // 존재하지 않는 job(404)은 계속 물어봐도 소용없으니 폴링 중단.
+      if (isJobNotFound(query.state.error)) return false;
+      return POLL_INTERVAL_MS;
     },
     retry: (failureCount, error) => {
       if (isJobNotFound(error)) return false; // 존재하지 않는 job → 즉시 표면화
