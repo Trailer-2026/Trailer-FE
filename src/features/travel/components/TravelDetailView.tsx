@@ -315,6 +315,22 @@ type Row =
   | { t: "board" | "alight"; item: TravelScheduleItem }
   | { t: "place"; item: TravelScheduleItem };
 
+/**
+ * 표시 순서 정렬 — 시작 시각("HH:MM:SS", 없으면 맨 뒤) 오름차순.
+ * 서버는 추가 항목을 그날 마지막 sequence 로 붙이지만, 화면은 시간순으로 보여준다.
+ * 같은 시각은 원래 순서 유지(안정 정렬).
+ */
+function sortByStartTime(items: TravelScheduleItem[]): TravelScheduleItem[] {
+  return [...items].sort((a, b) => {
+    const at = a.start_time ?? "";
+    const bt = b.start_time ?? "";
+    if (!at && !bt) return 0;
+    if (!at) return 1;
+    if (!bt) return -1;
+    return at < bt ? -1 : at > bt ? 1 : 0;
+  });
+}
+
 /** 일정 항목 → 타임라인 행으로 확장. train 은 승차/하차 2행, 그 외는 1행. */
 function toRows(items: TravelScheduleItem[]): Row[] {
   const out: Row[] = [];
@@ -338,7 +354,8 @@ function DaySection({
   onAdd: () => void;
   onItemMenu: (item: TravelScheduleItem) => void;
 }) {
-  const rows = toRows(day.items);
+  // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
+  const rows = toRows(sortByStartTime(day.items));
   // 승차/장소 노드에만 순번을 매기고 하차는 빈 노드로 둔다.
   let seq = 0;
 
