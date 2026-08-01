@@ -1,9 +1,7 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import BackIcon from "@/src/components/icons/BackIcon";
 import BellIcon from "@/src/components/icons/BellIcon";
 import { Text } from "@/src/components/Text";
 import { useInAppNotifications } from "@/src/features/notification/inapp-store";
@@ -32,18 +30,9 @@ export default function NotificationsTab() {
         className="flex-row items-center"
         style={{
           paddingHorizontal: scale(20),
-          paddingTop: verticalScale(6),
-          paddingBottom: verticalScale(8),
-          gap: scale(10),
+          height: verticalScale(44),
         }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <BackIcon
-            color="#111827"
-            width={moderateScale(14)}
-            height={moderateScale(20)}
-          />
-        </Pressable>
         <Text
           className="font-bold text-gray-900"
           style={{ fontSize: moderateScale(20) }}

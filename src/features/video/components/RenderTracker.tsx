@@ -9,20 +9,20 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { useActiveRenderStore, type RenderBanner } from "../active-render-store";
 import { videoKeys } from "../keys";
-import { isJobNotFound, useRenderStatus } from "../queries";
+import { isRenderNotFound, useRenderStatus } from "../queries";
 
 const ACCENT = "#5E84F4";
 
 /**
  * 앱 전역 렌더 추적기 — (app) 레이아웃에 항상 마운트.
  *
- * - 저장된 job 을 복구하고(hydrate), job_id 가 있으면 어느 화면에서든 폴링한다.
+ * - 저장된 릴스를 복구하고(hydrate), reels_idx 가 있으면 어느 화면에서든 폴링한다.
  * - 앱이 포그라운드로 돌아오면 즉시 최신 상태를 재확인.
  * - done|failed 를 감지하면(진행률 화면 밖일 때) 상단 인앱 배너를 띄운다.
  * - 존재하지 않는 job(404)은 추적을 정리한다.
  */
 export default function RenderTracker() {
-  const jobId = useActiveRenderStore((s) => s.jobId);
+  const reelsIdx = useActiveRenderStore((s) => s.reelsIdx);
   const hydrated = useActiveRenderStore((s) => s.hydrated);
   const hydrate = useActiveRenderStore((s) => s.hydrate);
   const notify = useActiveRenderStore((s) => s.notify);
@@ -31,7 +31,7 @@ export default function RenderTracker() {
 
   const queryClient = useQueryClient();
 
-  // 최초 1회: 저장된 job 복구
+  // 최초 1회: 저장된 릴스 복구
   useEffect(() => {
     if (!hydrated) void hydrate();
   }, [hydrated, hydrate]);
@@ -39,33 +39,38 @@ export default function RenderTracker() {
   // 포그라운드 복귀 시 즉시 재확인(백그라운드 동안 멈춘 폴링 보완)
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active" && jobId) {
+      if (state === "active" && reelsIdx != null) {
         void queryClient.invalidateQueries({
-          queryKey: videoKeys.status(jobId),
+          queryKey: videoKeys.status(reelsIdx),
         });
       }
     });
     return () => sub.remove();
-  }, [jobId, queryClient]);
+  }, [reelsIdx, queryClient]);
 
-  const { data, error } = useRenderStatus(jobId);
+  const { data, error } = useRenderStatus(reelsIdx);
 
-  // 완료/실패 감지 → 배너
+  // 완료/실패/미확인 감지 → 배너
   useEffect(() => {
-    if (data && (data.status === "done" || data.status === "failed")) {
+    if (
+      data &&
+      (data.status === "done" ||
+        data.status === "failed" ||
+        data.status === "unknown")
+    ) {
       notify(data);
     }
   }, [data, notify]);
 
-  // 사라진 job(404) → 추적 정리(재실행마다 헛폴링 방지)
+  // 사라진 릴스(404) → 추적 정리(재실행마다 헛폴링 방지)
   useEffect(() => {
-    if (jobId && isJobNotFound(error)) acknowledge();
-  }, [jobId, error, acknowledge]);
+    if (reelsIdx != null && isRenderNotFound(error)) acknowledge();
+  }, [reelsIdx, error, acknowledge]);
 
   if (!banner) return null;
 
   const onPress = () => {
-    router.push(`/reels/progress?job_id=${banner.jobId}`);
+    router.push(`/reels/progress?reels_idx=${banner.reelsIdx}`);
     acknowledge();
   };
 

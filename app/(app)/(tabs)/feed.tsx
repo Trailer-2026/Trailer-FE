@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -14,17 +13,8 @@ import { useReelsStore } from "@/src/features/reels/store";
 import type { Reels } from "@/src/features/reels/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-/**
- * "내 여행영상 만들기" 말풍선 — 꼬리·글씨까지 포함된 이미지 에셋.
- * (Metro 는 대소문자를 구분하므로 실제 파일명과 정확히 일치시킬 것)
- *
- * 원본 432 x 172 중 본체(알약)가 432 x 120, 꼬리 꼭짓점은 오른쪽 끝에서 54.5px.
- * 0.25 배로 렌더하면 본체가 정확히 108 x 30 이 된다.
- */
-const TOOLTIP_IMG = require("../../../assets/images/style/message.png");
-const TOOLTIP_W = 108; // 432 * 0.25 — 본체 폭과 동일
-const TOOLTIP_H = 43; // 172 * 0.25 — 꼬리 포함 전체 높이
-const TAIL_APEX_FROM_RIGHT = 13.6; // 54.5 * 0.25 — 이미지 우측 끝 ~ 꼬리 꼭짓점
+// "내 여행영상 만들기" 말풍선 — 메인탭 말풍선과 동일한 CSS 텍스트 버블(색·굵기 통일).
+const TOOLTIP_COLOR = "#5E84F4";
 
 export default function FeedTab() {
   const insets = useSafeAreaInsets();
@@ -91,13 +81,12 @@ export default function FeedTab() {
           className="flex-row items-center justify-between"
           style={{
             paddingHorizontal: scale(20),
-            paddingTop: verticalScale(6),
-            paddingBottom: verticalScale(4),
+            height: verticalScale(44),
           }}
         >
           <Text
             className="font-bold text-white"
-            style={{ fontSize: moderateScale(17) }}
+            style={{ fontSize: moderateScale(20) }}
           >
             트레일러
           </Text>
@@ -134,21 +123,55 @@ export default function FeedTab() {
           </View>
         </View>
 
-        {/* "내 여행영상 만들기" 말풍선 (이미지). 꼬리 꼭짓점이 + 아이콘 중앙에 오도록
-            이미지 우측 여백(TAIL_APEX_FROM_RIGHT)만큼 되밀어 배치한다. */}
-        <Image
-          source={TOOLTIP_IMG}
-          contentFit="contain"
+        {/* "내 여행영상 만들기" 말풍선 (CSS) — + 아이콘 바로 밑, 꼬리가 + 아래를 가리킴 */}
+        <View
           pointerEvents="none"
           style={{
             position: "absolute",
             top: verticalScale(6) + moderateScale(30) + verticalScale(4),
-            right:
-              scale(20) + moderateScale(30) / 2 - scale(TAIL_APEX_FROM_RIGHT),
-            width: scale(TOOLTIP_W),
-            height: scale(TOOLTIP_H), // 가로세로 같은 배율 — 비율 왜곡 방지
+            right: scale(20),
+            alignItems: "flex-end",
+            zIndex: 10,
           }}
-        />
+        >
+          {/* 꼬리 (위로 향하는 삼각형) — + 아이콘 중앙 아래 */}
+          <View
+            style={{
+              width: 0,
+              height: 0,
+              marginRight: moderateScale(15) - scale(6),
+              // 둥근 말풍선 모서리와 맞닿는 부분이 뜨지 않게 살짝 겹치도록 아래로 더 뺀다
+              marginBottom: -verticalScale(3),
+              borderLeftWidth: scale(6),
+              borderRightWidth: scale(6),
+              borderBottomWidth: verticalScale(16),
+              borderLeftColor: "transparent",
+              borderRightColor: "transparent",
+              borderBottomColor: TOOLTIP_COLOR,
+            }}
+          />
+          {/* 말풍선 본체 */}
+          <View
+            style={{
+              width: scale(100), // 메인탭 말풍선(TOOLTIP_W)과 동일 크기
+              height: verticalScale(30),
+              backgroundColor: TOOLTIP_COLOR,
+              borderRadius: scale(14),
+              alignItems: "center",
+              justifyContent: "center",
+              elevation: 8,
+              shadowColor: "#000",
+            }}
+          >
+            <Text
+              className="text-white font-semibold"
+              numberOfLines={1}
+              style={{ fontSize: moderateScale(12) }}
+            >
+              여행영상 만들기
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );

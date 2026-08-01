@@ -88,8 +88,8 @@ export default function ReelsEditScreen() {
       {
         onSuccess: (status) => {
           // 전역 추적 시작 → 진행률 화면을 떠나도 완료를 감지해 배너로 알림.
-          startTracking(status.job_id);
-          router.push(`/reels/progress?job_id=${status.job_id}`);
+          startTracking(status.reels_idx);
+          router.push(`/reels/progress?reels_idx=${status.reels_idx}`);
         },
         // 400(GPS 부족·같은 장소·알 수 없는 옵션 등)은 서버 메시지를 그대로 노출.
         onError: (err) => Alert.alert("영상 만들기 실패", describeRenderError(err)),

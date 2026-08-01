@@ -4,9 +4,13 @@ import type { CommonResponse } from "@/src/api/types";
 import type {
   HomeTravelCard,
   PastTravelListResponse,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
   TravelCreateRequest,
+  TravelDetail,
   TravelLikeResponse,
   TravelResponse,
+  TravelScheduleItem,
 } from "./types";
 
 /**
@@ -48,6 +52,67 @@ export async function getPastTravels(): Promise<PastTravelListResponse> {
   );
   // 없어도 data 는 빈 배열로 오지만, 방어적으로 null 이면 빈 목록으로 취급.
   return res.data.data ?? { travels: [], total: 0 };
+}
+
+/**
+ * GET /api/travels/{travel_idx} — 여행 1건 일정표 상세(일자별 타임라인).
+ * 404: 존재하지 않거나 본인 여행 아님 / 401: 인증 필요(client.ts 인터셉터 처리).
+ */
+export async function getTravelDetail(
+  travelIdx: number,
+): Promise<TravelDetail> {
+  const res = await api.get<CommonResponse<TravelDetail>>(
+    `/api/travels/${travelIdx}`,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * POST /api/travels/{travel_idx}/schedules — 일정 항목 추가.
+ * 400: kind별 필수값 누락 / 여행 기간 벗어난 일자·출발일 / 도착일<출발일 /
+ *      출발역 좌표 없음 → message 를 그대로 노출. 404/401.
+ */
+export async function createSchedule(
+  travelIdx: number,
+  body: ScheduleCreateRequest,
+): Promise<TravelScheduleItem> {
+  const res = await api.post<CommonResponse<TravelScheduleItem>>(
+    `/api/travels/${travelIdx}/schedules`,
+    body,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * PATCH /api/travels/{travel_idx}/schedules/{schedule_idx} — 일정 부분 수정.
+ * 보낸 필드만 반영. 변경하지 않는 필드는 body 에서 빼고 보낸다(호출부에서 diff).
+ */
+export async function updateSchedule(
+  travelIdx: number,
+  scheduleIdx: number,
+  body: ScheduleUpdateRequest,
+): Promise<TravelScheduleItem> {
+  const res = await api.patch<CommonResponse<TravelScheduleItem>>(
+    `/api/travels/${travelIdx}/schedules/${scheduleIdx}`,
+    body,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * DELETE /api/travels/{travel_idx}/schedules/{schedule_idx} — 소프트 삭제.
+ * 응답 data 는 null. 404/401.
+ */
+export async function deleteSchedule(
+  travelIdx: number,
+  scheduleIdx: number,
+): Promise<void> {
+  await api.delete<CommonResponse<null>>(
+    `/api/travels/${travelIdx}/schedules/${scheduleIdx}`,
+  );
 }
 
 /**

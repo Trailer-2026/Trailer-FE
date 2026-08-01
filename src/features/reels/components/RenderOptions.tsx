@@ -1,11 +1,8 @@
-import { Pressable, Switch, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { Text } from "@/src/components/Text";
-import {
-  ENGINE_OPTIONS,
-  LIGHT_OPTIONS,
-  THEME_OPTIONS,
-} from "@/src/features/video/options";
+import { THEME_OPTIONS } from "@/src/features/video/options";
+import { useBgmTracks } from "@/src/features/video/queries";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -17,10 +14,19 @@ type Props = {
 };
 
 /**
- * 릴스 편집 화면의 렌더 옵션 패널 — 테마/조명/엔진 칩 + 인트로·아웃트로 토글.
- * quick(true 고정)·bgm("")·출발지는 이번엔 UI 없이 기본값으로 전송한다.
+ * 릴스 편집 화면의 렌더 옵션 패널 — 테마·BGM 칩.
+ * BGM 목록은 서버(useBgmTracks)에서 받아 "무음 + 트랙들"로 구성한다.
+ * 엔진(항상 modal)·인트로/아웃트로(항상 포함)는 서버 고정이라 UI 가 없다.
  */
 export default function RenderOptions({ value, onChange }: Props) {
+  const { data: tracks } = useBgmTracks();
+
+  // 무음 + 서버 트랙(값=file, 라벨=title).
+  const bgmOptions = [
+    { value: "", label: "무음" },
+    ...(tracks ?? []).map((t) => ({ value: t.file, label: t.title })),
+  ];
+
   return (
     <View style={{ gap: verticalScale(10) }}>
       <ChipRow
@@ -30,30 +36,11 @@ export default function RenderOptions({ value, onChange }: Props) {
         onSelect={(theme) => onChange({ theme })}
       />
       <ChipRow
-        label="조명"
-        options={LIGHT_OPTIONS}
-        selected={value.light_preset}
-        onSelect={(light_preset) => onChange({ light_preset })}
+        label="음악"
+        options={bgmOptions}
+        selected={value.bgm}
+        onSelect={(bgm) => onChange({ bgm })}
       />
-      <ChipRow
-        label="엔진"
-        options={ENGINE_OPTIONS}
-        selected={value.engine}
-        onSelect={(engine) => onChange({ engine })}
-      />
-
-      <View className="flex-row" style={{ gap: scale(24) }}>
-        <ToggleRow
-          label="인트로"
-          value={value.intro}
-          onChange={(intro) => onChange({ intro })}
-        />
-        <ToggleRow
-          label="아웃트로"
-          value={value.outro}
-          onChange={(outro) => onChange({ outro })}
-        />
-      </View>
     </View>
   );
 }
@@ -106,31 +93,6 @@ function ChipRow<T extends string>({
           );
         })}
       </View>
-    </View>
-  );
-}
-
-/** 라벨 + 스위치. */
-function ToggleRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <View className="flex-row items-center" style={{ gap: scale(8) }}>
-      <Text className="text-gray-300" style={{ fontSize: moderateScale(12) }}>
-        {label}
-      </Text>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: "#3A3A3A", true: ACCENT }}
-        thumbColor="#FFFFFF"
-      />
     </View>
   );
 }
