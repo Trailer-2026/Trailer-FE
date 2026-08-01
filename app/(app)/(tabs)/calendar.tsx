@@ -1,35 +1,50 @@
 import Feather from "@expo/vector-icons/Feather";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
-import { formatLongDate } from "@/src/features/travel/format";
-import PastTravelSections from "@/src/features/travel/components/PastTravelSections";
+import TravelSummaryCard from "@/src/features/travel/components/TravelSummaryCard";
 import {
   useCurrentTravel,
   usePastTravels,
-  useToggleTravelLike,
+  usePrefetchTravelDetail,
 } from "@/src/features/travel/queries";
-import type {
-  HomeTravelCard,
-  PastTravelCard,
-} from "@/src/features/travel/types";
+import type { HomeTravelCard } from "@/src/features/travel/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
 
+// 헤더 우측 아이콘 (Figma base64 → 검증된 PNG, 100x100)
+const HEADER_ICON = require("../../../assets/images/style/schedule-table.png");
+// 프로모 배너 기차 일러스트 (220x220)
+const PASS_TRAIN = require("../../../assets/images/style/passTrain.png");
+
 type Tab = "upcoming" | "past";
 
+/** 여행 카드 → 일정표 상세로 이동. */
+function goDetail(travel: { travel_idx: number; cover_image_url: string | null }) {
+  router.push({
+    pathname: "/travel/[travelIdx]",
+    params: {
+      travelIdx: travel.travel_idx,
+      cover: travel.cover_image_url ?? "",
+    },
+  });
+}
+
 /**
- * 세 번째 탭 '내 일정' — 예정된 여행(일정표 상세) / 다녀온 여행(목록).
- * 승차권 예매·일정추천 진입은 홈 퀵메뉴('승차권 예매' → /course/intro)로 유지된다.
+ * 세 번째 탭 '내 일정' — 예정된 여행 / 다녀온 여행. 둘 다 요약 카드로 표시하고
+ * 누르면 일정표 상세로 이동한다. 승차권 예매·일정추천 진입은 홈 퀵메뉴로 유지.
  */
 export default function CalendarTab() {
   const [tab, setTab] = useState<Tab>("upcoming");
   const { data: current, isLoading: currentLoading } = useCurrentTravel();
+
+  // 예정된 여행 상세 일정을 미리 받아둔다 → 상세 화면 진입 시 로딩 없이 즉시 표시.
+  usePrefetchTravelDetail(current?.travel_idx);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -38,13 +53,12 @@ export default function CalendarTab() {
         className="flex-row items-center justify-between bg-white"
         style={{
           paddingHorizontal: scale(20),
-          paddingTop: verticalScale(6),
-          paddingBottom: verticalScale(10),
+          height: verticalScale(44),
         }}
       >
         <Text
           className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(24) }}
+          style={{ fontSize: moderateScale(20) }}
         >
           내 일정
         </Text>
@@ -55,7 +69,11 @@ export default function CalendarTab() {
           accessibilityRole="button"
           accessibilityLabel="승차권"
         >
-          <TicketIcon width={moderateScale(26)} height={moderateScale(20)} />
+          <Image
+            source={HEADER_ICON}
+            contentFit="contain"
+            style={{ width: moderateScale(32), height: moderateScale(24) }}
+          />
         </Pressable>
       </View>
 
@@ -66,7 +84,8 @@ export default function CalendarTab() {
         className="flex-row"
         style={{
           paddingHorizontal: scale(20),
-          paddingVertical: verticalScale(10),
+          paddingTop: verticalScale(28),
+          paddingBottom: verticalScale(22),
           gap: scale(10),
         }}
       >
@@ -83,8 +102,8 @@ export default function CalendarTab() {
               onPress={() => setTab(t.key)}
               className="items-center justify-center active:opacity-80"
               style={{
-                paddingHorizontal: scale(20),
-                height: verticalScale(38),
+                width: scale(100),
+                height: verticalScale(41),
                 borderRadius: 999,
                 borderWidth: 1,
                 borderColor: active ? ACCENT : "#D1D5DB",
@@ -115,11 +134,11 @@ export default function CalendarTab() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 프로모 배너 — 내일로 패스 등록 유도(예정된 여행 없을 때)             */
+/* 프로모 배너                                                          */
 /* ------------------------------------------------------------------ */
 function PromoBanner() {
   return (
-    <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(4) }}>
+    <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(18) }}>
       <View
         className="flex-row items-center"
         style={{
@@ -131,11 +150,12 @@ function PromoBanner() {
         }}
       >
         <View style={{ flex: 1 }}>
+          {/* '내일로 패스 정보'만 굵게, 나머지는 얇게(기본 굵기) */}
           <Text
-            className="font-bold text-gray-900"
             style={{ fontSize: moderateScale(14), lineHeight: moderateScale(21) }}
           >
-            내일로 패스 정보를 등록하고,
+            <Text className="font-bold text-gray-900">내일로 패스 정보</Text>
+            <Text className="text-gray-700">를 등록하고,</Text>
           </Text>
           <Text
             className="text-gray-700"
@@ -144,14 +164,18 @@ function PromoBanner() {
             나에게 맞는 여행 계획을 시작해 보세요.
           </Text>
         </View>
-        <Text style={{ fontSize: moderateScale(34) }}>🚆</Text>
+        <Image
+          source={PASS_TRAIN}
+          contentFit="contain"
+          style={{ width: moderateScale(50), height: moderateScale(50) }}
+        />
       </View>
     </View>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* 예정된 여행 — 현재/예정 여행 1건의 일정표 상세                        */
+/* 예정된 여행 — D-day 카드                                             */
 /* ------------------------------------------------------------------ */
 function UpcomingTab({
   current,
@@ -160,23 +184,17 @@ function UpcomingTab({
   current: HomeTravelCard | null | undefined;
   loading: boolean;
 }) {
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator color={ACCENT} />
-      </View>
-    );
-  }
+  if (loading) return <Loading />;
 
   if (!current) {
     return (
       <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(6) }}>
         <View
-          className="items-center"
+          className="items-center justify-center"
           style={{
             backgroundColor: "#F5F5F7",
             borderRadius: scale(16),
-            paddingVertical: verticalScale(28),
+            height: verticalScale(170),
             paddingHorizontal: scale(20),
           }}
         >
@@ -201,17 +219,12 @@ function UpcomingTab({
               height: verticalScale(52),
               borderRadius: scale(12),
               gap: scale(6),
-              elevation: 2,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.08,
-              shadowRadius: 4,
             }}
           >
-            <Feather name="plus" size={moderateScale(18)} color={ACCENT} />
+            <Feather name="plus" size={moderateScale(18)} color="#668DFF" />
             <Text
               className="font-bold"
-              style={{ fontSize: moderateScale(15), color: ACCENT }}
+              style={{ fontSize: moderateScale(15), color: "#668DFF" }}
             >
               새 여행 일정 만들기
             </Text>
@@ -222,85 +235,15 @@ function UpcomingTab({
   }
 
   return (
-    <UpcomingTravelCard
-      travel={current}
-      onPress={() =>
-        router.push({
-          pathname: "/travel/[travelIdx]",
-          params: {
-            travelIdx: current.travel_idx,
-            cover: current.cover_image_url ?? "",
-          },
-        })
-      }
-    />
-  );
-}
-
-/** D-day 배지 + 제목 + 기간 카드. 누르면 일정표 상세로 이동. */
-function UpcomingTravelCard({
-  travel,
-  onPress,
-}: {
-  travel: HomeTravelCard;
-  onPress: () => void;
-}) {
-  return (
     <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(6) }}>
-      <Pressable
-        onPress={onPress}
-        className="active:opacity-80"
-        style={{
-          borderWidth: 1,
-          borderColor: "#C7D6F5",
-          borderRadius: scale(16),
-          backgroundColor: "#FBFCFF",
-          paddingHorizontal: scale(18),
-          paddingVertical: verticalScale(18),
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <View
-            className="rounded-full"
-            style={{
-              backgroundColor: ACCENT,
-              paddingHorizontal: scale(12),
-              paddingVertical: verticalScale(4),
-            }}
-          >
-            <Text
-              className="text-white font-bold"
-              style={{ fontSize: moderateScale(13) }}
-            >
-              {dDayLabel(travel)}
-            </Text>
-          </View>
-          <Pressable
-            // TODO(travel-menu): 여행 편집/삭제 메뉴(현재 무동작).
-            onPress={() => {}}
-            hitSlop={10}
-            className="active:opacity-60"
-            accessibilityRole="button"
-            accessibilityLabel="여행 메뉴"
-          >
-            <Feather name="more-vertical" size={moderateScale(18)} color="#9CA3AF" />
-          </Pressable>
-        </View>
-
-        <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(18), marginTop: verticalScale(12) }}
-          numberOfLines={1}
-        >
-          {travel.title}
-        </Text>
-        <Text
-          className="text-gray-500"
-          style={{ fontSize: moderateScale(13), marginTop: verticalScale(6) }}
-        >
-          {formatLongDate(travel.start_date)} ~ {formatLongDate(travel.end_date)}
-        </Text>
-      </Pressable>
+      <TravelSummaryCard
+        badge={dDayLabel(current)}
+        badgeColor={ACCENT}
+        title={current.title}
+        startDate={current.start_date}
+        endDate={current.end_date}
+        onPress={() => goDetail(current)}
+      />
     </View>
   );
 }
@@ -319,28 +262,13 @@ function dDayLabel(travel: HomeTravelCard): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* 다녀온 여행 — 지난 여행 목록(주요/지난). profile 과 공통 컴포넌트 사용   */
+/* 다녀온 여행 — 완료 카드 목록(민트)                                    */
 /* ------------------------------------------------------------------ */
 function PastTab() {
   const { data, isLoading } = usePastTravels();
-  const toggleLike = useToggleTravelLike();
-
   const travels = data?.travels ?? [];
 
-  function handleToggleLike(t: PastTravelCard) {
-    toggleLike.mutate(
-      { travelIdx: t.travel_idx, currentlyLiked: t.liked },
-      { onError: () => Alert.alert("오류", "잠시 후 다시 시도해 주세요.") },
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator color={ACCENT} />
-      </View>
-    );
-  }
+  if (isLoading) return <Loading />;
 
   if (travels.length === 0) {
     return (
@@ -358,23 +286,33 @@ function PastTab() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingHorizontal: scale(20),
-        paddingTop: verticalScale(8),
+        paddingTop: verticalScale(6),
         paddingBottom: verticalScale(24),
+        gap: verticalScale(12),
       }}
     >
-      <PastTravelSections
-        travels={travels}
-        onToggleLike={handleToggleLike}
-        onPressItem={(t) =>
-          router.push({
-            pathname: "/travel/[travelIdx]",
-            params: {
-              travelIdx: t.travel_idx,
-              cover: t.cover_image_url ?? "",
-            },
-          })
-        }
-      />
+      {travels.map((t) => (
+        <TravelSummaryCard
+          key={t.travel_idx}
+          badge="완료"
+          badgeColor="#B0E6DB"
+          badgeTextColor="#111827"
+          showCheck
+          fixedBadge
+          title={t.title}
+          startDate={t.start_date}
+          endDate={t.end_date}
+          onPress={() => goDetail(t)}
+        />
+      ))}
     </ScrollView>
+  );
+}
+
+function Loading() {
+  return (
+    <View className="flex-1 items-center justify-center bg-white">
+      <ActivityIndicator color={ACCENT} />
+    </View>
   );
 }

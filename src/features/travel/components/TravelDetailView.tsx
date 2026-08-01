@@ -11,6 +11,7 @@ import {
   ScrollView,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
@@ -25,9 +26,9 @@ import AddScheduleModal from "./schedule/AddScheduleModal";
 import EditScheduleModal from "./schedule/EditScheduleModal";
 
 const ACCENT = "#5E84F4";
+const MINT = "#34C6A8"; // 타임라인 번호 노드
 const CARD_BG = "#F4F4F6";
 const RAIL_LINE = "#D9DCE1";
-const NODE_RING = "#C3CFEA";
 const HOLLOW_RING = "#D1D5DB";
 
 const KTX_LOGO = require("../../../../assets/images/style/ktx.png");
@@ -54,6 +55,7 @@ export default function TravelDetailView({
   onBack?: () => void;
 }) {
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
+  const insets = useSafeAreaInsets();
 
   // 추가 모달 상태(선택된 day_no 프리필용), 편집 대상.
   const [addState, setAddState] = useState<{ dayNo?: number } | null>(null);
@@ -135,7 +137,7 @@ export default function TravelDetailView({
       <ScrollView
         className="flex-1 bg-white"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: verticalScale(32) }}
+        contentContainerStyle={{ paddingBottom: verticalScale(32) + insets.bottom }}
       >
         <Hero travel={data} coverUri={cover} onBack={onBack} />
 
@@ -453,14 +455,14 @@ function TimelineRow({
             width: scale(28),
             height: scale(28),
             borderWidth: 1.5,
-            borderColor: number != null ? NODE_RING : HOLLOW_RING,
+            borderColor: number != null ? MINT : HOLLOW_RING,
             backgroundColor: number != null ? "#FFFFFF" : "#EEF0F3",
           }}
         >
           {number != null ? (
             <Text
               className="font-bold"
-              style={{ fontSize: moderateScale(13), color: ACCENT }}
+              style={{ fontSize: moderateScale(13), color: MINT }}
             >
               {number}
             </Text>
@@ -561,7 +563,7 @@ function BoardCard({ item }: { item: TravelScheduleItem }) {
             >
               <Text
                 className="font-bold"
-                style={{ fontSize: moderateScale(11), color: "#128A54" }}
+                style={{ fontSize: moderateScale(11), color: "#111827" }}
               >
                 {item.train_grade}
               </Text>

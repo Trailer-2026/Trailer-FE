@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import {
   createSchedule,
@@ -111,6 +112,24 @@ export function useTravelDetail(travelIdx?: number) {
     enabled: travelIdx != null,
     staleTime: 1000 * 60, // 1분
   });
+}
+
+/**
+ * 여행 상세(일정표)를 미리 캐시에 받아둔다.
+ * - 예정된 여행 탭 진입 시 호출해두면, 상세 화면의 useTravelDetail 이 같은 키
+ *   (travelKeys.detail)의 캐시를 재사용해 로딩 없이 즉시 렌더된다.
+ * - travelIdx 가 없으면 아무것도 안 한다. 이미 fresh 한 캐시가 있으면 재요청도 생략.
+ */
+export function usePrefetchTravelDetail(travelIdx?: number) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (travelIdx == null) return;
+    queryClient.prefetchQuery({
+      queryKey: travelKeys.detail(travelIdx),
+      queryFn: () => getTravelDetail(travelIdx),
+      staleTime: 1000 * 60, // 1분 — useTravelDetail 과 동일
+    });
+  }, [queryClient, travelIdx]);
 }
 
 /**
