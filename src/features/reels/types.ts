@@ -19,6 +19,34 @@ export type Reels = {
   comment_count: number;
 };
 
+/** GET /api/videos/reels/recommend 의 항목. 작성자 없는 옛 릴스는 닉네임·프로필이 null. */
+export type ReelsRecommendItem = {
+  reels_idx: number;
+  url: string;
+  title: string | null;
+  nickname: string | null;
+  profile_image: string | null;
+};
+
+/**
+ * GET /api/reels/{reels_idx}/comments 의 항목.
+ * 답글은 1단계까지만 — 최상위 댓글의 replies 에만 담겨 오고, 답글의 replies 는 항상 빈 배열.
+ */
+export type ReelsComment = {
+  comment_idx: number;
+  reels_idx: number;
+  user_idx: number;
+  nickname: string | null;
+  profile_image: string | null;
+  content: string;
+  /** 답글이면 부모 댓글 PK, 최상위면 null */
+  parent_idx: number | null;
+  created_at: string | null;
+  like_count: number;
+  liked: boolean;
+  replies: ReelsComment[];
+};
+
 export type ReelsAuthor = {
   name: string;
   avatar_url: string | null;
