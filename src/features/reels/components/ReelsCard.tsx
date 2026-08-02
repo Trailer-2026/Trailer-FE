@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { VideoView, type VideoPlayer } from "expo-video";
 import { Pressable, View } from "react-native";
 
 import CommentIcon from "@/src/components/icons/CommentIcon";
@@ -15,7 +16,12 @@ type Props = {
   reels: Reels;
   /** 한 카드가 차지할 높이(= 뷰포트 높이). 페이징 단위와 반드시 같아야 한다. */
   height: number;
+  /** 지금 화면에 보이는 카드인지 — 이 카드만 플레이어를 붙인다. */
+  active: boolean;
+  /** 피드 전체가 공유하는 플레이어 1개. 카드마다 만들면 ExoPlayer 버퍼가 쌓여 OOM 난다. */
+  player: VideoPlayer;
   onToggleLike: (reelsIdx: number) => void;
+  onOpenComments: (reelsIdx: number) => void;
 };
 
 /**
@@ -35,13 +41,24 @@ function formatCount(n: number) {
   return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}천`;
 }
 
-export default function ReelsCard({ reels, height, onToggleLike }: Props) {
+export default function ReelsCard({
+  reels,
+  height,
+  active,
+  player,
+  onToggleLike,
+  onOpenComments,
+}: Props) {
   return (
     <View className="w-full bg-black" style={{ height }}>
-      {/* 영상 제작 로직이 아직 없어 정지 이미지(썸네일)로 대체 렌더한다.
-          TODO(영상): video_url 이 생기면 expo-video 플레이어로 교체하고,
-          현재 보이는 카드만 재생하도록 viewability 로 제어. */}
-      {reels.thumbnail_url ? (
+      {reels.video_url && active ? (
+        <VideoView
+          player={player}
+          style={{ width: "100%", height: "100%" }}
+          contentFit="cover"
+          nativeControls={false}
+        />
+      ) : reels.thumbnail_url ? (
         <Image
           source={{ uri: reels.thumbnail_url }}
           style={{ width: "100%", height: "100%" }}
@@ -96,8 +113,7 @@ export default function ReelsCard({ reels, height, onToggleLike }: Props) {
           className="items-center active:opacity-60"
           style={{ gap: verticalScale(4) }}
           hitSlop={moderateScale(8)}
-          // TODO(댓글): 댓글 화면(바텀시트) 열기 — 이번 범위 밖.
-          onPress={() => {}}
+          onPress={() => onOpenComments(reels.reels_idx)}
           accessibilityRole="button"
           accessibilityLabel="댓글 보기"
         >

@@ -1,15 +1,25 @@
+import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
-import { FlatList, Pressable, View, type LayoutChangeEvent } from "react-native";
+import { useVideoPlayer } from "expo-video";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  View,
+  type LayoutChangeEvent,
+  type ViewToken,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
 import ShareUpIcon from "@/src/components/icons/ShareUpIcon";
 import { Text } from "@/src/components/Text";
+import CommentsSheet from "@/src/features/reels/components/CommentsSheet";
 import ReelsCard from "@/src/features/reels/components/ReelsCard";
-import { useReelsStore } from "@/src/features/reels/store";
+import { useRecommendedReels } from "@/src/features/reels/queries";
 import type { Reels } from "@/src/features/reels/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -18,8 +28,65 @@ const TOOLTIP_COLOR = "#5E84F4";
 
 export default function FeedTab() {
   const insets = useSafeAreaInsets();
-  const reels = useReelsStore((s) => s.reels);
-  const toggleLike = useReelsStore((s) => s.toggleLike);
+  const { data: reels = [], isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useRecommendedReels();
+
+  // 다른 탭으로 가면 소리까지 멈추도록 — 포커스가 없으면 재생 중인 카드도 없다.
+  const isFocused = useIsFocused();
+
+  // 추천 API 는 좋아요 여부를 주지 않는다. 이번 세션 동안만 로컬로 기억한다.
+  const [likes, setLikes] = useState<Record<number, boolean>>({});
+  const toggleLike = useCallback((reelsIdx: number) => {
+    setLikes((prev) => ({ ...prev, [reelsIdx]: !prev[reelsIdx] }));
+  }, []);
+
+  // 댓글 시트를 연 릴스. null 이면 닫힘.
+  const [commentsFor, setCommentsFor] = useState<number | null>(null);
+
+  // 지금 화면을 채우고 있는 카드 = 재생할 카드.
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [visiblePosition, setVisiblePosition] = useState(0);
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const token = viewableItems[0];
+      if (!token) return; // 카드 전환 중 — 직전 상태를 유지해 재생이 끊기지 않게 한다
+      setActiveIdx((token.item as Reels).reels_idx);
+      if (token.index != null) setVisiblePosition(token.index);
+    },
+  ).current;
+  // 카드가 화면 대부분을 덮었을 때만 "보이는" 것으로 친다(전환 중 두 장 동시 재생 방지).
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+
+  // 플레이어는 피드 전체에서 1개만. 카드마다 만들면 ExoPlayer 버퍼가 쌓여 힙(192MB)이 터진다.
+  const player = useVideoPlayer(null, (p) => {
+    p.loop = true;
+  });
+
+  const activeUrl =
+    reels.find((r) => r.reels_idx === activeIdx)?.video_url ?? null;
+
+  // 보이는 카드가 바뀌면 소스만 갈아끼운다(플레이어 재생성 없음).
+  useEffect(() => {
+    if (!activeUrl) return;
+    void player.replaceAsync(activeUrl).catch(() => {
+      // 개별 영상 로드 실패는 무시 — 다음 카드로 넘기면 복구된다.
+    });
+  }, [activeUrl, player]);
+
+  // 탭을 벗어나거나 볼 카드가 없으면 정지.
+  useEffect(() => {
+    if (isFocused && activeUrl) player.play();
+    else player.pause();
+  }, [isFocused, activeUrl, player]);
+
+  // 끝에서 3장 남으면 다음 10개를 미리 받는다(이미 받은 reels_idx 는 exclude 로 제외됨).
+  // onEndReached 는 pagingEnabled 와 함께 쓰면 마지막 카드에 닿아서야 늦게 불린다.
+  useEffect(() => {
+    if (reels.length === 0) return;
+    if (visiblePosition < reels.length - 3) return;
+    if (!hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [visiblePosition, reels.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // 카드 1장 = 뷰포트 1개. 탭바를 제외한 실제 높이를 onLayout 으로 재서
   // 페이징 간격과 카드 높이를 항상 일치시킨다(기기별 탭바/내비바 높이 차이 흡수).
@@ -31,19 +98,26 @@ export default function FeedTab() {
   const renderItem = useCallback(
     ({ item }: { item: Reels }) => (
       <ReelsCard
-        reels={item}
+        reels={{ ...item, liked: !!likes[item.reels_idx] }}
         height={viewportHeight}
+        active={isFocused && item.reels_idx === activeIdx}
+        player={player}
         onToggleLike={toggleLike}
+        onOpenComments={setCommentsFor}
       />
     ),
-    [viewportHeight, toggleLike],
+    [viewportHeight, toggleLike, likes, activeIdx, isFocused, player],
   );
 
   return (
     <View className="flex-1 bg-black" onLayout={onLayout}>
       <StatusBar style="light" />
 
-      {viewportHeight > 0 ? (
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#FFFFFF" />
+        </View>
+      ) : viewportHeight > 0 ? (
         <FlatList
           data={reels}
           keyExtractor={(item) => String(item.reels_idx)}
@@ -60,6 +134,8 @@ export default function FeedTab() {
           })}
           windowSize={3}
           removeClippedSubviews
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
         />
       ) : null}
 
@@ -173,6 +249,11 @@ export default function FeedTab() {
           </View>
         </View>
       </View>
+
+      <CommentsSheet
+        reelsIdx={commentsFor}
+        onClose={() => setCommentsFor(null)}
+      />
     </View>
   );
 }
