@@ -8,8 +8,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
-import { captureFromCamera, promptMediaSource } from "@/src/features/reels/capture";
+import { captureFromCamera } from "@/src/features/reels/capture";
 import DraggableTimeline from "@/src/features/reels/components/DraggableTimeline";
+import MediaSourceSheet, {
+  type MediaSource,
+} from "@/src/features/reels/components/MediaSourceSheet";
 import RenderOptions from "@/src/features/reels/components/RenderOptions";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import {
@@ -46,6 +49,7 @@ export default function ReelsEditScreen() {
 
   // 위쪽 큰 미리보기에 띄울 항목. 목록이 줄어들 수 있어 인덱스가 아니라 uri 로 잡는다.
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const selected =
     assets.find((a) => a.uri === selectedUri) ?? assets[0] ?? null;
 
@@ -62,12 +66,12 @@ export default function ReelsEditScreen() {
   // photos-only 렌더 대상은 사진만. 영상이 섞여 있어도 사진만 추려 보낸다.
   const photos = assets.filter((a) => a.kind === "image");
 
-  const onAddMore = async () => {
-    const source = await promptMediaSource();
+  const onAddMore = async (source: MediaSource) => {
+    setSheetOpen(false);
     if (source === "camera") {
       const media = await captureFromCamera();
       if (media && media.length > 0) addAssets(media);
-    } else if (source === "gallery") {
+    } else {
       router.push("/reels/gallery?mode=add");
     }
   };
@@ -203,7 +207,7 @@ export default function ReelsEditScreen() {
         }}
       >
         <Pressable
-          onPress={onAddMore}
+          onPress={() => setSheetOpen(true)}
           className="items-center justify-center active:opacity-70"
           style={{
             width: scale(THUMB_H),
@@ -233,6 +237,12 @@ export default function ReelsEditScreen() {
           labelFor={(index) => formatTimelineLabel(index * SECONDS_PER_PHOTO)}
         />
       </View>
+
+      <MediaSourceSheet
+        visible={sheetOpen}
+        onSelect={onAddMore}
+        onClose={() => setSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -50,22 +50,3 @@ export async function captureFromCamera(): Promise<ReelsMediaAsset[] | null> {
   });
 }
 
-/**
- * "촬영 / 갤러리에서 선택" 선택지를 띄운다.
- * 갤러리는 위치·시각을 확실히 읽기 위해 커스텀 그리드 화면(/reels/gallery)으로 보내므로,
- * 여기서는 어떤 소스를 골랐는지만 반환하고 실제 이동은 호출한 화면이 처리한다.
- */
-export function promptMediaSource(): Promise<"camera" | "gallery" | null> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      "미디어 추가",
-      "사진을 어떻게 추가할까요?",
-      [
-        { text: "촬영하기", onPress: () => resolve("camera") },
-        { text: "갤러리에서 선택", onPress: () => resolve("gallery") },
-        { text: "취소", style: "cancel", onPress: () => resolve(null) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(null) },
-    );
-  });
-}
