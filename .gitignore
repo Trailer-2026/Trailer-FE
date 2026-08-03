@@ -43,3 +43,10 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase (앱용 설정, 각자 콘솔에서 받기)
+google-services.json
+GoogleService-Info.plist
+
+# Claude Code (settings.json 은 팀 공유라 추적, *.local.json 은 개인 설정이라 제외)
+.claude/settings.local.json

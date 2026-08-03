@@ -33,16 +33,23 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#7292EE",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#7292EE"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "@react-native-kakao/core"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0de2e495-d74d-45e7-abcc-c8acc6eeb420"
+      }
     }
   }
 }
