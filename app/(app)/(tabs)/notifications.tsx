@@ -26,8 +26,6 @@ import {
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
-// 알림 카드 우측 썸네일 대체 이미지(여행 커버 미확보 시).
-const COVER_FALLBACK = require("../../../assets/images/Main.png");
 
 /** ISO 문자열 → "방금 전" / "N분 전" / "N시간 전" / "M/D". */
 function relativeTime(iso: string): string {
@@ -356,11 +354,11 @@ function NotificationCard({
   onPress: () => void;
 }) {
   const unread = !item.is_read;
-  // 여행에 연결된 알림(담기·D-1 등) 에는 우측에 대표 사진 썸네일을 붙인다.
-  // 삭제 알림은 원본이 사라져 캐시에서 커버를 못 꺼내므로(백엔드가 cover_image_url 을
-  // 넣어주기 전까지) 아예 썸네일 자체를 빼서 fallback 이미지도 안 뜨게 한다.
-  const isDelete = item.type.toUpperCase().includes("DELETE");
-  const showThumb = item.travel_idx != null && !isDelete;
+  // 캐시에서 실제 커버 URL 을 꺼낸 경우에만 썸네일을 그린다.
+  // - 담기·D-1 알림: current/past 캐시에 여행이 있어 URL 이 잡힘 → 실제 사진 표시.
+  // - 삭제 알림: 소프트 삭제된 여행은 두 캐시 어디에도 없어 URL=null → 썸네일 자체 미표시.
+  //   (type enum 이 서버 스펙에 확정 표기가 없어 substring 매칭에 의존하지 않고, 커버 유무로 판단.)
+  const showThumb = coverUrl != null;
   return (
     <Pressable
       onPress={onPress}
@@ -409,7 +407,7 @@ function NotificationCard({
 
       {showThumb ? (
         <Image
-          source={coverUrl ? { uri: coverUrl } : COVER_FALLBACK}
+          source={{ uri: coverUrl! }}
           contentFit="cover"
           style={{
             width: scale(56),
