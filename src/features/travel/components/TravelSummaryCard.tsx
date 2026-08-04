@@ -23,6 +23,7 @@ export default function TravelSummaryCard({
   startDate,
   endDate,
   onPress,
+  onMenuPress,
 }: {
   badge: string;
   badgeColor: string;
@@ -36,6 +37,8 @@ export default function TravelSummaryCard({
   startDate: string;
   endDate: string;
   onPress: () => void;
+  /** ⋮ 를 누르면 호출. 주지 않으면 버튼 무동작(TODO 상태 유지). */
+  onMenuPress?: () => void;
 }) {
   return (
     <Pressable
@@ -82,9 +85,9 @@ export default function TravelSummaryCard({
           </Text>
         </View>
         <Pressable
-          // TODO(travel-menu): 여행 편집/삭제 메뉴(현재 무동작).
-          onPress={() => {}}
+          onPress={onMenuPress}
           hitSlop={10}
+          disabled={!onMenuPress}
           className="active:opacity-60"
           accessibilityRole="button"
           accessibilityLabel="여행 메뉴"
