@@ -11,6 +11,7 @@ import type {
   TravelLikeResponse,
   TravelResponse,
   TravelScheduleItem,
+  TravelUpdateRequest,
 } from "./types";
 
 /**
@@ -113,6 +114,34 @@ export async function deleteSchedule(
   await api.delete<CommonResponse<null>>(
     `/api/travels/${travelIdx}/schedules/${scheduleIdx}`,
   );
+}
+
+/**
+ * PATCH /api/travels/{travel_idx} — 여행 제목 변경.
+ * title 이 빈 문자열·공백이면 서버가 지역·기간으로 자동 생성한다.
+ * 404: 존재하지 않거나 본인 여행 아님 / 401: 인증 필요(client.ts 처리).
+ */
+export async function updateTravelTitle(
+  travelIdx: number,
+  title: string,
+): Promise<TravelResponse> {
+  const body: TravelUpdateRequest = { title };
+  const res = await api.patch<CommonResponse<TravelResponse>>(
+    `/api/travels/${travelIdx}`,
+    body,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * DELETE /api/travels/{travel_idx} — 여행 소프트 삭제.
+ * 해당 여행의 일정 항목도 함께 삭제된다. 예정 여행을 삭제하면
+ * '예정 여행은 1개만' 제약이 풀린다. 응답 data 는 null.
+ * 404: 존재하지 않거나 본인 여행 아님 / 401: 인증 필요.
+ */
+export async function deleteTravel(travelIdx: number): Promise<void> {
+  await api.delete<CommonResponse<null>>(`/api/travels/${travelIdx}`);
 }
 
 /**

@@ -10,6 +10,14 @@ export type TravelCreateRequest = {
   plan_id: string;
 };
 
+/**
+ * PATCH /api/travels/{travel_idx} body — 여행 제목 변경.
+ * 빈 값·공백을 보내면 서버가 지역·기간으로 자동 생성('부산 2박 3일 여행' 형태).
+ */
+export type TravelUpdateRequest = {
+  title: string;
+};
+
 /** POST /api/travels 응답 */
 export type TravelResponse = {
   travel_idx: number;

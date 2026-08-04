@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+import { notificationKeys } from "../notification/keys";
+
 import {
   createSchedule,
   createTravel,
   deleteSchedule,
+  deleteTravel,
   getCurrentTravel,
   getPastTravels,
   getTravelDetail,
   likeTravel,
   unlikeTravel,
   updateSchedule,
+  updateTravelTitle,
 } from "./api";
 import { travelKeys } from "./keys";
 import type {
@@ -180,6 +184,7 @@ export function useDeleteSchedule(travelIdx: number) {
 /**
  * "이 일정 선택하기" 저장.
  * - 성공 시 travels/current 를 invalidate 하여 홈 카드가 자동 갱신되게 한다.
+ * - 서버가 알림 로그에도 이벤트를 남기므로 알림 목록 캐시도 함께 무효화.
  * - 400 만료 에러는 호출부에서 axios status 로 분기.
  */
 export function useCreateTravel() {
@@ -188,6 +193,43 @@ export function useCreateTravel() {
     mutationFn: (planId: string) => createTravel(planId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: travelKeys.current() });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.list() });
+    },
+  });
+}
+
+/**
+ * 여행 제목 변경.
+ * - title 을 빈 문자열/공백으로 보내면 서버가 지역·기간으로 자동 생성한다.
+ * - 성공 시 응답의 travel_idx 로 detail 캐시와 current/past 목록을 함께 무효화해
+ *   상세·요약 어디서든 새 제목이 반영되게 한다.
+ */
+export function useUpdateTravelTitle(travelIdx: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (title: string) => updateTravelTitle(travelIdx, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: travelKeys.current() });
+      queryClient.invalidateQueries({ queryKey: travelKeys.past() });
+      queryClient.invalidateQueries({ queryKey: travelKeys.detail(travelIdx) });
+    },
+  });
+}
+
+/**
+ * 여행 소프트 삭제.
+ * - 삭제된 여행의 detail 캐시는 아예 제거(다시 불러도 404 라 keep 하는 의미가 없다).
+ * - current/past 목록과 알림 목록(서버가 '여행 삭제' 로그를 남김) 을 무효화.
+ */
+export function useDeleteTravel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (travelIdx: number) => deleteTravel(travelIdx),
+    onSuccess: (_data, travelIdx) => {
+      queryClient.removeQueries({ queryKey: travelKeys.detail(travelIdx) });
+      queryClient.invalidateQueries({ queryKey: travelKeys.current() });
+      queryClient.invalidateQueries({ queryKey: travelKeys.past() });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.list() });
     },
   });
 }
