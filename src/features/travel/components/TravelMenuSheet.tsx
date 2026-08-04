@@ -1,10 +1,13 @@
 import Feather from "@expo/vector-icons/Feather";
 import { Modal, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const DANGER = "#EF4444";
+// (tabs)/_layout.tsx 의 tabBarStyle.height 계산과 동일해야 시트가 탭바 바로 위에 붙는다.
+const TAB_BAR_HEIGHT = verticalScale(65);
 
 /**
  * 여행 요약 카드의 ⋮ 를 누르면 뜨는 바텀시트 메뉴.
@@ -27,6 +30,7 @@ export default function TravelMenuSheet({
   onRename: () => void;
   onDelete: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -35,7 +39,8 @@ export default function TravelMenuSheet({
         className="flex-1 justify-end"
         style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
       >
-        {/* 내부 탭이 백드롭까지 버블링 되지 않게 Pressable 로 stop */}
+        {/* 내부 탭이 백드롭까지 버블링 되지 않게 Pressable 로 stop.
+            marginBottom = 하단 탭바 높이(+ 세이프 인셋) → 시트가 탭바 위에 살짝 떠 있게 배치. */}
         <Pressable
           className="bg-white"
           style={{
@@ -43,7 +48,8 @@ export default function TravelMenuSheet({
             borderTopRightRadius: scale(20),
             paddingHorizontal: scale(20),
             paddingTop: verticalScale(18),
-            paddingBottom: verticalScale(28),
+            paddingBottom: verticalScale(16),
+            marginBottom: TAB_BAR_HEIGHT + insets.bottom,
           }}
         >
           <Text
