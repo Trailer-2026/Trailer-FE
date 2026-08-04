@@ -250,6 +250,8 @@ function SceneryPromoCard({
       style={{
         marginHorizontal: scale(20),
         marginTop: verticalScale(8),
+        // 아래 알림 목록과 붙지 않게 여백 확보.
+        marginBottom: verticalScale(16),
         borderRadius: scale(16),
         backgroundColor: "#F2DEE8",
       }}
