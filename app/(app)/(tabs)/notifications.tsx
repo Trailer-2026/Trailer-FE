@@ -67,6 +67,12 @@ export default function NotificationsTab() {
   const onItemPress = useCallback(
     (item: NotificationLogItem) => {
       if (!item.is_read) readOne.mutate(item.notification_log_idx);
+      // 삭제 알림은 원본 여행이 사라졌으니 상세로 갈 수 없다 → AI 일정 생성 진입점으로.
+      // type enum 이 서버 스펙에 명시돼 있지 않아 대소문자·표기 변형에 안전하게 substring 매칭.
+      if (item.type.toUpperCase().includes("DELETE")) {
+        router.push("/course/intro");
+        return;
+      }
       if (item.travel_idx != null) {
         router.push({
           pathname: "/travel/[travelIdx]",
@@ -340,31 +346,24 @@ function NotificationCard({
       />
 
       <View style={{ flex: 1 }}>
-        <View className="flex-row items-center justify-between">
-          <Text
-            className={unread ? "font-bold text-gray-900" : "font-semibold text-gray-900"}
-            style={{ fontSize: moderateScale(14) }}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-          <Text
-            className="text-gray-400"
-            style={{ fontSize: moderateScale(12), marginLeft: scale(8) }}
-          >
-            {relativeTime(item.created_at)}
-          </Text>
-        </View>
         <Text
-          className="text-gray-700"
+          className={unread ? "font-bold text-gray-900" : "text-gray-900"}
           style={{
-            fontSize: moderateScale(13),
-            lineHeight: moderateScale(19),
-            marginTop: verticalScale(4),
+            fontSize: moderateScale(14),
+            lineHeight: moderateScale(20),
           }}
-          numberOfLines={2}
+          numberOfLines={3}
         >
           {item.body}
+        </Text>
+        <Text
+          className="text-gray-400"
+          style={{
+            fontSize: moderateScale(12),
+            marginTop: verticalScale(4),
+          }}
+        >
+          {relativeTime(item.created_at)}
         </Text>
       </View>
     </Pressable>
