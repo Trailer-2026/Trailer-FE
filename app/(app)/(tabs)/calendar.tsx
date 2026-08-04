@@ -172,7 +172,6 @@ export default function CalendarTab() {
 
       <TravelMenuSheet
         visible={!!menuTravel}
-        travelTitle={menuTravel?.title ?? ""}
         onClose={() => setMenuTravel(null)}
         // '내 여행 영상 만들기' 는 아직 미구현 → onMakeVideo 미전달로 비활성 표시.
         onRename={() => {
