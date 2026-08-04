@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -18,9 +19,15 @@ import {
   useReadNotification,
 } from "@/src/features/notification/queries";
 import type { NotificationLogItem } from "@/src/features/notification/types";
+import {
+  useCurrentTravel,
+  usePastTravels,
+} from "@/src/features/travel/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
+// 알림 카드 우측 썸네일 대체 이미지(여행 커버 미확보 시).
+const COVER_FALLBACK = require("../../../assets/images/Main.png");
 
 /** ISO 문자열 → "방금 전" / "N분 전" / "N시간 전" / "M/D". */
 function relativeTime(iso: string): string {
@@ -59,6 +66,20 @@ export default function NotificationsTab() {
     [data],
   );
   const unreadCount = data?.pages[0]?.unread_count ?? 0;
+
+  // 여행 커버 이미지 조회용 — 알림 스펙엔 cover 가 없어 현재/과거 여행 캐시로 룩업.
+  // 둘 다 다른 탭에서 이미 자주 부르는 쿼리라 대부분 캐시 hit, 첫 방문에도 1회 fetch 로 끝.
+  // TODO(backend): NotificationLogItem 에 cover_image_url 이 추가되면 이 룩업 제거.
+  const { data: currentTravel } = useCurrentTravel();
+  const { data: pastTravels } = usePastTravels();
+  const coverByIdx = useMemo(() => {
+    const m = new Map<number, string | null>();
+    if (currentTravel) m.set(currentTravel.travel_idx, currentTravel.cover_image_url);
+    for (const t of pastTravels?.travels ?? []) {
+      m.set(t.travel_idx, t.cover_image_url);
+    }
+    return m;
+  }, [currentTravel, pastTravels]);
 
   const onEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
@@ -128,7 +149,15 @@ export default function NotificationsTab() {
         data={items}
         keyExtractor={(item) => String(item.notification_log_idx)}
         renderItem={({ item }) => (
-          <NotificationCard item={item} onPress={() => onItemPress(item)} />
+          <NotificationCard
+            item={item}
+            coverUrl={
+              item.travel_idx != null
+                ? coverByIdx.get(item.travel_idx) ?? null
+                : null
+            }
+            onPress={() => onItemPress(item)}
+          />
         )}
         ListHeaderComponent={
           <SceneryPromoCard
@@ -316,16 +345,22 @@ function SceneryPromoCard({
 /* ------------------------------------------------------------------ */
 function NotificationCard({
   item,
+  coverUrl,
   onPress,
 }: {
   item: NotificationLogItem;
+  /** 연결된 여행의 커버 이미지 URL. null 이면 fallback 이미지 사용. */
+  coverUrl: string | null;
   onPress: () => void;
 }) {
   const unread = !item.is_read;
+  // 여행에 연결된 알림(담기·D-1 등) 에는 우측에 대표 사진 썸네일을 붙인다.
+  // 삭제 알림은 원본이 사라져 travel_idx=null → 자연스레 썸네일 없음.
+  const showThumb = item.travel_idx != null;
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row active:opacity-70"
+      className="flex-row items-center active:opacity-70"
       style={{
         paddingHorizontal: scale(20),
         paddingVertical: verticalScale(14),
@@ -341,6 +376,7 @@ function NotificationCard({
           height: scale(8),
           borderRadius: scale(4),
           backgroundColor: unread ? ACCENT : "transparent",
+          alignSelf: "flex-start",
           marginTop: verticalScale(6),
         }}
       />
@@ -366,6 +402,19 @@ function NotificationCard({
           {relativeTime(item.created_at)}
         </Text>
       </View>
+
+      {showThumb ? (
+        <Image
+          source={coverUrl ? { uri: coverUrl } : COVER_FALLBACK}
+          contentFit="cover"
+          style={{
+            width: scale(56),
+            height: scale(56),
+            borderRadius: scale(8),
+            backgroundColor: "#E5E7EB",
+          }}
+        />
+      ) : null}
     </Pressable>
   );
 }
