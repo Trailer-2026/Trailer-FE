@@ -355,8 +355,10 @@ function NotificationCard({
 }) {
   const unread = !item.is_read;
   // 여행에 연결된 알림(담기·D-1 등) 에는 우측에 대표 사진 썸네일을 붙인다.
-  // 삭제 알림은 원본이 사라져 travel_idx=null → 자연스레 썸네일 없음.
-  const showThumb = item.travel_idx != null;
+  // 삭제 알림은 원본이 사라져 캐시에서 커버를 못 꺼내므로(백엔드가 cover_image_url 을
+  // 넣어주기 전까지) 아예 썸네일 자체를 빼서 fallback 이미지도 안 뜨게 한다.
+  const isDelete = item.type.toUpperCase().includes("DELETE");
+  const showThumb = item.travel_idx != null && !isDelete;
   return (
     <Pressable
       onPress={onPress}
