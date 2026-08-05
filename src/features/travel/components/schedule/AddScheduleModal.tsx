@@ -1,11 +1,15 @@
-import Feather from "@expo/vector-icons/Feather";
-import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useState } from "react";
 
+import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
 import type { PlaceSearchResult } from "@/src/features/place/types";
 import { describeScheduleError } from "@/src/features/travel/errors";
-import { useCreateSchedule } from "@/src/features/travel/queries";
+import {
+  useCreateSchedule,
+  useTravelDetail,
+} from "@/src/features/travel/queries";
 import type {
   ScheduleCreateRequest,
   TravelDay,
@@ -24,33 +28,35 @@ import {
 } from "./parts";
 import PlaceSearchField from "./PlaceSearchField";
 
-type Step = "choose" | "visit" | "train";
+/** 추가할 항목 종류. 호출부가 곧바로 지정한다(중간 선택 시트 없음). */
+export type ScheduleKind = "visit" | "train";
 
 /**
- * 일정 항목 추가 — 종류 선택(장소/티켓) 후 각 폼.
+ * 일정 항목 추가 폼. `kind` 로 장소/티켓 폼이 바로 열린다.
  * 장소는 검색으로 좌표를 채우고, 티켓은 출발/도착일·시각·열차 정보를 입력한다.
+ *
+ * 날짜 칩에 쓸 `days` 는 travelIdx 로 직접 조회한다(호출부가 넘기지 않음).
+ * → 일정표 상세의 티켓 카드와 '내 일정' 탭 헤더의 승차권 아이콘 등 진입점이 달라도
+ *   항상 같은 캐시(travelKeys.detail)를 보고 동일한 화면이 뜬다.
  */
 export default function AddScheduleModal({
   visible,
   onClose,
   travelIdx,
-  days,
+  kind,
   initialDayNo,
   onSaved,
 }: {
   visible: boolean;
   onClose: () => void;
   travelIdx: number;
-  days: TravelDay[];
+  kind: ScheduleKind;
   initialDayNo?: number;
   onSaved?: () => void;
 }) {
-  const [step, setStep] = useState<Step>("choose");
   const create = useCreateSchedule(travelIdx);
-
-  useEffect(() => {
-    if (visible) setStep("choose");
-  }, [visible]);
+  // 상세 화면에서 열면 이미 캐시가 있어 즉시, 탭 헤더에서 열면 프리페치분을 재사용한다.
+  const { data, isLoading } = useTravelDetail(visible ? travelIdx : undefined);
 
   const submit = (body: ScheduleCreateRequest) => {
     create.mutate(body, {
@@ -64,13 +70,15 @@ export default function AddScheduleModal({
 
   if (!visible) return null;
 
-  if (step === "choose") {
-    return <ChooseSheet onClose={onClose} onPick={setStep} />;
-  }
-  if (step === "visit") {
+  const title = kind === "train" ? "티켓 정보 추가하기" : "장소 추가";
+
+  // 캐시가 비어 있는 진입점(탭 헤더 등)에서 첫 조회 중일 때.
+  if (isLoading || !data) return <LoadingSheet title={title} onClose={onClose} />;
+
+  if (kind === "visit") {
     return (
       <VisitForm
-        days={days}
+        days={data.days}
         initialDayNo={initialDayNo}
         saving={create.isPending}
         onClose={onClose}
@@ -80,7 +88,7 @@ export default function AddScheduleModal({
   }
   return (
     <TrainForm
-      days={days}
+      days={data.days}
       saving={create.isPending}
       onClose={onClose}
       onSubmit={submit}
@@ -88,103 +96,48 @@ export default function AddScheduleModal({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 종류 선택 시트                                                       */
-/* ------------------------------------------------------------------ */
-function ChooseSheet({
+/** 일정표를 아직 못 받아온 동안 잠깐 뜨는 로딩 화면(탭에서 눌러 바로 열 때). */
+function LoadingSheet({
+  title,
   onClose,
-  onPick,
 }: {
+  title: string;
   onClose: () => void;
-  onPick: (step: Step) => void;
 }) {
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        className="flex-1 justify-end"
-        style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      >
-        <Pressable
-          className="bg-white"
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
+        {/* 폼이 뜬 뒤와 헤더가 튀지 않도록 ModalShell 의 back 헤더와 같은 여백/크기. */}
+        <View
+          className="flex-row items-center"
           style={{
-            borderTopLeftRadius: scale(20),
-            borderTopRightRadius: scale(20),
             paddingHorizontal: scale(20),
-            paddingTop: verticalScale(20),
-            paddingBottom: verticalScale(36),
-            gap: verticalScale(12),
+            paddingTop: verticalScale(16),
+            paddingBottom: verticalScale(10),
           }}
         >
+          <Pressable
+            onPress={onClose}
+            hitSlop={12}
+            className="active:opacity-60"
+            style={{ padding: scale(4) }}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로"
+          >
+            <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
+          </Pressable>
           <Text
             className="font-bold text-gray-900"
-            style={{ fontSize: moderateScale(17), marginBottom: verticalScale(4) }}
+            style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
           >
-            어떤 일정을 추가할까요?
+            {title}
           </Text>
-          <ChoiceRow
-            icon="map-pin"
-            title="장소"
-            desc="관광지·맛집 등 방문 일정"
-            onPress={() => onPick("visit")}
-          />
-          <ChoiceRow
-            icon="navigation"
-            title="티켓"
-            desc="기차 승차권 정보"
-            onPress={() => onPick("train")}
-          />
-        </Pressable>
-      </Pressable>
+        </View>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={ACCENT} />
+        </View>
+      </SafeAreaView>
     </Modal>
-  );
-}
-
-function ChoiceRow({
-  icon,
-  title,
-  desc,
-  onPress,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  title: string;
-  desc: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:opacity-70"
-      style={{
-        backgroundColor: "#F5F5F7",
-        borderRadius: scale(14),
-        paddingHorizontal: scale(16),
-        paddingVertical: verticalScale(16),
-        gap: scale(14),
-      }}
-    >
-      <View
-        className="items-center justify-center rounded-full"
-        style={{ width: scale(40), height: scale(40), backgroundColor: "#EEF2FF" }}
-      >
-        <Feather name={icon} size={moderateScale(18)} color={ACCENT} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(15) }}
-        >
-          {title}
-        </Text>
-        <Text
-          className="text-gray-400"
-          style={{ fontSize: moderateScale(12), marginTop: verticalScale(2) }}
-        >
-          {desc}
-        </Text>
-      </View>
-      <Feather name="chevron-right" size={moderateScale(20)} color="#C4C9D4" />
-    </Pressable>
   );
 }
 
@@ -238,6 +191,7 @@ function VisitForm({
   return (
     <ModalShell
       visible
+      leading="back"
       title="장소 추가"
       onClose={onClose}
       onSave={handleSave}
@@ -301,13 +255,12 @@ function TrainForm({
   const [seatNo, setSeatNo] = useState("");
   const [memo, setMemo] = useState("");
 
+  // 열차번호는 선택 항목. 필수는 출발/도착역·일자·시각뿐이다.
   const canSave =
     !!depDate &&
     !!arrDate &&
     isValidTime(startTime) &&
     isValidTime(endTime) &&
-    trainNo.trim() !== "" &&
-    trainGrade.trim() !== "" &&
     depStation.trim() !== "" &&
     arrStation.trim() !== "";
 
@@ -319,10 +272,10 @@ function TrainForm({
       arr_date: arrDate,
       start_time: toApiTime(startTime),
       end_time: toApiTime(endTime),
-      train_no: trainNo.trim(),
-      train_grade: trainGrade.trim(),
       dep_station: depStation.trim(),
       arr_station: arrStation.trim(),
+      ...(trainNo.trim() ? { train_no: trainNo.trim() } : {}),
+      ...(trainGrade.trim() ? { train_grade: trainGrade.trim() } : {}),
       ...(carNo.trim() ? { car_no: carNo.trim() } : {}),
       ...(seatNo.trim() ? { seat_no: seatNo.trim() } : {}),
       ...(memo.trim() ? { memo: memo.trim() } : {}),
@@ -332,52 +285,13 @@ function TrainForm({
   return (
     <ModalShell
       visible
-      title="티켓 추가"
+      leading="back"
+      title="티켓 정보 추가하기"
       onClose={onClose}
       onSave={handleSave}
       saving={saving}
       canSave={canSave}
     >
-      <ChipSelect
-        label="출발일"
-        required
-        options={dateOptions}
-        selected={depDate}
-        onSelect={setDepDate}
-      />
-      <ChipSelect
-        label="도착일"
-        required
-        options={dateOptions}
-        selected={arrDate}
-        onSelect={setArrDate}
-      />
-      <TimeField
-        label="출발 시각"
-        required
-        value={startTime}
-        onChangeText={setStartTime}
-      />
-      <TimeField
-        label="도착 시각"
-        required
-        value={endTime}
-        onChangeText={setEndTime}
-      />
-      <Field
-        label="열차 등급"
-        required
-        value={trainGrade}
-        onChangeText={setTrainGrade}
-        placeholder="KTX, ITX-새마을 등"
-      />
-      <Field
-        label="열차 번호"
-        required
-        value={trainNo}
-        onChangeText={setTrainNo}
-        placeholder="101"
-      />
       <Field
         label="출발역"
         required
@@ -392,6 +306,38 @@ function TrainForm({
         onChangeText={setArrStation}
         placeholder="부산"
       />
+      <ChipSelect
+        label="출발일"
+        required
+        options={dateOptions}
+        selected={depDate}
+        onSelect={setDepDate}
+      />
+      <TimeField
+        label="출발시간"
+        required
+        value={startTime}
+        onChangeText={setStartTime}
+      />
+      <ChipSelect
+        label="도착일"
+        required
+        options={dateOptions}
+        selected={arrDate}
+        onSelect={setArrDate}
+      />
+      <TimeField
+        label="도착시간"
+        required
+        value={endTime}
+        onChangeText={setEndTime}
+      />
+      <Field
+        label="열차번호(선택)"
+        value={trainNo}
+        onChangeText={setTrainNo}
+        placeholder="101"
+      />
       <Field
         label="호차(선택)"
         value={carNo}
@@ -403,6 +349,12 @@ function TrainForm({
         value={seatNo}
         onChangeText={setSeatNo}
         placeholder="3A"
+      />
+      <Field
+        label="열차 등급(선택)"
+        value={trainGrade}
+        onChangeText={setTrainGrade}
+        placeholder="KTX, ITX-새마을 등"
       />
       <Field
         label="메모(선택)"

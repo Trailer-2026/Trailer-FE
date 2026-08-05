@@ -12,7 +12,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
+import NewTravelSheet from "@/src/features/travel/components/NewTravelSheet";
 import RenameTravelModal from "@/src/features/travel/components/RenameTravelModal";
+import AddScheduleModal from "@/src/features/travel/components/schedule/AddScheduleModal";
 import TravelMenuSheet from "@/src/features/travel/components/TravelMenuSheet";
 import TravelSummaryCard from "@/src/features/travel/components/TravelSummaryCard";
 import { describeScheduleError } from "@/src/features/travel/errors";
@@ -63,6 +65,22 @@ export default function CalendarTab() {
   const [renameTravel, setRenameTravel] = useState<HomeTravelCard | null>(null);
   const del = useDeleteTravel();
 
+  // 헤더 승차권 아이콘 → 티켓 추가 화면. 일정표 상세의 'KTX 티켓 정보 추가하기' 와
+  // 같은 컴포넌트/같은 여행(예정된 여행)을 쓰므로 어느 쪽에서 저장해도 결과가 같다.
+  const [ticketOpen, setTicketOpen] = useState(false);
+  // '새 여행 일정 만들기' → AI 추천 / 직접 만들기 선택 시트.
+  const [createOpen, setCreateOpen] = useState(false);
+  const openTicket = () => {
+    if (!current) {
+      Alert.alert(
+        "예정된 여행이 없어요",
+        "여행 일정을 먼저 만들면 승차권을 등록할 수 있어요.",
+      );
+      return;
+    }
+    setTicketOpen(true);
+  };
+
   const confirmDelete = (travel: HomeTravelCard) => {
     Alert.alert(
       "여행을 삭제할까요?",
@@ -99,11 +117,11 @@ export default function CalendarTab() {
           내 일정
         </Text>
         <Pressable
-          // TODO(ticket): 승차권함 진입(현재 무동작).
+          onPress={openTicket}
           hitSlop={12}
           className="active:opacity-60"
           accessibilityRole="button"
-          accessibilityLabel="승차권"
+          accessibilityLabel="티켓 추가"
         >
           <Image
             source={HEADER_ICON}
@@ -165,6 +183,7 @@ export default function CalendarTab() {
           current={current}
           loading={currentLoading}
           onMenuPress={setMenuTravel}
+          onCreate={() => setCreateOpen(true)}
         />
       ) : (
         <PastTab />
@@ -192,6 +211,28 @@ export default function CalendarTab() {
           travelIdx={renameTravel.travel_idx}
           currentTitle={renameTravel.title}
           onClose={() => setRenameTravel(null)}
+        />
+      ) : null}
+
+      <NewTravelSheet
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onRecommend={() => {
+          setCreateOpen(false);
+          router.navigate("/course/intro");
+        }}
+        onManual={() => {
+          setCreateOpen(false);
+          router.push("/travel/manual");
+        }}
+      />
+
+      {ticketOpen && current ? (
+        <AddScheduleModal
+          visible
+          kind="train"
+          travelIdx={current.travel_idx}
+          onClose={() => setTicketOpen(false)}
         />
       ) : null}
     </SafeAreaView>
@@ -246,10 +287,12 @@ function UpcomingTab({
   current,
   loading,
   onMenuPress,
+  onCreate,
 }: {
   current: HomeTravelCard | null | undefined;
   loading: boolean;
   onMenuPress: (travel: HomeTravelCard) => void;
+  onCreate: () => void;
 }) {
   if (loading) return <Loading />;
 
@@ -278,7 +321,7 @@ function UpcomingTab({
             지금 바로 나만의 여행 일정을 만들어보세요
           </Text>
           <Pressable
-            onPress={() => router.navigate("/course/intro")}
+            onPress={onCreate}
             className="flex-row items-center justify-center bg-white active:opacity-80"
             style={{
               marginTop: verticalScale(18),

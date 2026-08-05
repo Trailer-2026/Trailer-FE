@@ -9,6 +9,7 @@ import type {
   TravelCreateRequest,
   TravelDetail,
   TravelLikeResponse,
+  TravelManualCreateRequest,
   TravelResponse,
   TravelScheduleItem,
   TravelUpdateRequest,
@@ -24,6 +25,22 @@ export async function createTravel(planId: string): Promise<TravelResponse> {
   const body: TravelCreateRequest = { plan_id: planId };
   const res = await api.post<CommonResponse<TravelResponse>>(
     "/api/travels",
+    body,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * POST /api/travels/manual — 추천 없이 빈 여행 1건 생성(제목·기간·지역).
+ * 400: 예정 여행이 이미 있음 / 종료일이 시작일보다 빠름 → message 를 그대로 노출.
+ * 401: client.ts 인터셉터가 refresh/로그아웃 처리.
+ */
+export async function createManualTravel(
+  body: TravelManualCreateRequest,
+): Promise<TravelResponse> {
+  const res = await api.post<CommonResponse<TravelResponse>>(
+    "/api/travels/manual",
     body,
   );
   if (!res.data.data) throw new Error(res.data.message);

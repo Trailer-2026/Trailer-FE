@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -48,6 +49,7 @@ export function ModalShell({
   saving,
   canSave,
   saveLabel = "저장",
+  leading = "close",
   children,
 }: {
   visible: boolean;
@@ -57,9 +59,12 @@ export function ModalShell({
   saving: boolean;
   canSave: boolean;
   saveLabel?: string;
+  /** "close": ✕ + 가운데 제목 / "back": 앱 공통 뒤로 아이콘 + 그 옆 제목 */
+  leading?: "close" | "back";
   children: ReactNode;
 }) {
   const saveEnabled = canSave && !saving;
+  const back = leading === "back";
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
@@ -68,22 +73,57 @@ export function ModalShell({
           className="flex-row items-center justify-between"
           style={{
             paddingHorizontal: scale(20),
-            paddingVertical: verticalScale(12),
+            // 뒤로 헤더는 앱 공통 화면(약관·프로필 등)과 같은 위 여백을 준다.
+            paddingTop: verticalScale(back ? 16 : 12),
+            paddingBottom: verticalScale(back ? 10 : 12),
             borderBottomWidth: 1,
             borderBottomColor: BORDER,
           }}
         >
-          <Pressable onPress={onClose} hitSlop={10} className="active:opacity-60">
-            <Text className="text-gray-500" style={{ fontSize: moderateScale(20) }}>
-              ✕
-            </Text>
-          </Pressable>
-          <Text
-            className="font-bold text-gray-900"
-            style={{ fontSize: moderateScale(16) }}
-          >
-            {title}
-          </Text>
+          {back ? (
+            <View className="flex-row items-center">
+              <Pressable
+                onPress={onClose}
+                hitSlop={12}
+                className="active:opacity-60"
+                style={{ padding: scale(4) }}
+                accessibilityRole="button"
+                accessibilityLabel="뒤로"
+              >
+                <BackIcon
+                  width={moderateScale(12)}
+                  height={moderateScale(17)}
+                />
+              </Pressable>
+              <Text
+                className="font-bold text-gray-900"
+                style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+              >
+                {title}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                className="active:opacity-60"
+              >
+                <Text
+                  className="text-gray-500"
+                  style={{ fontSize: moderateScale(20) }}
+                >
+                  ✕
+                </Text>
+              </Pressable>
+              <Text
+                className="font-bold text-gray-900"
+                style={{ fontSize: moderateScale(16) }}
+              >
+                {title}
+              </Text>
+            </>
+          )}
           <Pressable
             onPress={onSave}
             disabled={!saveEnabled}
@@ -207,8 +247,8 @@ export function FieldLabel({
       className="font-semibold text-gray-700"
       style={{ fontSize: moderateScale(13), marginBottom: verticalScale(6) }}
     >
+      {required ? <Text style={{ color: "#EF4444" }}>* </Text> : null}
       {label}
-      {required ? <Text style={{ color: "#EF4444" }}> *</Text> : null}
     </Text>
   );
 }

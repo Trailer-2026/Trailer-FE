@@ -8,6 +8,16 @@ export function formatKoreanDate(d: Date): string {
   return `${y}년 ${m}월 ${day}일(${WEEKDAYS[d.getDay()]})`;
 }
 
+/**
+ * Date → API 날짜 문자열 "YYYY-MM-DD".
+ * toISOString() 은 UTC 로 바꾸면서 KST 자정 이전이면 하루 밀리므로 직접 조립한다.
+ */
+export function toIsoDate(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 export function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }

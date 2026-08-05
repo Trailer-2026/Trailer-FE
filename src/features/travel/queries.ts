@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { notificationKeys } from "../notification/keys";
 
 import {
+  createManualTravel,
   createSchedule,
   createTravel,
   deleteSchedule,
@@ -21,6 +22,7 @@ import type {
   PastTravelListResponse,
   ScheduleCreateRequest,
   ScheduleUpdateRequest,
+  TravelManualCreateRequest,
 } from "./types";
 
 /** past 목록 캐시에서 특정 여행의 liked 를 갱신하는 헬퍼. */
@@ -194,6 +196,22 @@ export function useCreateTravel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: travelKeys.current() });
       queryClient.invalidateQueries({ queryKey: notificationKeys.list() });
+    },
+  });
+}
+
+/**
+ * "직접 일정 만들기" — 빈 여행 1건 생성(POST /api/travels/manual).
+ * - 예정 여행은 1개만 가능해서 이미 있으면 400. 호출부에서 message 그대로 안내한다.
+ * - 성공 시 current 를 invalidate 해 일정 탭 카드가 바로 갱신되게 한다.
+ *   (추천 저장과 달리 알림 로그 이벤트는 없으므로 알림 캐시는 건드리지 않는다.)
+ */
+export function useCreateManualTravel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: TravelManualCreateRequest) => createManualTravel(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: travelKeys.current() });
     },
   });
 }
