@@ -1,5 +1,9 @@
-import { Modal, Pressable } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import PencilIcon from "@/src/components/icons/PencilIcon";
+import SparkleIcon from "@/src/components/icons/SparkleIcon";
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -20,6 +24,8 @@ export default function NewTravelSheet({
   onRecommend: () => void;
   onManual: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal
       visible={visible}
@@ -40,7 +46,8 @@ export default function NewTravelSheet({
             borderTopRightRadius: scale(20),
             paddingHorizontal: scale(20),
             paddingTop: verticalScale(24),
-            paddingBottom: verticalScale(40),
+            // 하단 내비게이션 바(제스처 바 포함)에 마지막 항목이 가리지 않도록 인셋 가산.
+            paddingBottom: verticalScale(24) + insets.bottom,
           }}
         >
           <Text
@@ -51,23 +58,27 @@ export default function NewTravelSheet({
           </Text>
 
           <ChoiceRow
-            emoji="✨"
-            highlighted
+            icon={
+              <SparkleIcon
+                width={moderateScale(24)}
+                height={moderateScale(24)}
+              />
+            }
             onPress={onRecommend}
             style={{ marginTop: verticalScale(24) }}
           >
-            <Text className="font-bold" style={{ color: ACCENT }}>
-              추천{" "}
-            </Text>
-            <Text className="font-bold text-gray-800">AI 일정 추천받기</Text>
+            <Text style={{ color: ACCENT }}>추천 </Text>
+            <Text className="text-gray-800">AI 일정 추천받기</Text>
           </ChoiceRow>
 
           <ChoiceRow
-            emoji="✏️"
+            icon={
+              <PencilIcon width={moderateScale(20)} height={moderateScale(20)} />
+            }
             onPress={onManual}
             style={{ marginTop: verticalScale(12) }}
           >
-            <Text className="font-bold text-gray-800">직접 일정 만들기</Text>
+            <Text className="text-gray-800">직접 일정 만들기</Text>
           </ChoiceRow>
         </Pressable>
       </Pressable>
@@ -75,42 +86,40 @@ export default function NewTravelSheet({
   );
 }
 
-/** 아이콘은 왼쪽 고정, 문구는 카드 가운데 정렬. */
+/** 아이콘은 왼쪽 고정, 문구는 카드 가운데 정렬. 두 항목 모두 같은 파란 카드. */
 function ChoiceRow({
-  emoji,
-  highlighted,
+  icon,
   onPress,
   style,
   children,
 }: {
-  emoji: string;
-  highlighted?: boolean;
+  icon: React.ReactNode;
   onPress: () => void;
   style?: object;
   children: React.ReactNode;
 }) {
+  // 누르는 동안에만 테두리를 보여준다.
+  // ⚠️ style 을 함수(({pressed}) => …)로 주면 NativeWind 의 className 병합과 충돌해
+  //    스타일이 통째로 날아간다(카드가 사라짐). 반드시 상태 + 객체 style 로 처리할 것.
+  const [pressed, setPressed] = useState(false);
+
   return (
     <Pressable
       onPress={onPress}
-      className="items-center justify-center active:opacity-70"
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      className="items-center justify-center"
       style={{
         height: verticalScale(56),
         borderRadius: scale(10),
+        // borderWidth 는 항상 1 — 눌릴 때 0→1 로 바뀌면 내용이 밀려 덜컹거린다.
         borderWidth: 1,
-        borderColor: highlighted ? "#C7D7FF" : "transparent",
-        backgroundColor: highlighted ? "#F2F6FF" : "#F5F5F7",
+        borderColor: pressed ? "#C7D7FF" : "transparent",
+        backgroundColor: "#F2F6FF",
         ...style,
       }}
     >
-      <Text
-        style={{
-          position: "absolute",
-          left: scale(18),
-          fontSize: moderateScale(20),
-        }}
-      >
-        {emoji}
-      </Text>
+      <View style={{ position: "absolute", left: scale(18) }}>{icon}</View>
       <Text style={{ fontSize: moderateScale(15) }}>{children}</Text>
     </Pressable>
   );

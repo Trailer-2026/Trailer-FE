@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BackIcon from "@/src/components/icons/BackIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { describeScheduleError } from "../errors";
@@ -151,6 +152,9 @@ export default function TravelDetailView({
           onBack={onBack}
           onAddTicket={() => setAddState({ kind: "train" })}
         />
+
+        {/* 실시간 창밖 풍경 — 탑승 시작/종료와 폴링 결과. 열차 항목이 없으면 안 뜬다. */}
+        <LiveScenerySection detail={data} />
 
         <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(4) }}>
           {data.days.length === 0 ? (
