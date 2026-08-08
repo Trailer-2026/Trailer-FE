@@ -221,6 +221,7 @@ export default function ProfileTab() {
                   contentFit="contain"
                 />
               }
+              onPress={() => router.push("/profile/reels")}
             />
           </View>
         </ImageBackground>

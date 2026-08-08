@@ -1,7 +1,11 @@
 import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
 
-import type { MyProfile, ProfileImageFile } from "./types";
+import type {
+  MyProfile,
+  MyReelsListResponse,
+  ProfileImageFile,
+} from "./types";
 
 /**
  * 내 프로필 조회. 내 정보 탭 진입 시 호출.
@@ -12,6 +16,33 @@ export async function getMyProfile(): Promise<MyProfile> {
   const res = await api.get<CommonResponse<MyProfile>>("/api/users/me/profile");
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
+}
+
+/**
+ * 내가 올린 릴스 목록(최신순). GET /api/users/me/reels
+ *
+ * 커서 페이징 — 응답의 next_cursor 를 그대로 다음 요청 cursor 로 넘긴다(null 이면 끝).
+ * 렌더가 안 끝난 릴스는 서버가 빼고 준다. 401: 인증 필요.
+ */
+export async function getMyReels(
+  cursor?: number | null,
+): Promise<MyReelsListResponse> {
+  const res = await api.get<CommonResponse<MyReelsListResponse>>(
+    "/api/users/me/reels",
+    { params: cursor != null ? { cursor } : undefined },
+  );
+  return res.data.data ?? { items: [], next_cursor: null };
+}
+
+/**
+ * 사용자 차단. POST /api/blocks/{user_idx}
+ *
+ * 단방향 — 차단하면 그 사용자의 릴스·댓글이 나에게만 안 보인다.
+ * 이미 차단한 상대에게 다시 호출해도 성공(멱등)이라 중복 호출 방어가 필요 없다.
+ * 400: 자기 자신 차단 / 404: 사용자 없음 / 401: 인증 필요.
+ */
+export async function blockUser(userIdx: number): Promise<void> {
+  await api.post(`/api/blocks/${userIdx}`);
 }
 
 /**
