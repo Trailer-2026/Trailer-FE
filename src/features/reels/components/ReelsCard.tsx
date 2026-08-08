@@ -1,9 +1,10 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { VideoView, type VideoPlayer } from "expo-video";
-import { Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import CommentIcon from "@/src/components/icons/CommentIcon";
+import DownloadIcon from "@/src/components/icons/DownloadIcon";
 import HeartIcon from "@/src/components/icons/HeartIcon";
 import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
 import ShareIcon from "@/src/components/icons/ShareIcon";
@@ -22,6 +23,12 @@ type Props = {
   player: VideoPlayer;
   onToggleLike: (reelsIdx: number) => void;
   onOpenComments: (reelsIdx: number) => void;
+  /** 내 영상이면 다운로드, 남의 영상이면 링크 공유 — 분기는 호출부(feed)가 한다. */
+  onShare: (reels: Reels) => void;
+  /** 내 영상 — 버튼을 공유 대신 다운로드 아이콘으로 바꾼다. */
+  mine?: boolean;
+  /** 다운로드·링크 조회 진행 중 — 버튼을 스피너로 바꾸고 중복 탭을 막는다. */
+  sharing?: boolean;
 };
 
 /**
@@ -48,7 +55,11 @@ export default function ReelsCard({
   player,
   onToggleLike,
   onOpenComments,
+  onShare,
+  mine = false,
+  sharing = false,
 }: Props) {
+  const ActionIcon = mine ? DownloadIcon : ShareIcon;
   return (
     <View className="w-full bg-black" style={{ height }}>
       {reels.video_url && active ? (
@@ -133,16 +144,26 @@ export default function ReelsCard({
         <Pressable
           className="items-center active:opacity-60"
           hitSlop={moderateScale(8)}
-          // TODO(공유): 시스템 공유 시트 연결 — 이번 범위 밖.
-          onPress={() => {}}
+          disabled={sharing}
+          onPress={() => onShare(reels)}
           accessibilityRole="button"
-          accessibilityLabel="공유"
+          accessibilityLabel={mine ? "갤러리에 저장" : "공유"}
         >
-          <ShareIcon
-            width={moderateScale(ICON.share.w)}
-            height={moderateScale(ICON.share.h)}
-            color="#FFFFFF"
-          />
+          {sharing ? (
+            <ActivityIndicator
+              color="#FFFFFF"
+              style={{
+                width: moderateScale(ICON.share.w),
+                height: moderateScale(ICON.share.h),
+              }}
+            />
+          ) : (
+            <ActionIcon
+              width={moderateScale(ICON.share.w)}
+              height={moderateScale(ICON.share.h)}
+              color="#FFFFFF"
+            />
+          )}
         </Pressable>
       </View>
 

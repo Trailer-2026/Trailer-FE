@@ -1,26 +1,38 @@
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as MediaLibrary from "expo-media-library";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
+  Share,
   View,
   type LayoutChangeEvent,
   type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
 import ShareUpIcon from "@/src/components/icons/ShareUpIcon";
 import { Text } from "@/src/components/Text";
 import CommentsSheet from "@/src/features/reels/components/CommentsSheet";
 import ReelsCard from "@/src/features/reels/components/ReelsCard";
-import { useRecommendedReels } from "@/src/features/reels/queries";
-import type { Reels } from "@/src/features/reels/types";
+import {
+  useRecommendedReels,
+  useToggleReelsLike,
+} from "@/src/features/reels/queries";
+import type { LikeResponse, Reels } from "@/src/features/reels/types";
+import { useMyProfile } from "@/src/features/user/queries";
+import {
+  downloadMyReelsVideo,
+  getReelsShareUrl,
+} from "@/src/features/video/api";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // "내 여행영상 만들기" 말풍선 — 메인탭 말풍선과 동일한 CSS 텍스트 버블(색·굵기 통일).
@@ -34,14 +46,92 @@ export default function FeedTab() {
   // 다른 탭으로 가면 소리까지 멈추도록 — 포커스가 없으면 재생 중인 카드도 없다.
   const isFocused = useIsFocused();
 
-  // 추천 API 는 좋아요 여부를 주지 않는다. 이번 세션 동안만 로컬로 기억한다.
-  const [likes, setLikes] = useState<Record<number, boolean>>({});
-  const toggleLike = useCallback((reelsIdx: number) => {
-    setLikes((prev) => ({ ...prev, [reelsIdx]: !prev[reelsIdx] }));
-  }, []);
+  // 추천 API 는 liked/like_count 를 주지 않는다 → 처음엔 "안 누름 / 0" 으로 보이고,
+  // 한 번 누르면 서버 응답의 확정값으로 덮어써 이번 세션 동안 유지한다.
+  const [likes, setLikes] = useState<Record<number, LikeResponse>>({});
+  const toggleReelsLike = useToggleReelsLike();
+  const toggleLike = useCallback(
+    (reelsIdx: number) => {
+      const before = likes[reelsIdx] ?? { liked: false, like_count: 0 };
+      // 하트는 즉시 반응해야 하므로 먼저 뒤집고, 실패하면 되돌린다.
+      setLikes((prev) => ({
+        ...prev,
+        [reelsIdx]: {
+          liked: !before.liked,
+          like_count: Math.max(0, before.like_count + (before.liked ? -1 : 1)),
+        },
+      }));
+      toggleReelsLike.mutate(
+        { reelsIdx, liked: before.liked },
+        {
+          onSuccess: (data) =>
+            setLikes((prev) => ({ ...prev, [reelsIdx]: data })),
+          onError: (err) => {
+            setLikes((prev) => ({ ...prev, [reelsIdx]: before }));
+            Alert.alert("좋아요 실패", describeApiError(err));
+          },
+        },
+      );
+    },
+    [likes, toggleReelsLike],
+  );
 
   // 댓글 시트를 연 릴스. null 이면 닫힘.
   const [commentsFor, setCommentsFor] = useState<number | null>(null);
+
+  // 공유/다운로드 —
+  // 추천 API 가 작성자 user_idx 를 주지 않아 내 영상 판별은 닉네임 비교로 한다.
+  // (닉네임이 겹치면 오판할 수 있지만, 다운로드 API 가 남의 릴스에 404 를 주므로 서버가 최종 방어)
+  const { data: me } = useMyProfile();
+  const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
+
+  const isMyReels = useCallback(
+    (reels: Reels) => !!me?.nickname && me.nickname === reels.author.name,
+    [me?.nickname],
+  );
+
+  const onShare = useCallback(
+    async (reels: Reels) => {
+      const isMine = isMyReels(reels);
+
+      if (downloadingIdx != null) return;
+      setDownloadingIdx(reels.reels_idx);
+
+      if (!isMine) {
+        try {
+          // 버킷 영상 주소 대신 공유 페이지 링크 — 카톡·SNS 에서 미리보기가 뜬다.
+          const shareUrl = await getReelsShareUrl(reels.reels_idx);
+          await Share.share({
+            // 안드로이드는 url 필드를 무시하므로 message 에 넣어야 한다.
+            message: `${reels.caption ? `${reels.caption}\n` : ""}${shareUrl}`,
+          });
+        } catch (err) {
+          // 404 = 삭제됐거나 아직 렌더 중.
+          Alert.alert("공유할 수 없어요", describeApiError(err));
+        } finally {
+          setDownloadingIdx(null);
+        }
+        return;
+      }
+
+      try {
+        // 갤러리 저장 권한만 요청(writeOnly) — 읽기까지 요구할 이유가 없다.
+        const permission = await MediaLibrary.requestPermissionsAsync(true);
+        if (!permission.granted) {
+          Alert.alert("권한 필요", "영상을 저장하려면 갤러리 권한이 필요해요.");
+          return;
+        }
+        const uri = await downloadMyReelsVideo(reels.reels_idx);
+        await MediaLibrary.saveToLibraryAsync(uri);
+        Alert.alert("저장 완료", "갤러리에 영상을 저장했어요.");
+      } catch (err) {
+        Alert.alert("다운로드 실패", describeApiError(err));
+      } finally {
+        setDownloadingIdx(null);
+      }
+    },
+    [isMyReels, downloadingIdx],
+  );
 
   // 지금 화면을 채우고 있는 카드 = 재생할 카드.
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
@@ -98,15 +188,28 @@ export default function FeedTab() {
   const renderItem = useCallback(
     ({ item }: { item: Reels }) => (
       <ReelsCard
-        reels={{ ...item, liked: !!likes[item.reels_idx] }}
+        reels={{ ...item, ...likes[item.reels_idx] }}
         height={viewportHeight}
         active={isFocused && item.reels_idx === activeIdx}
         player={player}
         onToggleLike={toggleLike}
         onOpenComments={setCommentsFor}
+        onShare={onShare}
+        mine={isMyReels(item)}
+        sharing={downloadingIdx === item.reels_idx}
       />
     ),
-    [viewportHeight, toggleLike, likes, activeIdx, isFocused, player],
+    [
+      viewportHeight,
+      toggleLike,
+      likes,
+      activeIdx,
+      isFocused,
+      player,
+      onShare,
+      isMyReels,
+      downloadingIdx,
+    ],
   );
 
   return (

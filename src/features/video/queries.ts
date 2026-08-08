@@ -2,7 +2,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
-import { getBgmTracks, getRenderStatus, renderPhotosOnly } from "./api";
+import {
+  cutVideoSection,
+  getBgmTracks,
+  getRenderStatus,
+  insertImageClip,
+  renderPhotosOrdered,
+} from "./api";
 import { videoKeys } from "./keys";
 import type { RenderOptions } from "./types";
 
@@ -49,9 +55,9 @@ export function useRenderStatus(reelsIdx: number | null) {
 }
 
 /**
- * 렌더 시작. 성공 시 반환된 reels_idx 로 진행률 화면으로 이동한다(호출부).
+ * 렌더 시작(사진 순서 지정). 성공 시 반환된 reels_idx 로 진행률 화면으로 이동한다(호출부).
  */
-export function useRenderPhotosOnly() {
+export function useRenderPhotosOrdered() {
   return useMutation({
     mutationFn: ({
       photos,
@@ -59,6 +65,32 @@ export function useRenderPhotosOnly() {
     }: {
       photos: ReelsMediaAsset[];
       options: RenderOptions;
-    }) => renderPhotosOnly(photos, options),
+    }) => renderPhotosOrdered(photos, options),
+  });
+}
+
+/**
+ * 완성 영상 편집 — 구간 삭제 / 사진 삽입.
+ *
+ * 서버가 편집 전 영상을 지우므로 되돌리기가 없다(호출부에서 확인을 받는다).
+ * 성공하면 새 video_url 을 그대로 화면 상태로 쓴다 — 릴스 PK 는 그대로다.
+ */
+export function useCutVideoSection() {
+  return useMutation({
+    mutationFn: (vars: {
+      reelsIdx: number;
+      startSeconds: number;
+      endSeconds: number;
+    }) => cutVideoSection(vars.reelsIdx, vars.startSeconds, vars.endSeconds),
+  });
+}
+
+export function useInsertImageClip() {
+  return useMutation({
+    mutationFn: (vars: {
+      reelsIdx: number;
+      atSeconds: number;
+      photo: ReelsMediaAsset;
+    }) => insertImageClip(vars.reelsIdx, vars.atSeconds, vars.photo),
   });
 }
