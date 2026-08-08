@@ -5,10 +5,10 @@ import { useCallback, useEffect } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import { Text } from "@/src/components/Text";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import { useActiveRenderStore } from "@/src/features/video/active-render-store";
-import { describeRenderError } from "@/src/features/video/errors";
 import { isRenderNotFound, useRenderStatus } from "@/src/features/video/queries";
 import type { VideoRenderStatusResponse } from "@/src/features/video/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -87,6 +87,13 @@ export default function ReelsProgressScreen() {
     router.dismissAll();
   };
 
+  // 완성된 영상 편집으로. replace 라 뒤로가기가 진행률 화면으로 돌아오지 않는다.
+  const goToStudio = (videoUrl: string) => {
+    router.replace(
+      `/reels/studio?reels_idx=${reelsIdx}&url=${encodeURIComponent(videoUrl)}`,
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <StatusBar style="light" />
@@ -112,7 +119,7 @@ export default function ReelsProgressScreen() {
       return (
         <ErrorState
           title="진행 상황을 불러오지 못했어요"
-          message={`${describeRenderError(error)}\n(reels_idx: ${reelsIdx ?? "없음"})`}
+          message={`${describeApiError(error)}\n(reels_idx: ${reelsIdx ?? "없음"})`}
           onRetry={retry}
         />
       );
@@ -151,7 +158,7 @@ export default function ReelsProgressScreen() {
     }
 
     if (data.status === "done") {
-      return <DoneState status={data} onFeed={goToFeed} />;
+      return <DoneState status={data} onFeed={goToFeed} onEdit={goToStudio} />;
     }
 
     // running
@@ -241,13 +248,15 @@ function RunningState({ status }: { status: VideoRenderStatusResponse }) {
   );
 }
 
-/** 완료 — 인앱 영상 재생 + 피드로 이동. */
+/** 완료 — 인앱 영상 재생 + 편집/피드 이동. */
 function DoneState({
   status,
   onFeed,
+  onEdit,
 }: {
   status: VideoRenderStatusResponse;
   onFeed: () => void;
+  onEdit: (videoUrl: string) => void;
 }) {
   const source = status.video_url ?? status.reels_url;
   // 완료 화면 진입 시 자동 재생(반복). 세로 영상이라 contain 으로 맞춘다.
@@ -281,7 +290,10 @@ function DoneState({
         </Text>
       )}
 
-      <View className="w-full">
+      <View className="w-full" style={{ gap: verticalScale(10) }}>
+        {source ? (
+          <PrimaryButton label="영상 편집하기" onPress={() => onEdit(source)} />
+        ) : null}
         <SecondaryButton label="피드로 이동" onPress={onFeed} />
       </View>
     </View>
