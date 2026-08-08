@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import { Text } from "@/src/components/Text";
 import { StepHeader } from "@/src/features/course/components/StepHeader";
-import { describeRecommendError } from "@/src/features/course/errors";
 import { useRecommendCourses } from "@/src/features/course/queries";
 import { buildRecommendCriteria, useCourseStore } from "@/src/features/course/store";
 import { moderateScale, verticalScale } from "@/src/utils/responsive";
@@ -75,7 +75,7 @@ export default function LoadingScreen() {
               className="mt-2 text-sm text-gray-500 text-center"
               selectable
             >
-              {describeRecommendError(error)}
+              {describeApiError(error)}
             </Text>
             <Pressable
               onPress={() => refetch()}
@@ -142,10 +142,16 @@ function LoadingSpinner({ progress }: { progress: number }) {
     return () => anim.stop();
   }, [rot]);
 
-  const spin = rot.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
+  // progress 갱신(50ms 주기)마다 interpolate() 를 새로 만들면 네이티브 애니메이션
+  // 노드가 계속 교체되어 connectAnimatedNodes 크래시로 이어진다. 노드를 고정한다.
+  const spin = useMemo(
+    () =>
+      rot.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["0deg", "360deg"],
+      }),
+    [rot],
+  );
 
   // progress(0~100) 만큼 막대를 파랗게 채운다. 최소 1개는 채워 활성 표시.
   const filled = Math.max(

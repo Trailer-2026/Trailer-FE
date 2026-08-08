@@ -17,14 +17,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
 import RefreshIcon from "@/src/components/icons/RefreshIcon";
 import { StaticTabBar } from "@/src/components/StaticTabBar";
 import { Text } from "@/src/components/Text";
 import { addDays } from "@/src/features/course/date";
-import { describeRecommendError } from "@/src/features/course/errors";
-import { formatMinutes } from "@/src/features/course/format";
+import { formatMinutes, kstHourMinute } from "@/src/features/course/format";
 import {
   usePrefetchNextRecommendPage,
   useRecommendCourses,
@@ -172,7 +172,7 @@ export default function ResultScreen() {
           ]);
           return;
         }
-        Alert.alert("저장 실패", describeRecommendError(err));
+        Alert.alert("저장 실패", describeApiError(err));
       },
     });
   };
@@ -214,7 +214,7 @@ export default function ResultScreen() {
         </View>
       ) : isError || !data ? (
         <ErrorView
-          message={describeRecommendError(error)}
+          message={describeApiError(error)}
           onRetry={() => refetch()}
         />
       ) : (
@@ -425,11 +425,17 @@ function PlanCard({
     itinerary.title || itinerary.route_type || itinerary.label || "추천 코스";
 
   // 중앙(=index*SNAP)에서 1.0, 좌우로 멀어질수록 0.85 로 부드럽게 축소.
-  const cardScale = scrollX.interpolate({
-    inputRange: [(index - 1) * SNAP, index * SNAP, (index + 1) * SNAP],
-    outputRange: [0.85, 1, 0.85],
-    extrapolate: "clamp",
-  });
+  // 렌더마다 interpolate() 를 새로 만들면 네이티브 애니메이션 노드가 교체되면서
+  // connectAnimatedNodes 크래시가 나므로 useMemo 로 고정한다.
+  const cardScale = useMemo(
+    () =>
+      scrollX.interpolate({
+        inputRange: [(index - 1) * SNAP, index * SNAP, (index + 1) * SNAP],
+        outputRange: [0.85, 1, 0.85],
+        extrapolate: "clamp",
+      }),
+    [scrollX, index],
+  );
 
   return (
     <Animated.View
@@ -1286,17 +1292,13 @@ function minutesBetween(a: string, b: string): number {
   return Math.max(0, Math.round(ms / 60000));
 }
 
-/** ISO8601 → "오전 9:00" / "오후 6:31" */
+/** ISO8601 → KST 기준 "오전 9:00" / "오후 6:31" */
 function formatKoreanClock(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h < 12 ? "오전" : "오후";
-  let hh = h % 12;
-  if (hh === 0) hh = 12;
-  return `${ampm} ${hh}:${String(m).padStart(2, "0")}`;
+  const hm = kstHourMinute(iso);
+  if (!hm) return "";
+  const ampm = hm.h < 12 ? "오전" : "오후";
+  const hh = hm.h % 12 === 0 ? 12 : hm.h % 12;
+  return `${ampm} ${hh}:${String(hm.m).padStart(2, "0")}`;
 }
 
 /**
@@ -1311,14 +1313,12 @@ function formatVisitClock(v: string | null | undefined): string {
   return "";
 }
 
-/** 마커 밑 방문 시간 — 좁은 레일에 맞춰 24시간 "HH:mm". */
+/** 마커 밑 방문 시간 — 좁은 레일에 맞춰 KST 24시간 "HH:mm". */
 function formatMarkerClock(v: string | null | undefined): string {
   if (!v) return "";
-  const d = new Date(v);
-  if (!Number.isNaN(d.getTime())) {
-    return `${String(d.getHours()).padStart(2, "0")}:${String(
-      d.getMinutes(),
-    ).padStart(2, "0")}`;
+  const hm = kstHourMinute(v);
+  if (hm) {
+    return `${String(hm.h).padStart(2, "0")}:${String(hm.m).padStart(2, "0")}`;
   }
   const m = /^(\d{1,2}):(\d{2})/.exec(v);
   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";

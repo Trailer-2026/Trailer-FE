@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, BackHandler, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -64,16 +64,28 @@ export function AuthBottomSheet({
     return () => sub.remove();
   }, [visible, ready, onClose]);
 
-  if (!rendered) return null;
+  // interpolate() 를 렌더 본문에서 매번 호출하면 렌더마다 새 네이티브 애니메이션
+  // 노드가 만들어지고 이전 노드는 detach 된다. 이 과정에서 이미 버려진 노드를
+  // 향해 connect 가 날아가면 "connectAnimatedNodes: Animated node with tag
+  // (parent) [n] does not exist" 로 앱이 죽는다. useMemo 로 노드를 고정한다.
+  const translateY = useMemo(
+    () =>
+      anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [verticalScale(460), 0],
+      }),
+    [anim],
+  );
+  const backdropOpacity = useMemo(
+    () =>
+      anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 0.45],
+      }),
+    [anim],
+  );
 
-  const translateY = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [verticalScale(460), 0],
-  });
-  const backdropOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.45],
-  });
+  if (!rendered) return null;
 
   return (
     <View style={StyleSheet.absoluteFill}>
