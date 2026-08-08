@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import * as MediaLibrary from "expo-media-library";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -40,6 +40,32 @@ function mediaTypesFor(filter: Filter): MediaLibrary.MediaTypeValue[] {
 }
 
 /**
+ * 영상 생성에 쓸 수 있는 항목만 남긴다 — 위치(EXIF GPS) + 촬영시각이 둘 다 있어야
+ * 서버가 이동 경로를 그린다(없으면 렌더 요청이 400). 캡처·다운로드 사진은 대개 위치가 없다.
+ *
+ * 조회한 원본 정보는 cache 에 담아 확정 단계에서 재사용한다.
+ * ponytail: 페이지마다 60건을 병렬로 읽는다. 사진 수천 장에서 느려지면
+ *           PAGE_SIZE 를 줄이거나 화면에 보이는 칸부터 lazy 로 검사할 것.
+ */
+async function filterUsable(
+  assets: MediaLibrary.Asset[],
+  cache: Map<string, MediaLibrary.AssetInfo>,
+): Promise<MediaLibrary.Asset[]> {
+  const infos = await Promise.all(
+    assets.map((asset) =>
+      MediaLibrary.getAssetInfoAsync(asset).catch(() => null),
+    ),
+  );
+  return assets.filter((asset, i) => {
+    const info = infos[i];
+    // EXIF 촬영시각이 없으면 MediaStore DATE_TAKEN 이 -1 로 온다(0 이 아니다).
+    if (!info?.location || !(info.creationTime > 0)) return false;
+    cache.set(asset.id, info);
+    return true;
+  });
+}
+
+/**
  * 커스텀 갤러리 그리드 — expo-media-library 로 사진/영상을 직접 읽는다.
  *
  * 시스템 피커와 달리 원본 asset 을 조회하므로, 확정 시 각 항목의 위치·촬영시각을 확실히 얻는다.
@@ -73,6 +99,10 @@ export default function ReelsGalleryScreen() {
   // 선택 순서 유지 — id 배열
   const [selected, setSelected] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+
+  // 그리드에 남긴 항목의 원본 정보(위치·촬영시각). 필터링하며 이미 읽었으므로
+  // 확정할 때 다시 조회하지 않는다.
+  const infoCache = useRef(new Map<string, MediaLibrary.AssetInfo>()).current;
 
   const usable = permStatus === "granted";
 
@@ -119,21 +149,31 @@ export default function ReelsGalleryScreen() {
       if (!reset && !hasNext) return;
       setLoading(true);
       try {
-        const page = await MediaLibrary.getAssetsAsync({
-          first: PAGE_SIZE,
-          after: reset ? undefined : cursor,
-          mediaType: mediaTypesFor(filter),
-          sortBy: [MediaLibrary.SortBy.creationTime],
-          album: album?.id,
-        });
-        setAssets((prev) => (reset ? page.assets : [...prev, ...page.assets]));
-        setCursor(page.endCursor);
-        setHasNext(page.hasNextPage);
+        // 걸러내고 나면 한 페이지가 통째로 비는 경우가 있다. 그대로 두면 그리드가
+        // 비어 onEndReached 가 다시 불리지 않으므로, 쓸 수 있는 게 나올 때까지 이어 받는다.
+        let after = reset ? undefined : cursor;
+        let collected: MediaLibrary.Asset[] = [];
+        let more = true;
+        while (more && collected.length === 0) {
+          const page = await MediaLibrary.getAssetsAsync({
+            first: PAGE_SIZE,
+            after,
+            mediaType: mediaTypesFor(filter),
+            sortBy: [MediaLibrary.SortBy.creationTime],
+            album: album?.id,
+          });
+          collected = await filterUsable(page.assets, infoCache);
+          after = page.endCursor;
+          more = page.hasNextPage;
+        }
+        setAssets((prev) => (reset ? collected : [...prev, ...collected]));
+        setCursor(after);
+        setHasNext(more);
       } finally {
         setLoading(false);
       }
     },
-    [usable, loading, hasNext, cursor, filter, album],
+    [usable, loading, hasNext, cursor, filter, album, infoCache],
   );
 
   // 권한/필터/앨범이 바뀌면 처음부터 다시 로드
@@ -159,9 +199,11 @@ export default function ReelsGalleryScreen() {
     if (selected.length === 0 || confirming) return;
     setConfirming(true);
     try {
-      // 선택 순서대로 원본 정보(위치·시각 포함) 조회
+      // 그리드에 남은 항목은 필터링하며 원본 정보를 이미 읽어뒀다(위치·시각 포함).
       const infos = await Promise.all(
-        selected.map((id) => MediaLibrary.getAssetInfoAsync(id)),
+        selected.map(
+          async (id) => infoCache.get(id) ?? MediaLibrary.getAssetInfoAsync(id),
+        ),
       );
       const media = infos.map(toReelsMediaFromLibrary);
 
@@ -252,6 +294,29 @@ export default function ReelsGalleryScreen() {
                 <ActivityIndicator color="#9CA3AF" />
               </View>
             ) : null
+          }
+          // 위치 없는 사진만 있는 기기에선 그리드가 통째로 빈다 — 이유를 알려준다.
+          ListEmptyComponent={
+            loading ? null : (
+              <View
+                className="items-center"
+                style={{
+                  paddingTop: verticalScale(80),
+                  paddingHorizontal: scale(32),
+                }}
+              >
+                <Text
+                  className="text-center text-gray-400"
+                  style={{
+                    fontSize: moderateScale(13),
+                    lineHeight: moderateScale(20),
+                  }}
+                >
+                  쓸 수 있는 사진이 없어요.{"\n"}촬영 위치와 시각이 기록된 사진만
+                  보여줘요.
+                </Text>
+              </View>
+            )
           }
           renderItem={({ item }) => {
             const order = selected.indexOf(item.id);
