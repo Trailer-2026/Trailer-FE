@@ -14,8 +14,15 @@ import {
   unlikeComment,
   unlikeReels,
 } from "./api";
+import { userKeys } from "@/src/features/user/keys";
+
 import { reelsKeys } from "./keys";
-import type { Reels, ReelsComment, ReelsRecommendItem } from "./types";
+import type {
+  LikeResponse,
+  Reels,
+  ReelsComment,
+  ReelsRecommendItem,
+} from "./types";
 
 /** 릴스 댓글 목록. 시트를 열었을 때만(reelsIdx 가 있을 때만) 요청한다. */
 export function useReelsComments(reelsIdx: number | null) {
@@ -54,9 +61,30 @@ export function useCreateReelsComment(reelsIdx: number | null) {
  * 호출부(feed.tsx)가 응답값을 화면 상태로 들고 있는다.
  */
 export function useToggleReelsLike() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: { reelsIdx: number; liked: boolean }) =>
       vars.liked ? unlikeReels(vars.reelsIdx) : likeReels(vars.reelsIdx),
+    // 좋아요가 곧 북마크라 목록이 바뀐다(하트를 풀면 목록에서 빠진다).
+    onSuccess: (data, vars) => {
+      // 목록은 다시 받아오고(순서·구성이 서버 기준),
+      queryClient.invalidateQueries({
+        queryKey: userKeys.likedReels(),
+        exact: true,
+      });
+      // 피드용 인덱스는 응답값으로 직접 고친다 — 여기서 무효화하면 좋아요를 누를 때마다
+      // 수백 건짜리 목록을 다시 받게 된다.
+      queryClient.setQueryData<Map<number, LikeResponse>>(
+        userKeys.likedIndex(),
+        (index) => {
+          if (!index) return index;
+          const next = new Map(index);
+          if (data.liked) next.set(vars.reelsIdx, data);
+          else next.delete(vars.reelsIdx);
+          return next;
+        },
+      );
+    },
   });
 }
 

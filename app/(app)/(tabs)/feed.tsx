@@ -28,7 +28,10 @@ import {
   useToggleReelsLike,
 } from "@/src/features/reels/queries";
 import type { LikeResponse, Reels } from "@/src/features/reels/types";
-import { useMyProfile } from "@/src/features/user/queries";
+import {
+  useLikedReelsIndex,
+  useMyProfile,
+} from "@/src/features/user/queries";
 import {
   downloadMyReelsVideo,
   getReelsShareUrl,
@@ -46,13 +49,15 @@ export default function FeedTab() {
   // 다른 탭으로 가면 소리까지 멈추도록 — 포커스가 없으면 재생 중인 카드도 없다.
   const isFocused = useIsFocused();
 
-  // 추천 API 는 liked/like_count 를 주지 않는다 → 처음엔 "안 누름 / 0" 으로 보이고,
-  // 한 번 누르면 서버 응답의 확정값으로 덮어써 이번 세션 동안 유지한다.
+  // 추천 API 는 liked/like_count 를 주지 않는다 → 내가 좋아요한 목록을 미리 받아
+  // 하트의 초기 상태로 쓰고, 누른 뒤에는 서버 응답의 확정값으로 덮어쓴다.
+  const { data: likedIndex } = useLikedReelsIndex();
   const [likes, setLikes] = useState<Record<number, LikeResponse>>({});
   const toggleReelsLike = useToggleReelsLike();
   const toggleLike = useCallback(
     (reelsIdx: number) => {
-      const before = likes[reelsIdx] ?? { liked: false, like_count: 0 };
+      const before = likes[reelsIdx] ??
+        likedIndex?.get(reelsIdx) ?? { liked: false, like_count: 0 };
       // 하트는 즉시 반응해야 하므로 먼저 뒤집고, 실패하면 되돌린다.
       setLikes((prev) => ({
         ...prev,
@@ -73,7 +78,7 @@ export default function FeedTab() {
         },
       );
     },
-    [likes, toggleReelsLike],
+    [likes, likedIndex, toggleReelsLike],
   );
 
   // 댓글 시트를 연 릴스. null 이면 닫힘.
@@ -188,7 +193,11 @@ export default function FeedTab() {
   const renderItem = useCallback(
     ({ item }: { item: Reels }) => (
       <ReelsCard
-        reels={{ ...item, ...likes[item.reels_idx] }}
+        reels={{
+          ...item,
+          ...likedIndex?.get(item.reels_idx),
+          ...likes[item.reels_idx],
+        }}
         height={viewportHeight}
         active={isFocused && item.reels_idx === activeIdx}
         player={player}
@@ -203,6 +212,7 @@ export default function FeedTab() {
       viewportHeight,
       toggleLike,
       likes,
+      likedIndex,
       activeIdx,
       isFocused,
       player,

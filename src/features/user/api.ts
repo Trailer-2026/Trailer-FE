@@ -35,6 +35,28 @@ export async function getMyReels(
 }
 
 /**
+ * 내가 좋아요한 릴스 목록(누른 순). GET /api/users/me/reels/liked
+ *
+ * 별도 북마크 기능이 없어 릴스 좋아요가 곧 저장이다 — 하트를 해제하면 목록에서 빠진다.
+ * 응답 형태·페이징 방식은 내 릴스 목록과 같다. 401: 인증 필요.
+ */
+export async function getLikedReels(
+  cursor?: number | null,
+  limit?: number,
+): Promise<MyReelsListResponse> {
+  const res = await api.get<CommonResponse<MyReelsListResponse>>(
+    "/api/users/me/reels/liked",
+    {
+      params: {
+        ...(cursor != null ? { cursor } : {}),
+        ...(limit != null ? { limit } : {}),
+      },
+    },
+  );
+  return res.data.data ?? { items: [], next_cursor: null };
+}
+
+/**
  * 사용자 차단. POST /api/blocks/{user_idx}
  *
  * 단방향 — 차단하면 그 사용자의 릴스·댓글이 나에게만 안 보인다.
