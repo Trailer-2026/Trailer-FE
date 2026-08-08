@@ -72,6 +72,8 @@ export default function ProfileTab() {
           color={MENU_ICON}
         />
       ),
+      // 별도 북마크 기능이 없어 릴스 좋아요가 곧 저장이다(서버 설명 기준).
+      onPress: () => router.push("/profile/reels?list=liked"),
     },
   ];
   const menu2: MenuRow[] = [

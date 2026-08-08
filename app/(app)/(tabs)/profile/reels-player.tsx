@@ -9,6 +9,7 @@ import {
   Alert,
   FlatList,
   Pressable,
+  Share,
   View,
   type LayoutChangeEvent,
   type ViewToken,
@@ -22,9 +23,12 @@ import CommentsSheet from "@/src/features/reels/components/CommentsSheet";
 import ReelsCard from "@/src/features/reels/components/ReelsCard";
 import { useToggleReelsLike } from "@/src/features/reels/queries";
 import type { LikeResponse, Reels } from "@/src/features/reels/types";
-import { useMyReels } from "@/src/features/user/queries";
+import { useLikedReels, useMyReels } from "@/src/features/user/queries";
 import type { MyReelsItem } from "@/src/features/user/types";
-import { downloadMyReelsVideo } from "@/src/features/video/api";
+import {
+  downloadMyReelsVideo,
+  getReelsShareUrl,
+} from "@/src/features/video/api";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 /** 목록 응답 → 피드 카드가 쓰는 Reels. 내 목록이라 작성자는 항상 나다. */
@@ -53,10 +57,18 @@ function toReels(item: MyReelsItem): Reels {
  * 카드마다 플레이어를 만들면 ExoPlayer 버퍼가 쌓여 힙이 터진다.
  */
 export default function MyReelsPlayerScreen() {
-  const { reels_idx } = useLocalSearchParams<{ reels_idx?: string }>();
+  const { reels_idx, list } = useLocalSearchParams<{
+    reels_idx?: string;
+    list?: string;
+  }>();
   const startIdx = reels_idx != null ? Number(reels_idx) : null;
+  // list=liked 면 좋아요한 릴스(= 남의 영상일 수 있음), 없으면 내가 만든 릴스.
+  const liked = list === "liked";
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+
+  const mineQuery = useMyReels(!liked);
+  const likedQuery = useLikedReels(liked);
   const {
     data: reels = [],
     isLoading,
@@ -66,7 +78,7 @@ export default function MyReelsPlayerScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useMyReels();
+  } = liked ? likedQuery : mineQuery;
 
   // 좋아요는 목록 응답에 들어 있어(is_liked/like_count) 서버 확정값만 덧씌운다.
   const [likes, setLikes] = useState<Record<number, LikeResponse>>({});
@@ -102,12 +114,28 @@ export default function MyReelsPlayerScreen() {
 
   const [commentsFor, setCommentsFor] = useState<number | null>(null);
 
-  // 내 영상이라 공유 버튼은 갤러리 저장 전용.
+  // 내 영상이면 갤러리 저장, 좋아요한 남의 영상이면 공유 링크로 공유.
   const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
-  const onDownload = useCallback(
+  const onShareOrDownload = useCallback(
     async (item: Reels) => {
       if (downloadingIdx != null) return;
       setDownloadingIdx(item.reels_idx);
+
+      if (liked) {
+        try {
+          const shareUrl = await getReelsShareUrl(item.reels_idx);
+          await Share.share({
+            // 안드로이드는 url 필드를 무시하므로 message 에 넣어야 한다.
+            message: `${item.caption ? `${item.caption}\n` : ""}${shareUrl}`,
+          });
+        } catch (err) {
+          Alert.alert("공유할 수 없어요", describeApiError(err));
+        } finally {
+          setDownloadingIdx(null);
+        }
+        return;
+      }
+
       try {
         // 저장 권한만 요청(writeOnly) — 읽기까지 요구할 이유가 없다.
         const permission = await MediaLibrary.requestPermissionsAsync(true);
@@ -124,7 +152,7 @@ export default function MyReelsPlayerScreen() {
         setDownloadingIdx(null);
       }
     },
-    [downloadingIdx],
+    [downloadingIdx, liked],
   );
 
   // 지금 화면을 채우고 있는 카드 = 재생할 카드.
@@ -187,8 +215,8 @@ export default function MyReelsPlayerScreen() {
         player={player}
         onToggleLike={toggleLike}
         onOpenComments={setCommentsFor}
-        onShare={onDownload}
-        mine
+        onShare={onShareOrDownload}
+        mine={!liked}
         sharing={downloadingIdx === item.reels_idx}
       />
     ),
@@ -199,7 +227,8 @@ export default function MyReelsPlayerScreen() {
       activeIdx,
       player,
       toggleLike,
-      onDownload,
+      onShareOrDownload,
+      liked,
       downloadingIdx,
     ],
   );
