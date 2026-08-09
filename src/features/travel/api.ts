@@ -1,3 +1,5 @@
+import { isAxiosError } from "axios";
+
 import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
 
@@ -12,6 +14,8 @@ import type {
   TravelManualCreateRequest,
   TravelResponse,
   TravelScheduleItem,
+  TravelTicket,
+  TravelTicketListResponse,
   TravelUpdateRequest,
 } from "./types";
 
@@ -84,6 +88,55 @@ export async function getTravelDetail(
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
+}
+
+/**
+ * GET /api/travels/{travel_idx}/tickets — 승차권 목록(승차권 1매 = 기차 일정 1건).
+ *
+ * 이 엔드포인트는 **AI 추천 일정을 승인해 저장한 여행에서만** 열려 있고, '직접 일정
+ * 만들기'로 만든 여행은 404 로 응답한다. 그 경우 이미 있는 일정표 상세의 kind=train
+ * 항목으로 같은 모양을 만들어 돌려준다 → 어떤 여행이든 승차권 화면이 동일하게 보인다.
+ */
+export async function getTravelTickets(
+  travelIdx: number,
+): Promise<TravelTicket[]> {
+  try {
+    const res = await api.get<CommonResponse<TravelTicketListResponse>>(
+      `/api/travels/${travelIdx}/tickets`,
+    );
+    return res.data.data?.tickets ?? [];
+  } catch (e) {
+    if (isAxiosError(e) && e.response?.status === 404) {
+      return ticketsFromDetail(await getTravelDetail(travelIdx));
+    }
+    throw e;
+  }
+}
+
+/** 일정표 상세의 기차 항목 → 승차권 목록(폴백). 역·시각이 없는 항목은 제외. */
+function ticketsFromDetail(detail: TravelDetail): TravelTicket[] {
+  const out: TravelTicket[] = [];
+  detail.days.forEach((day) => {
+    day.items.forEach((item) => {
+      if (item.kind !== "train") return;
+      if (!item.dep_station || !item.arr_station) return;
+      if (!item.start_time || !item.end_time) return;
+      out.push({
+        schedule_idx: item.schedule_idx,
+        day_no: day.day_no,
+        date: day.date,
+        train_grade: item.train_grade ?? "",
+        train_no: item.train_no ?? "",
+        dep_station: item.dep_station,
+        arr_station: item.arr_station,
+        dep_time: item.start_time,
+        arr_time: item.end_time,
+        car_no: item.car_no,
+        seat_no: item.seat_no,
+      });
+    });
+  });
+  return out;
 }
 
 /**

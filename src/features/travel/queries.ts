@@ -12,6 +12,7 @@ import {
   getCurrentTravel,
   getPastTravels,
   getTravelDetail,
+  getTravelTickets,
   likeTravel,
   unlikeTravel,
   updateSchedule,
@@ -139,18 +140,38 @@ export function usePrefetchTravelDetail(travelIdx?: number) {
 }
 
 /**
- * 일정 항목 추가/편집/삭제. 성공 시 해당 여행의 상세(detail)를 invalidate 해
- * 타임라인이 자동 갱신되게 한다.
+ * 여행의 승차권 목록.
+ * - travelIdx 가 없으면 비활성.
+ * - '직접 만들기' 여행은 서버가 404 를 주는데, api 층에서 상세로 폴백하므로
+ *   호출부는 신경 쓸 필요 없다.
  */
+export function useTravelTickets(travelIdx?: number) {
+  return useQuery({
+    queryKey: travelKeys.tickets(travelIdx ?? -1),
+    queryFn: () => getTravelTickets(travelIdx!),
+    enabled: travelIdx != null,
+    staleTime: 1000 * 60, // 1분
+  });
+}
+
+/**
+ * 일정 항목 추가/편집/삭제 성공 시 해당 여행의 캐시를 함께 무효화한다.
+ * 기차 항목은 승차권 화면에도 그대로 나오므로 detail 과 tickets 를 같이 비운다.
+ */
+function invalidateTravelCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  travelIdx: number,
+) {
+  queryClient.invalidateQueries({ queryKey: travelKeys.detail(travelIdx) });
+  queryClient.invalidateQueries({ queryKey: travelKeys.tickets(travelIdx) });
+}
+
 export function useCreateSchedule(travelIdx: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: ScheduleCreateRequest) =>
       createSchedule(travelIdx, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: travelKeys.detail(travelIdx),
-      }),
+    onSuccess: () => invalidateTravelCaches(queryClient, travelIdx),
   });
 }
 
@@ -164,10 +185,7 @@ export function useUpdateSchedule(travelIdx: number) {
       scheduleIdx: number;
       body: ScheduleUpdateRequest;
     }) => updateSchedule(travelIdx, scheduleIdx, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: travelKeys.detail(travelIdx),
-      }),
+    onSuccess: () => invalidateTravelCaches(queryClient, travelIdx),
   });
 }
 
@@ -176,10 +194,7 @@ export function useDeleteSchedule(travelIdx: number) {
   return useMutation({
     mutationFn: (scheduleIdx: number) =>
       deleteSchedule(travelIdx, scheduleIdx),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: travelKeys.detail(travelIdx),
-      }),
+    onSuccess: () => invalidateTravelCaches(queryClient, travelIdx),
   });
 }
 

@@ -8,4 +8,6 @@ export const travelKeys = {
   past: () => [...travelKeys.all, "past"] as const,
   detail: (travelIdx: number) =>
     [...travelKeys.all, "detail", travelIdx] as const,
+  tickets: (travelIdx: number) =>
+    [...travelKeys.all, "tickets", travelIdx] as const,
 };

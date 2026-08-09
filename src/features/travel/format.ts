@@ -52,6 +52,24 @@ export function formatLongDate(iso: string): string {
   return `${d.getFullYear()}.${mo}.${day}(${WEEKDAYS[d.getDay()]})`;
 }
 
+/** "2026-07-03" → "2026년 07월 03일(금)" — 승차권 상단 띠. */
+export function formatTicketDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}년 ${mo}월 ${day}일(${WEEKDAYS[d.getDay()]})`;
+}
+
+/** "2026-07-03" → "07.03/금" — DAY 배지 옆 짧은 표기. */
+export function formatDaySlash(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${mo}.${day}/${WEEKDAYS[d.getDay()]}`;
+}
+
 export function travelStatusLabel(status: TravelStatus): string {
   switch (status) {
     case "PLANNED":

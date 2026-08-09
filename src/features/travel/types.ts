@@ -153,12 +153,37 @@ export type TrainScheduleCreate = {
   end_time: string; // "HH:MM:SS" 도착
   dep_station: string;
   arr_station: string;
-  /** 열차번호·등급은 선택 — 티켓에 없거나 모를 수 있어 비워두면 아예 보내지 않는다. */
-  train_no?: string;
-  train_grade?: string;
+  /** 서버가 kind=train 에서 필수로 요구한다(누락 시 400). */
+  train_no: string;
+  train_grade: string;
   car_no?: string;
   seat_no?: string;
   memo?: string;
+};
+
+/**
+ * GET /api/travels/{travel_idx}/tickets — 승차권 1매(= 기차 일정 1건).
+ * 좌석·호차는 예매 정보라 없을 수 있다.
+ */
+export type TravelTicket = {
+  schedule_idx: number;
+  day_no: number;
+  /** 승차 일자 "YYYY-MM-DD" */
+  date: string;
+  train_grade: string;
+  train_no: string;
+  dep_station: string;
+  arr_station: string;
+  /** "HH:MM:SS" */
+  dep_time: string;
+  arr_time: string;
+  car_no: string | null;
+  seat_no: string | null;
+};
+
+export type TravelTicketListResponse = {
+  travel_idx: number;
+  tickets: TravelTicket[];
 };
 
 /**
