@@ -37,7 +37,6 @@ import {
   type Segment,
   type TrainInfo,
 } from "@/src/features/course/types";
-import { useInAppNotifications } from "@/src/features/notification/inapp-store";
 import { useCreateTravel } from "@/src/features/travel/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -100,7 +99,6 @@ export default function ResultScreen() {
 
   const { data, error, isLoading, isError, refetch } = useRecommendCourses(criteria);
   const prefetchNext = usePrefetchNextRecommendPage();
-  const addNotification = useInAppNotifications((s) => s.add);
   const createTravel = useCreateTravel();
 
   // 응답이 오면 다음 page 를 백그라운드에서 미리 가져와둔다.
@@ -149,18 +147,14 @@ export default function ResultScreen() {
     carouselRef.current?.scrollTo({ x: i * SNAP, animated: true });
   };
 
-  // "이 여행 담기" — 서버에 여행 저장(POST) → 성공 시 인앱 알림 추가 후 홈으로.
+  // "이 여행 담기" — 서버에 여행 저장(POST) → 성공 시 홈으로.
   // 홈의 예정 여행 카드는 useCreateTravel 이 travels/current 를 invalidate 해 자동 갱신된다.
+  // 저장 성공 시 서버가 알림 로그에 이벤트를 남기므로 알림 탭에서도 이후 확인 가능.
   const onSaveTravel = () => {
     if (!activePlan || createTravel.isPending) return;
-    const title =
-      activePlan.title ||
-      activePlan.route_type ||
-      activePlan.label ||
-      "추천 코스";
     createTravel.mutate(activePlan.plan_id, {
       onSuccess: () => {
-        addNotification(`'${title}'이 추가되었습니다`);
+        // 성공 알림은 서버가 알림 로그에 기록 → 알림 탭에서 확인.
         router.replace("/"); // 메인(홈)으로
       },
       onError: (err) => {

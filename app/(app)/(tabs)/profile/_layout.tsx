@@ -21,6 +21,7 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="social" />
       <Stack.Screen name="travels" />
       <Stack.Screen name="version" />
+      <Stack.Screen name="terms" />
     </Stack>
   );
 }

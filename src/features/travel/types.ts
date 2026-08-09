@@ -10,6 +10,26 @@ export type TravelCreateRequest = {
   plan_id: string;
 };
 
+/**
+ * POST /api/travels/manual body — 추천 없이 빈 여행 1건을 직접 만든다.
+ * 일정 항목은 생성 후 POST /{travel_idx}/schedules 로 하나씩 붙인다.
+ * title/region 은 선택 — title 을 비우면 서버가 지역·기간으로 자동 생성한다.
+ */
+export type TravelManualCreateRequest = {
+  start_date: string; // "YYYY-MM-DD"
+  end_date: string; // "YYYY-MM-DD"
+  title?: string;
+  region?: string;
+};
+
+/**
+ * PATCH /api/travels/{travel_idx} body — 여행 제목 변경.
+ * 빈 값·공백을 보내면 서버가 지역·기간으로 자동 생성('부산 2박 3일 여행' 형태).
+ */
+export type TravelUpdateRequest = {
+  title: string;
+};
+
 /** POST /api/travels 응답 */
 export type TravelResponse = {
   travel_idx: number;
@@ -131,10 +151,11 @@ export type TrainScheduleCreate = {
   arr_date: string; // "YYYY-MM-DD"
   start_time: string; // "HH:MM:SS" 출발
   end_time: string; // "HH:MM:SS" 도착
-  train_no: string;
-  train_grade: string;
   dep_station: string;
   arr_station: string;
+  /** 열차번호·등급은 선택 — 티켓에 없거나 모를 수 있어 비워두면 아예 보내지 않는다. */
+  train_no?: string;
+  train_grade?: string;
   car_no?: string;
   seat_no?: string;
   memo?: string;

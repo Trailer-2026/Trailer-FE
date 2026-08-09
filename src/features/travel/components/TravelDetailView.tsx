@@ -16,13 +16,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BackIcon from "@/src/components/icons/BackIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { describeScheduleError } from "../errors";
 import { formatClockTime, formatDayDate, formatLongDate } from "../format";
 import { useDeleteSchedule, useTravelDetail } from "../queries";
 import type { TravelDay, TravelDetail, TravelScheduleItem } from "../types";
-import AddScheduleModal from "./schedule/AddScheduleModal";
+import AddScheduleModal, {
+  type ScheduleKind,
+} from "./schedule/AddScheduleModal";
 import EditScheduleModal from "./schedule/EditScheduleModal";
 
 const ACCENT = "#5E84F4";
@@ -57,8 +60,12 @@ export default function TravelDetailView({
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
   const insets = useSafeAreaInsets();
 
-  // 추가 모달 상태(선택된 day_no 프리필용), 편집 대상.
-  const [addState, setAddState] = useState<{ dayNo?: number } | null>(null);
+  // 추가 모달 상태 — kind 로 장소/티켓 폼이 바로 열린다(중간 선택 시트 없음).
+  // dayNo 는 장소 폼의 날짜 프리필용.
+  const [addState, setAddState] = useState<{
+    kind: ScheduleKind;
+    dayNo?: number;
+  } | null>(null);
   const [editTarget, setEditTarget] = useState<{
     item: TravelScheduleItem;
     dayNo: number;
@@ -139,20 +146,25 @@ export default function TravelDetailView({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: verticalScale(32) + insets.bottom }}
       >
-        <Hero travel={data} coverUri={cover} onBack={onBack} />
+        <Hero
+          travel={data}
+          coverUri={cover}
+          onBack={onBack}
+          onAddTicket={() => setAddState({ kind: "train" })}
+        />
 
-        {/* KTX 티켓 정보 추가하기 — 히어로 하단에 겹쳐 뜨는 카드(현재 무동작) */}
-        <TicketAddCard />
+        {/* 실시간 창밖 풍경 — 탑승 시작/종료와 폴링 결과. 열차 항목이 없으면 안 뜬다. */}
+        <LiveScenerySection detail={data} />
 
-        <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(8) }}>
+        <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(4) }}>
           {data.days.length === 0 ? (
-            <EmptyDays onAdd={() => setAddState({})} />
+            <EmptyDays onAdd={() => setAddState({ kind: "visit" })} />
           ) : (
             data.days.map((day) => (
               <DaySection
                 key={day.day_no}
                 day={day}
-                onAdd={() => setAddState({ dayNo: day.day_no })}
+                onAdd={() => setAddState({ kind: "visit", dayNo: day.day_no })}
                 onItemMenu={(item) => openItemMenu(item, day.day_no)}
               />
             ))
@@ -160,13 +172,15 @@ export default function TravelDetailView({
         </View>
       </ScrollView>
 
-      <AddScheduleModal
-        visible={!!addState}
-        onClose={() => setAddState(null)}
-        travelIdx={travelIdx}
-        days={data.days}
-        initialDayNo={addState?.dayNo}
-      />
+      {addState ? (
+        <AddScheduleModal
+          visible
+          onClose={() => setAddState(null)}
+          travelIdx={travelIdx}
+          kind={addState.kind}
+          initialDayNo={addState.dayNo}
+        />
+      ) : null}
       {editTarget ? (
         <EditScheduleModal
           visible
@@ -196,22 +210,24 @@ function EmptyDays({ onAdd }: { onAdd: () => void }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 히어로 — 커버 이미지 + 제목/기간 오버레이 (+ 뒤로)                    */
+/* 히어로 — 커버 이미지 안에 제목/기간 + 티켓 추가 카드 (+ 뒤로)          */
 /* ------------------------------------------------------------------ */
 function Hero({
   travel,
   coverUri,
   onBack,
+  onAddTicket,
 }: {
   travel: TravelDetail;
   coverUri: string | null;
   onBack?: () => void;
+  onAddTicket: () => void;
 }) {
   const [failed, setFailed] = useState(false);
   const source = coverUri && !failed ? { uri: coverUri } : PLACEHOLDER;
 
   return (
-    <View style={{ height: verticalScale(210) }}>
+    <View style={{ height: verticalScale(190) }}>
       <ImageBackground
         source={source}
         resizeMode="cover"
@@ -246,17 +262,18 @@ function Hero({
           </Pressable>
         ) : null}
 
+        {/* 제목·기간·티켓 카드 모두 커버 이미지 안쪽 하단에 얹는다. */}
         <View
           style={{
             position: "absolute",
             left: scale(20),
             right: scale(20),
-            bottom: verticalScale(30),
+            bottom: verticalScale(14),
           }}
         >
           <Text
             className="text-white font-bold"
-            style={{ fontSize: moderateScale(22) }}
+            style={{ fontSize: moderateScale(20) }}
             numberOfLines={2}
           >
             {travel.title}
@@ -265,48 +282,48 @@ function Hero({
             className="text-white"
             style={{
               fontSize: moderateScale(13),
-              marginTop: verticalScale(6),
+              marginTop: verticalScale(4),
               opacity: 0.95,
             }}
           >
             {formatLongDate(travel.start_date)} ~ {formatLongDate(travel.end_date)}
           </Text>
+          <TicketAddCard onPress={onAddTicket} />
         </View>
       </ImageBackground>
     </View>
   );
 }
 
-function TicketAddCard() {
+/** 커버 이미지 안, 제목/기간 바로 아래 놓이는 티켓 추가 카드. */
+function TicketAddCard({ onPress }: { onPress: () => void }) {
   return (
-    <View style={{ paddingHorizontal: scale(20), marginTop: -verticalScale(20) }}>
-      <Pressable
-        // TODO(ticket): KTX 승차권 정보 추가 플로우 연결(현재 무동작).
-        className="flex-row items-center bg-white active:opacity-80"
-        style={{
-          borderRadius: scale(12),
-          paddingHorizontal: scale(16),
-          height: verticalScale(52),
-          gap: scale(10),
-          elevation: 4,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 6,
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="KTX 티켓 정보 추가하기"
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center bg-white active:opacity-80"
+      style={{
+        marginTop: verticalScale(18),
+        width: scale(320),
+        height: verticalScale(48),
+        // 거의 사각형 — 모서리만 살짝. 그림자 대신 바깥 회색 테두리로 경계를 준다.
+        borderRadius: scale(6),
+        borderWidth: 1,
+        borderColor: "#D9DCE1",
+        paddingHorizontal: scale(16),
+        gap: scale(10),
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="KTX 티켓 정보 추가하기"
+    >
+      <TicketIcon width={moderateScale(26)} height={moderateScale(26)} />
+      <Text
+        className="flex-1 font-bold text-gray-800"
+        style={{ fontSize: moderateScale(14) }}
       >
-        <TicketIcon width={moderateScale(22)} height={moderateScale(22)} />
-        <Text
-          className="flex-1 font-semibold text-gray-800"
-          style={{ fontSize: moderateScale(14) }}
-        >
-          KTX 티켓 정보 추가하기
-        </Text>
-        <Feather name="plus" size={moderateScale(20)} color={ACCENT} />
-      </Pressable>
-    </View>
+        KTX 티켓 정보 추가하기
+      </Text>
+      <Feather name="plus" size={moderateScale(20)} color={ACCENT} />
+    </Pressable>
   );
 }
 

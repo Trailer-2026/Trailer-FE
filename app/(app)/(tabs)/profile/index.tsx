@@ -99,6 +99,7 @@ export default function ProfileTab() {
           color={MENU_ICON}
         />
       ),
+      onPress: () => router.push("/profile/terms"),
     },
     {
       key: "version",

@@ -6,6 +6,7 @@ import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
 import HomeIcon from "@/src/components/icons/HomeIcon";
 import PersonIcon from "@/src/components/icons/PersonIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
+import { useUnreadNotificationCount } from "@/src/features/notification/queries";
 import { moderateScale, verticalScale } from "@/src/utils/responsive";
 
 // 릴스(피드) 탭은 풀스크린 영상 위라 하단바도 어둡게 뒤집는다.
@@ -13,6 +14,9 @@ const DARK_BAR_BG = "#0D0D0D";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  // 알림 탭 배지 — 목록 캐시(pages[0].unread_count)에 반응. 로그인 상태에서 이 레이아웃이
+  // 마운트되면 자동으로 첫 페이지를 fetch 해 배지가 계산된다.
+  const unreadCount = useUnreadNotificationCount();
 
   // 배경색만 다르고 치수는 공통 — 라이트/다크 두 벌에서 재사용
   const tabBarMetrics = {
@@ -93,6 +97,21 @@ export default function TabsLayout() {
               height={moderateScale(22)}
             />
           ),
+          // 99+ 로 캡. 0 이면 undefined 로 빼서 dot/숫자 표시 자체를 숨긴다.
+          tabBarBadge:
+            unreadCount > 0
+              ? unreadCount > 99
+                ? "99+"
+                : unreadCount
+              : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: "#FF3B30",
+            color: "#FFFFFF",
+            fontSize: moderateScale(10),
+            minWidth: moderateScale(16),
+            height: moderateScale(16),
+            lineHeight: moderateScale(16),
+          },
         }}
       />
       <Tabs.Screen

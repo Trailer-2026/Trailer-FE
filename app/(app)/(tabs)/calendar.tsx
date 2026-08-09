@@ -2,13 +2,25 @@ import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
+import NewTravelSheet from "@/src/features/travel/components/NewTravelSheet";
+import RenameTravelModal from "@/src/features/travel/components/RenameTravelModal";
+import AddScheduleModal from "@/src/features/travel/components/schedule/AddScheduleModal";
+import TravelMenuSheet from "@/src/features/travel/components/TravelMenuSheet";
 import TravelSummaryCard from "@/src/features/travel/components/TravelSummaryCard";
+import { describeScheduleError } from "@/src/features/travel/errors";
 import {
   useCurrentTravel,
+  useDeleteTravel,
   usePastTravels,
   usePrefetchTravelDetail,
 } from "@/src/features/travel/queries";
@@ -46,6 +58,48 @@ export default function CalendarTab() {
   // 예정된 여행 상세 일정을 미리 받아둔다 → 상세 화면 진입 시 로딩 없이 즉시 표시.
   usePrefetchTravelDetail(current?.travel_idx);
 
+  // ⋮ 메뉴 / 이름 바꾸기 모달 상태.
+  // 스냅샷을 로컬에 잡아두는 이유: 삭제 mutation 진행 중 서버 응답 오면 current 가 null 로
+  // 바뀌면서 시트가 사라져 로딩/에러 알림 위치가 튀지 않게 하기 위함.
+  const [menuTravel, setMenuTravel] = useState<HomeTravelCard | null>(null);
+  const [renameTravel, setRenameTravel] = useState<HomeTravelCard | null>(null);
+  const del = useDeleteTravel();
+
+  // 헤더 승차권 아이콘 → 티켓 추가 화면. 일정표 상세의 'KTX 티켓 정보 추가하기' 와
+  // 같은 컴포넌트/같은 여행(예정된 여행)을 쓰므로 어느 쪽에서 저장해도 결과가 같다.
+  const [ticketOpen, setTicketOpen] = useState(false);
+  // '새 여행 일정 만들기' → AI 추천 / 직접 만들기 선택 시트.
+  const [createOpen, setCreateOpen] = useState(false);
+  const openTicket = () => {
+    if (!current) {
+      Alert.alert(
+        "예정된 여행이 없어요",
+        "여행 일정을 먼저 만들면 승차권을 등록할 수 있어요.",
+      );
+      return;
+    }
+    setTicketOpen(true);
+  };
+
+  const confirmDelete = (travel: HomeTravelCard) => {
+    Alert.alert(
+      "여행을 삭제할까요?",
+      `'${travel.title}'과 이 여행의 일정이 모두 삭제돼요.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: () =>
+            del.mutate(travel.travel_idx, {
+              onError: (e) =>
+                Alert.alert("삭제 실패", describeScheduleError(e)),
+            }),
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       {/* 헤더 */}
@@ -63,11 +117,11 @@ export default function CalendarTab() {
           내 일정
         </Text>
         <Pressable
-          // TODO(ticket): 승차권함 진입(현재 무동작).
+          onPress={openTicket}
           hitSlop={12}
           className="active:opacity-60"
           accessibilityRole="button"
-          accessibilityLabel="승차권"
+          accessibilityLabel="티켓 추가"
         >
           <Image
             source={HEADER_ICON}
@@ -125,10 +179,62 @@ export default function CalendarTab() {
       </View>
 
       {tab === "upcoming" ? (
-        <UpcomingTab current={current} loading={currentLoading} />
+        <UpcomingTab
+          current={current}
+          loading={currentLoading}
+          onMenuPress={setMenuTravel}
+          onCreate={() => setCreateOpen(true)}
+        />
       ) : (
         <PastTab />
       )}
+
+      <TravelMenuSheet
+        visible={!!menuTravel}
+        onClose={() => setMenuTravel(null)}
+        // '내 여행 영상 만들기' 는 아직 미구현 → onMakeVideo 미전달로 비활성 표시.
+        onRename={() => {
+          const t = menuTravel;
+          setMenuTravel(null);
+          if (t) setRenameTravel(t);
+        }}
+        onDelete={() => {
+          const t = menuTravel;
+          setMenuTravel(null);
+          if (t) confirmDelete(t);
+        }}
+      />
+
+      {renameTravel ? (
+        <RenameTravelModal
+          visible
+          travelIdx={renameTravel.travel_idx}
+          currentTitle={renameTravel.title}
+          onClose={() => setRenameTravel(null)}
+        />
+      ) : null}
+
+      <NewTravelSheet
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onRecommend={() => {
+          setCreateOpen(false);
+          router.navigate("/course/intro");
+        }}
+        onManual={() => {
+          setCreateOpen(false);
+          router.push("/travel/manual");
+        }}
+      />
+
+      {ticketOpen && current ? (
+        <AddScheduleModal
+          visible
+          kind="train"
+          travelIdx={current.travel_idx}
+          onClose={() => setTicketOpen(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -180,9 +286,13 @@ function PromoBanner() {
 function UpcomingTab({
   current,
   loading,
+  onMenuPress,
+  onCreate,
 }: {
   current: HomeTravelCard | null | undefined;
   loading: boolean;
+  onMenuPress: (travel: HomeTravelCard) => void;
+  onCreate: () => void;
 }) {
   if (loading) return <Loading />;
 
@@ -211,7 +321,7 @@ function UpcomingTab({
             지금 바로 나만의 여행 일정을 만들어보세요
           </Text>
           <Pressable
-            onPress={() => router.navigate("/course/intro")}
+            onPress={onCreate}
             className="flex-row items-center justify-center bg-white active:opacity-80"
             style={{
               marginTop: verticalScale(18),
@@ -243,6 +353,7 @@ function UpcomingTab({
         startDate={current.start_date}
         endDate={current.end_date}
         onPress={() => goDetail(current)}
+        onMenuPress={() => onMenuPress(current)}
       />
     </View>
   );
