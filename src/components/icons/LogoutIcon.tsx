@@ -1,7 +1,7 @@
 import * as React from "react";
 import Svg, { Path, type SvgProps } from "react-native-svg";
 
-/** 내 정보 메뉴 '계정 비활성화' 아이콘 (Figma 벡터). */
+/** 내 정보 메뉴 '로그아웃' 아이콘 (Figma 벡터). */
 const LogoutIcon = ({ color = "#5E5E5E", ...props }: SvgProps) => (
   <Svg width={20} height={20} viewBox="0 0 20 20" fill="none" {...props}>
     <Path
