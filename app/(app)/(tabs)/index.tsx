@@ -25,6 +25,7 @@ import {
 } from "@/src/features/travel/format";
 import { useCurrentTravel } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
+import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // Figma 내보내기 아이콘 에셋 (Metro 는 대소문자 구분 — 실제 파일명 케이스와 정확히 일치시킬 것)
@@ -282,14 +283,17 @@ function PromoHero() {
         </View>
       </View>
 
-      {/* 내일로 패스 예약하기 — 360 x 29, #F2F2F2 */}
+      {/* 내일로 패스 예약하기 — 360 x 29, #F2F2F2. 탭하면 코레일 안내 페이지(웹) */}
       <Pressable
-        className="flex-row items-center justify-center"
+        onPress={() => openExternalUrl(NAEILRO_PASS_URL)}
+        className="flex-row items-center justify-center active:opacity-70"
         style={{
           height: verticalScale(29),
           backgroundColor: "#F2F2F2",
           gap: scale(6),
         }}
+        accessibilityRole="link"
+        accessibilityLabel="내일로 패스 예약하기"
       >
         <Image
           source={ICONS.ticket}
