@@ -1,7 +1,7 @@
 import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/src/components/Text";
 import NewTravelSheet from "@/src/features/travel/components/NewTravelSheet";
 import RenameTravelModal from "@/src/features/travel/components/RenameTravelModal";
-import AddScheduleModal from "@/src/features/travel/components/schedule/AddScheduleModal";
+import TicketWalletModal from "@/src/features/travel/components/ticket/TicketWalletModal";
 import TravelMenuSheet from "@/src/features/travel/components/TravelMenuSheet";
 import TravelSummaryCard from "@/src/features/travel/components/TravelSummaryCard";
 import { describeScheduleError } from "@/src/features/travel/errors";
@@ -25,6 +25,7 @@ import {
   usePrefetchTravelDetail,
 } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
+import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
@@ -35,6 +36,12 @@ const HEADER_ICON = require("../../../assets/images/style/schedule-table.png");
 const PASS_TRAIN = require("../../../assets/images/style/passTrain.png");
 
 type Tab = "upcoming" | "past";
+
+/**
+ * ⋮ 메뉴·이름 바꾸기의 대상. 예정된 여행(HomeTravelCard)과 다녀온 여행(PastTravelCard)
+ * 양쪽에서 오므로 두 타입이 공통으로 갖는 최소 필드만 요구한다.
+ */
+type MenuTarget = Pick<HomeTravelCard, "travel_idx" | "title">;
 
 /** 여행 카드 → 일정표 상세로 이동. */
 function goDetail(travel: { travel_idx: number; cover_image_url: string | null }) {
@@ -58,11 +65,30 @@ export default function CalendarTab() {
   // 예정된 여행 상세 일정을 미리 받아둔다 → 상세 화면 진입 시 로딩 없이 즉시 표시.
   usePrefetchTravelDetail(current?.travel_idx);
 
-  // ⋮ 메뉴 / 이름 바꾸기 모달 상태.
-  // 스냅샷을 로컬에 잡아두는 이유: 삭제 mutation 진행 중 서버 응답 오면 current 가 null 로
-  // 바뀌면서 시트가 사라져 로딩/에러 알림 위치가 튀지 않게 하기 위함.
-  const [menuTravel, setMenuTravel] = useState<HomeTravelCard | null>(null);
-  const [renameTravel, setRenameTravel] = useState<HomeTravelCard | null>(null);
+  /**
+   * 여행중(당일)이면 탭에 들어오는 즉시 일정표 상세로 보낸다.
+   * 하단 탭바(탭 레이아웃 / StaticTabBar) 어느 쪽으로 들어와도 목적지가 이 화면이라
+   * 여기 한 곳에서 처리하면 두 경로 모두 커버된다.
+   *
+   * 여행당 1회만 보내는 이유: 매 포커스마다 보내면 상세에서 뒤로 눌렀을 때
+   * 곧바로 다시 튕겨 들어가 목록을 영영 못 본다. 여행이 바뀌거나 앱을 다시
+   * 켜면 초기화되어 다시 자동 진입한다.
+   */
+  const autoOpenedIdx = useRef<number | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (!current || current.status !== "ONGOING") return;
+      if (autoOpenedIdx.current === current.travel_idx) return;
+      autoOpenedIdx.current = current.travel_idx;
+      goDetail(current);
+    }, [current]),
+  );
+
+  // ⋮ 메뉴 / 이름 바꾸기 모달 상태. 예정된 여행·다녀온 여행이 같은 시트를 공유한다.
+  // 스냅샷을 로컬에 잡아두는 이유: 삭제 mutation 진행 중 서버 응답 오면 목록이 갱신되며
+  // 시트가 사라져 로딩/에러 알림 위치가 튀지 않게 하기 위함.
+  const [menuTravel, setMenuTravel] = useState<MenuTarget | null>(null);
+  const [renameTravel, setRenameTravel] = useState<MenuTarget | null>(null);
   const del = useDeleteTravel();
 
   // 헤더 승차권 아이콘 → 티켓 추가 화면. 일정표 상세의 'KTX 티켓 정보 추가하기' 와
@@ -81,7 +107,7 @@ export default function CalendarTab() {
     setTicketOpen(true);
   };
 
-  const confirmDelete = (travel: HomeTravelCard) => {
+  const confirmDelete = (travel: MenuTarget) => {
     Alert.alert(
       "여행을 삭제할까요?",
       `'${travel.title}'과 이 여행의 일정이 모두 삭제돼요.`,
@@ -186,7 +212,7 @@ export default function CalendarTab() {
           onCreate={() => setCreateOpen(true)}
         />
       ) : (
-        <PastTab />
+        <PastTab onMenuPress={setMenuTravel} />
       )}
 
       <TravelMenuSheet
@@ -228,9 +254,7 @@ export default function CalendarTab() {
       />
 
       {ticketOpen && current ? (
-        <AddScheduleModal
-          visible
-          kind="train"
+        <TicketWalletModal
           travelIdx={current.travel_idx}
           onClose={() => setTicketOpen(false)}
         />
@@ -245,8 +269,10 @@ export default function CalendarTab() {
 function PromoBanner() {
   return (
     <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(18) }}>
-      <View
-        className="flex-row items-center"
+      {/* 배너 전체가 코레일 내일로 패스 안내 페이지(웹)로 가는 링크 */}
+      <Pressable
+        onPress={() => openExternalUrl(NAEILRO_PASS_URL)}
+        className="flex-row items-center active:opacity-80"
         style={{
           backgroundColor: "#DCE6FB",
           borderRadius: scale(16),
@@ -254,6 +280,8 @@ function PromoBanner() {
           paddingVertical: verticalScale(18),
           gap: scale(12),
         }}
+        accessibilityRole="link"
+        accessibilityLabel="내일로 패스 정보 등록하기"
       >
         <View style={{ flex: 1 }}>
           {/* '내일로 패스 정보'만 굵게, 나머지는 얇게(기본 굵기) */}
@@ -275,7 +303,7 @@ function PromoBanner() {
           contentFit="contain"
           style={{ width: moderateScale(50), height: moderateScale(50) }}
         />
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -375,7 +403,7 @@ function dDayLabel(travel: HomeTravelCard): string {
 /* ------------------------------------------------------------------ */
 /* 다녀온 여행 — 완료 카드 목록(민트)                                    */
 /* ------------------------------------------------------------------ */
-function PastTab() {
+function PastTab({ onMenuPress }: { onMenuPress: (travel: MenuTarget) => void }) {
   const { data, isLoading } = usePastTravels();
   const travels = data?.travels ?? [];
 
@@ -414,6 +442,7 @@ function PastTab() {
           startDate={t.start_date}
           endDate={t.end_date}
           onPress={() => goDetail(t)}
+          onMenuPress={() => onMenuPress(t)}
         />
       ))}
     </ScrollView>

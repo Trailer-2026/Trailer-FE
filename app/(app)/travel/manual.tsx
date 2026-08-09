@@ -16,7 +16,7 @@ const TEAL = "#B0E6DB";
 const BORDER = "#E5E7EB";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const DATE_RANGE = 60; // 오늘부터 선택 가능한 일수
+const DATE_RANGE = 30; // 오늘부터 한 달 이내만 출발일로 고를 수 있다
 
 // 숙박 수(nights) → 라벨. 종료일 = 출발일 + nights.
 const DURATIONS: { nights: number; label: string }[] = [

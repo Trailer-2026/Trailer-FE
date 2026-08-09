@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
+import PlayIcon from "@/src/components/icons/PlayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
@@ -27,6 +28,8 @@ import AddScheduleModal, {
   type ScheduleKind,
 } from "./schedule/AddScheduleModal";
 import EditScheduleModal from "./schedule/EditScheduleModal";
+import ScheduleItemMenuSheet from "./schedule/ScheduleItemMenuSheet";
+import TicketWalletModal from "./ticket/TicketWalletModal";
 
 const ACCENT = "#5E84F4";
 const MINT = "#34C6A8"; // 타임라인 번호 노드
@@ -72,29 +75,32 @@ export default function TravelDetailView({
   } | null>(null);
   const del = useDeleteSchedule(travelIdx);
 
-  // 항목 길게 누르면 편집/삭제 선택.
-  const openItemMenu = (item: TravelScheduleItem, dayNo: number) => {
-    Alert.alert(item.title || "일정", undefined, [
-      { text: "편집", onPress: () => setEditTarget({ item, dayNo }) },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () =>
-          Alert.alert("일정을 삭제할까요?", "삭제하면 되돌릴 수 없어요.", [
-            { text: "취소", style: "cancel" },
-            {
-              text: "삭제",
-              style: "destructive",
-              onPress: () =>
-                del.mutate(item.schedule_idx, {
-                  onError: (e) =>
-                    Alert.alert("삭제 실패", describeScheduleError(e)),
-                }),
-            },
-          ]),
-      },
-      { text: "취소", style: "cancel" },
-    ]);
+  // 히어로의 'KTX 티켓 정보 추가하기' → 승차권 화면(저장된 게 있으면 목록, 없으면 폼).
+  const [ticketOpen, setTicketOpen] = useState(false);
+
+  // ⋮(또는 길게 누르기)로 연 항목 메뉴의 대상.
+  const [menuTarget, setMenuTarget] = useState<{
+    item: TravelScheduleItem;
+    dayNo: number;
+  } | null>(null);
+
+  const confirmDeleteItem = (item: TravelScheduleItem) => {
+    Alert.alert(
+      "일정을 삭제할까요?",
+      `'${item.title || "이 일정"}'이 삭제되고 되돌릴 수 없어요.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: () =>
+            del.mutate(item.schedule_idx, {
+              onError: (e) =>
+                Alert.alert("삭제 실패", describeScheduleError(e)),
+            }),
+        },
+      ],
+    );
   };
 
   if (isLoading) {
@@ -138,6 +144,8 @@ export default function TravelDetailView({
   }
 
   const cover = coverImageUrl ?? firstItemImage(data);
+  // 다녀온 여행은 기록 열람용 — 일정 추가/티켓 등록·실시간 풍경은 의미가 없어 감춘다.
+  const completed = data.status === "COMPLETED";
 
   return (
     <>
@@ -150,22 +158,36 @@ export default function TravelDetailView({
           travel={data}
           coverUri={cover}
           onBack={onBack}
-          onAddTicket={() => setAddState({ kind: "train" })}
+          // 다녀온 여행에서는 같은 자리가 '내 여행 영상 만들기'가 된다.
+          // 진입 방법이 별도라 아직 배선하지 않음 → onAction 미전달로 '준비 중' 표시.
+          onAction={completed ? undefined : () => setTicketOpen(true)}
+          actionKind={completed ? "video" : "ticket"}
         />
 
         {/* 실시간 창밖 풍경 — 탑승 시작/종료와 폴링 결과. 열차 항목이 없으면 안 뜬다. */}
-        <LiveScenerySection detail={data} />
+        {completed ? null : <LiveScenerySection detail={data} />}
 
         <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(4) }}>
           {data.days.length === 0 ? (
-            <EmptyDays onAdd={() => setAddState({ kind: "visit" })} />
+            <EmptyDays
+              onAdd={completed ? undefined : () => setAddState({ kind: "visit" })}
+            />
           ) : (
             data.days.map((day) => (
               <DaySection
                 key={day.day_no}
                 day={day}
-                onAdd={() => setAddState({ kind: "visit", dayNo: day.day_no })}
-                onItemMenu={(item) => openItemMenu(item, day.day_no)}
+                onAdd={
+                  completed
+                    ? undefined
+                    : () => setAddState({ kind: "visit", dayNo: day.day_no })
+                }
+                // 다녀온 여행은 기록 열람용 → 항목 편집/삭제 진입도 막는다.
+                onItemMenu={
+                  completed
+                    ? undefined
+                    : (item) => setMenuTarget({ item, dayNo: day.day_no })
+                }
               />
             ))
           )}
@@ -181,6 +203,29 @@ export default function TravelDetailView({
           initialDayNo={addState.dayNo}
         />
       ) : null}
+      {ticketOpen ? (
+        <TicketWalletModal
+          travelIdx={travelIdx}
+          onClose={() => setTicketOpen(false)}
+        />
+      ) : null}
+
+      <ScheduleItemMenuSheet
+        visible={!!menuTarget}
+        title={menuTarget?.item.title || "일정"}
+        onClose={() => setMenuTarget(null)}
+        onEdit={() => {
+          const t = menuTarget;
+          setMenuTarget(null);
+          if (t) setEditTarget(t);
+        }}
+        onDelete={() => {
+          const t = menuTarget;
+          setMenuTarget(null);
+          if (t) confirmDeleteItem(t.item);
+        }}
+      />
+
       {editTarget ? (
         <EditScheduleModal
           visible
@@ -194,8 +239,8 @@ export default function TravelDetailView({
   );
 }
 
-/** 일정이 하나도 없을 때 — 안내 + 추가 버튼. */
-function EmptyDays({ onAdd }: { onAdd: () => void }) {
+/** 일정이 하나도 없을 때 — 안내 + 추가 버튼(다녀온 여행이면 버튼 없음). */
+function EmptyDays({ onAdd }: { onAdd?: () => void }) {
   return (
     <View style={{ paddingVertical: verticalScale(32), alignItems: "center" }}>
       <Text
@@ -204,7 +249,7 @@ function EmptyDays({ onAdd }: { onAdd: () => void }) {
       >
         등록된 일정이 없어요
       </Text>
-      <AddButton onPress={onAdd} />
+      {onAdd ? <AddButton onPress={onAdd} /> : null}
     </View>
   );
 }
@@ -212,16 +257,22 @@ function EmptyDays({ onAdd }: { onAdd: () => void }) {
 /* ------------------------------------------------------------------ */
 /* 히어로 — 커버 이미지 안에 제목/기간 + 티켓 추가 카드 (+ 뒤로)          */
 /* ------------------------------------------------------------------ */
+/** 히어로 하단 카드의 성격 — 예정: 티켓 등록 / 다녀온: 여행 영상 만들기. */
+type HeroActionKind = "ticket" | "video";
+
 function Hero({
   travel,
   coverUri,
   onBack,
-  onAddTicket,
+  onAction,
+  actionKind,
 }: {
   travel: TravelDetail;
   coverUri: string | null;
   onBack?: () => void;
-  onAddTicket: () => void;
+  /** 없으면 카드가 '준비 중'으로 비활성 표시된다. */
+  onAction?: () => void;
+  actionKind: HeroActionKind;
 }) {
   const [failed, setFailed] = useState(false);
   const source = coverUri && !failed ? { uri: coverUri } : PLACEHOLDER;
@@ -288,18 +339,33 @@ function Hero({
           >
             {formatLongDate(travel.start_date)} ~ {formatLongDate(travel.end_date)}
           </Text>
-          <TicketAddCard onPress={onAddTicket} />
+          <HeroActionCard kind={actionKind} onPress={onAction} />
         </View>
       </ImageBackground>
     </View>
   );
 }
 
-/** 커버 이미지 안, 제목/기간 바로 아래 놓이는 티켓 추가 카드. */
-function TicketAddCard({ onPress }: { onPress: () => void }) {
+/**
+ * 커버 이미지 안, 제목/기간 바로 아래 놓이는 액션 카드.
+ * 예정된 여행이면 티켓 등록, 다녀온 여행이면 여행 영상 만들기로 문구·아이콘이 바뀐다.
+ * onPress 가 없으면 메뉴 시트와 같은 방식으로 '준비 중' 비활성 표시.
+ */
+function HeroActionCard({
+  kind,
+  onPress,
+}: {
+  kind: HeroActionKind;
+  onPress?: () => void;
+}) {
+  const video = kind === "video";
+  const label = video ? "내 여행 영상 만들기" : "KTX 티켓 정보 추가하기";
+  const disabled = !onPress;
+  const tint = disabled ? "#C4C4C4" : ACCENT;
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       className="flex-row items-center bg-white active:opacity-80"
       style={{
         marginTop: verticalScale(18),
@@ -313,16 +379,38 @@ function TicketAddCard({ onPress }: { onPress: () => void }) {
         gap: scale(10),
       }}
       accessibilityRole="button"
-      accessibilityLabel="KTX 티켓 정보 추가하기"
+      accessibilityLabel={label}
     >
-      <TicketIcon width={moderateScale(26)} height={moderateScale(26)} />
+      {video ? (
+        <PlayIcon
+          color={tint}
+          width={moderateScale(22)}
+          height={moderateScale(22)}
+        />
+      ) : (
+        <TicketIcon width={moderateScale(26)} height={moderateScale(26)} />
+      )}
       <Text
-        className="flex-1 font-bold text-gray-800"
-        style={{ fontSize: moderateScale(14) }}
+        className="flex-1 font-bold"
+        style={{ fontSize: moderateScale(14), color: disabled ? "#9CA3AF" : "#1F2937" }}
       >
-        KTX 티켓 정보 추가하기
+        {label}
+        {disabled ? (
+          <Text
+            className="font-medium"
+            style={{ fontSize: moderateScale(12), color: "#C4C4C4" }}
+          >
+            {"  준비 중"}
+          </Text>
+        ) : null}
       </Text>
-      <Feather name="plus" size={moderateScale(20)} color={ACCENT} />
+      {disabled ? null : (
+        <Feather
+          name={video ? "chevron-right" : "plus"}
+          size={moderateScale(20)}
+          color={ACCENT}
+        />
+      )}
     </Pressable>
   );
 }
@@ -370,8 +458,10 @@ function DaySection({
   onItemMenu,
 }: {
   day: TravelDay;
-  onAdd: () => void;
-  onItemMenu: (item: TravelScheduleItem) => void;
+  /** 없으면 '일정 추가' 버튼을 그리지 않는다(다녀온 여행). */
+  onAdd?: () => void;
+  /** 없으면 항목 ⋮ 도 그리지 않는다(다녀온 여행). */
+  onItemMenu?: (item: TravelScheduleItem) => void;
 }) {
   // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
   const rows = toRows(sortByStartTime(day.items));
@@ -415,12 +505,12 @@ function DaySection({
             row={row}
             number={number}
             isLast={i === rows.length - 1}
-            onLongPress={() => onItemMenu(row.item)}
+            onMenu={onItemMenu ? () => onItemMenu(row.item) : undefined}
           />
         );
       })}
 
-      <AddButton onPress={onAdd} />
+      {onAdd ? <AddButton onPress={onAdd} /> : null}
     </View>
   );
 }
@@ -455,13 +545,15 @@ function TimelineRow({
   row,
   number,
   isLast,
-  onLongPress,
+  onMenu,
 }: {
   row: Row;
   number: number | null;
   isLast: boolean;
-  onLongPress: () => void;
+  /** 없으면 ⋮·길게 누르기 모두 비활성(다녀온 여행). */
+  onMenu?: () => void;
 }) {
+  const hasMenu = !!onMenu;
   return (
     <View style={{ flexDirection: "row" }}>
       {/* 레일 (번호 노드 + 연결선) */}
@@ -472,7 +564,8 @@ function TimelineRow({
             width: scale(28),
             height: scale(28),
             borderWidth: 1.5,
-            borderColor: number != null ? MINT : HOLLOW_RING,
+            // 번호 노드 테두리도 아래로 이어지는 연결선과 같은 회색(숫자만 민트).
+            borderColor: number != null ? RAIL_LINE : HOLLOW_RING,
             backgroundColor: number != null ? "#FFFFFF" : "#EEF0F3",
           }}
         >
@@ -490,20 +583,45 @@ function TimelineRow({
         ) : null}
       </View>
 
-      {/* 카드 — 길게 눌러 편집/삭제 */}
+      {/* 카드 — 길게 눌러도 편집/삭제 메뉴 */}
       <Pressable
-        onLongPress={onLongPress}
+        onLongPress={onMenu}
+        disabled={!onMenu}
         delayLongPress={350}
         className="active:opacity-80"
         style={{ flex: 1, paddingBottom: verticalScale(12) }}
       >
         {row.t === "board" ? (
-          <BoardCard item={row.item} />
+          <BoardCard item={row.item} hasMenu={hasMenu} />
         ) : row.t === "alight" ? (
-          <AlightCard item={row.item} />
+          <AlightCard item={row.item} hasMenu={hasMenu} />
         ) : (
-          <PlaceCard item={row.item} />
+          <PlaceCard item={row.item} hasMenu={hasMenu} />
         )}
+
+        {/* 편집/삭제 진입점. 길게 누르기만으론 아무도 못 찾아서 ⋮ 를 항상 보여준다.
+            카드 우측 상단에 얹고, 겹칠 수 있는 텍스트에는 MENU_INSET 만큼 여백을 준다. */}
+        {onMenu ? (
+          <Pressable
+            onPress={onMenu}
+            hitSlop={10}
+            className="active:opacity-60"
+            style={{
+              position: "absolute",
+              right: scale(6),
+              top: verticalScale(8),
+              padding: scale(4),
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="일정 메뉴"
+          >
+            <Feather
+              name="more-vertical"
+              size={moderateScale(16)}
+              color="#9CA3AF"
+            />
+          </Pressable>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -527,7 +645,20 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
-function BoardCard({ item }: { item: TravelScheduleItem }) {
+/**
+ * 카드 우측 상단 ⋮ 와 겹치지 않도록 첫 줄 텍스트에 주는 여백.
+ * 이미지·메모처럼 ⋮ 아래에 있는 요소에는 적용하지 않는다(가운데 정렬이 틀어지므로).
+ */
+const MENU_INSET = scale(24);
+
+function BoardCard({
+  item,
+  hasMenu,
+}: {
+  item: TravelScheduleItem;
+  hasMenu?: boolean;
+}) {
+  const inset = hasMenu ? MENU_INSET : 0;
   const dep = item.dep_station ?? "";
   const arr = item.arr_station ?? "";
   const start = formatClockTime(item.start_time);
@@ -540,7 +671,11 @@ function BoardCard({ item }: { item: TravelScheduleItem }) {
       {route ? (
         <Text
           className="font-semibold"
-          style={{ color: ACCENT, fontSize: moderateScale(12) }}
+          style={{
+            color: ACCENT,
+            fontSize: moderateScale(12),
+            paddingRight: inset,
+          }}
         >
           {route}
         </Text>
@@ -548,7 +683,11 @@ function BoardCard({ item }: { item: TravelScheduleItem }) {
 
       <View
         className="flex-row items-center"
-        style={{ gap: scale(6), marginTop: verticalScale(route ? 8 : 0) }}
+        style={{
+          gap: scale(6),
+          marginTop: verticalScale(route ? 8 : 0),
+          paddingRight: route ? 0 : inset,
+        }}
       >
         <Image
           source={KTX_LOGO}
@@ -600,7 +739,14 @@ function BoardCard({ item }: { item: TravelScheduleItem }) {
   );
 }
 
-function AlightCard({ item }: { item: TravelScheduleItem }) {
+function AlightCard({
+  item,
+  hasMenu,
+}: {
+  item: TravelScheduleItem;
+  hasMenu?: boolean;
+}) {
+  const inset = hasMenu ? MENU_INSET : 0;
   const end = formatClockTime(item.end_time);
   const arr = item.arr_station ?? "";
   return (
@@ -608,14 +754,22 @@ function AlightCard({ item }: { item: TravelScheduleItem }) {
       {end ? (
         <Text
           className="font-semibold"
-          style={{ color: ACCENT, fontSize: moderateScale(13) }}
+          style={{
+            color: ACCENT,
+            fontSize: moderateScale(13),
+            paddingRight: inset,
+          }}
         >
           {end}
         </Text>
       ) : null}
       <Text
         className="font-bold text-gray-900"
-        style={{ fontSize: moderateScale(16), marginTop: verticalScale(end ? 4 : 0) }}
+        style={{
+          fontSize: moderateScale(16),
+          marginTop: verticalScale(end ? 4 : 0),
+          paddingRight: end ? 0 : inset,
+        }}
       >
         {arr ? `${arr} 하차` : item.title}
       </Text>
@@ -623,21 +777,37 @@ function AlightCard({ item }: { item: TravelScheduleItem }) {
   );
 }
 
-function PlaceCard({ item }: { item: TravelScheduleItem }) {
+function PlaceCard({
+  item,
+  hasMenu,
+}: {
+  item: TravelScheduleItem;
+  hasMenu?: boolean;
+}) {
+  const inset = hasMenu ? MENU_INSET : 0;
   const start = formatClockTime(item.start_time);
   return (
     <Card>
       {start ? (
         <Text
           className="font-semibold"
-          style={{ color: ACCENT, fontSize: moderateScale(13) }}
+          style={{
+            color: ACCENT,
+            fontSize: moderateScale(13),
+            paddingRight: inset,
+          }}
         >
           {start}
         </Text>
       ) : null}
       <Text
         className="font-bold text-gray-900"
-        style={{ fontSize: moderateScale(16), marginTop: verticalScale(start ? 4 : 0) }}
+        style={{
+          fontSize: moderateScale(16),
+          marginTop: verticalScale(start ? 4 : 0),
+          // 시각이 있으면 ⋮ 는 그 줄 옆이라 제목까지 밀 필요가 없다.
+          paddingRight: start ? 0 : inset,
+        }}
         numberOfLines={2}
       >
         {item.title}

@@ -37,7 +37,7 @@ export default function TravelSummaryCard({
   startDate: string;
   endDate: string;
   onPress: () => void;
-  /** ⋮ 를 누르면 호출. 주지 않으면 버튼 무동작(TODO 상태 유지). */
+  /** ⋮ 를 누르면 호출. 주지 않으면 ⋮ 자체를 렌더하지 않는다(다녀온 여행 등). */
   onMenuPress?: () => void;
 }) {
   return (
@@ -84,16 +84,21 @@ export default function TravelSummaryCard({
             {badge}
           </Text>
         </View>
-        <Pressable
-          onPress={onMenuPress}
-          hitSlop={10}
-          disabled={!onMenuPress}
-          className="active:opacity-60"
-          accessibilityRole="button"
-          accessibilityLabel="여행 메뉴"
-        >
-          <Feather name="more-vertical" size={moderateScale(18)} color="#9CA3AF" />
-        </Pressable>
+        {onMenuPress ? (
+          <Pressable
+            onPress={onMenuPress}
+            hitSlop={10}
+            className="active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="여행 메뉴"
+          >
+            <Feather
+              name="more-vertical"
+              size={moderateScale(18)}
+              color="#9CA3AF"
+            />
+          </Pressable>
+        ) : null}
       </View>
 
       <Text
