@@ -61,8 +61,12 @@ export default function MyProfileScreen() {
             >
               <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
               <Text
-                className="font-bold text-gray-900"
-                style={{ fontSize: moderateScale(17), marginLeft: scale(10) }}
+                className="text-gray-900"
+                style={{
+                  fontSize: moderateScale(17),
+                  marginLeft: scale(10),
+                  fontWeight: 650 as never,
+                }}
               >
                 내 프로필
               </Text>

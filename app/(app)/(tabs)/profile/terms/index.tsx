@@ -32,8 +32,12 @@ export default function TermsIndexScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+          className="text-gray-900"
+style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
         >
           약관 및 정책
         </Text>

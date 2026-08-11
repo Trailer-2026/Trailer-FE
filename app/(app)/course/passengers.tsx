@@ -48,8 +48,8 @@ export default function PassengersScreen() {
             >
               <View>
                 <Text
-                  className="font-semibold text-gray-900"
-                  style={{ fontSize: moderateScale(18) }}
+                  className="text-gray-900"
+                  style={{ fontSize: moderateScale(18), fontWeight: 650 as never, }}
                 >
                   {row.title}
                 </Text>

@@ -120,8 +120,12 @@ export function ModalShell({
                 />
               </Pressable>
               <Text
-                className="font-bold text-gray-900"
-                style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+                className="text-gray-900"
+      style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
               >
                 {title}
               </Text>
@@ -324,8 +328,12 @@ export function FieldLabel({
 }) {
   return (
     <Text
-      className="font-semibold text-gray-700"
-      style={{ fontSize: moderateScale(13), marginBottom: verticalScale(6) }}
+      className="text-gray-700"
+      style={{
+        fontSize: moderateScale(13),
+        marginBottom: verticalScale(6),
+        fontWeight: 650 as never,
+      }}
     >
       {required ? <Text style={{ color: "#EF4444" }}>* </Text> : null}
       {label}

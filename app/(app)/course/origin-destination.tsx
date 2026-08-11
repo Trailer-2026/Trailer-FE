@@ -126,8 +126,12 @@ function StationSelect({
   return (
     <View>
       <Text
-        className="font-semibold"
-        style={{ fontSize: moderateScale(14), color: "#6A6A6A", marginBottom: verticalScale(8) }}
+        style={{
+          fontSize: moderateScale(14),
+          color: "#6A6A6A",
+          marginBottom: verticalScale(8),
+          fontWeight: 650 as never,
+        }}
       >
         {required ? <Text style={{ color: "#EF4444" }}>*</Text> : null}
         {label}

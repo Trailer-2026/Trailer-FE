@@ -195,8 +195,8 @@ export default function ResultScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(17) }}
+          className="text-gray-900"
+          style={{ fontSize: moderateScale(17), fontWeight: 650 as never }}
         >
           일정 추천
         </Text>
@@ -221,10 +221,11 @@ export default function ResultScreen() {
             {/* 타이틀 */}
             <View style={{ paddingHorizontal: scale(20) }}>
               <Text
-                className="font-bold text-gray-900"
+                className="text-gray-900"
                 style={{
                   fontSize: moderateScale(22),
                   marginTop: verticalScale(20),
+                  fontWeight: 650 as never,
                 }}
               >
                 {plans.length}가지 플랜을 추천드려요
@@ -311,10 +312,10 @@ export default function ResultScreen() {
                       color={canRetry ? "#9D9D9D" : "#C4C9D2"}
                     />
                     <Text
-                      className="font-semibold"
                       style={{
                         fontSize: moderateScale(14),
                         color: canRetry ? "#4B5563" : "#C4C9D2",
+                        fontWeight: 650 as never,
                       }}
                     >
                       {canRetry
@@ -340,11 +341,12 @@ export default function ResultScreen() {
 
                     {/* 선택 일차 동선 헤딩 — 플랜 요약 타이틀과 동일 굵기·크기 */}
                     <Text
-                      className="font-bold text-gray-900"
+                      className="text-gray-900"
                       style={{
                         paddingHorizontal: scale(20),
                         marginTop: verticalScale(24),
                         fontSize: moderateScale(17),
+                        fontWeight: 650 as never,
                       }}
                     >
                       {activeDay}일차 동선
@@ -472,8 +474,8 @@ function PlanCard({
           }}
         >
           <Text
-            className="text-white font-bold"
-            style={{ fontSize: moderateScale(12) }}
+            className="text-white"
+            style={{ fontSize: moderateScale(12), fontWeight: 650 as never, }}
           >
             {badge}
           </Text>
@@ -622,8 +624,12 @@ function PlanSummary({
   return (
     <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(18) }}>
       <Text
-        className="font-bold text-gray-900"
-        style={{ fontSize: moderateScale(17), marginBottom: verticalScale(16) }}
+        className="text-gray-900"
+        style={{
+          fontSize: moderateScale(17),
+          marginBottom: verticalScale(16),
+          fontWeight: 650 as never,
+        }}
       >
         {badge} 일정 요약
       </Text>
@@ -671,8 +677,12 @@ function SummaryItem({
     <View className="flex-1 items-center" style={{ gap: verticalScale(6) }}>
       {icon}
       <Text
-        className="font-bold text-gray-800"
-        style={{ fontSize: moderateScale(14), marginTop: verticalScale(2) }}
+        className="text-gray-800"
+        style={{
+          fontSize: moderateScale(14),
+          marginTop: verticalScale(2),
+          fontWeight: 650 as never,
+        }}
       >
         {label}
       </Text>

@@ -81,7 +81,13 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: verticalScale(32) }}
+        contentContainerStyle={{
+          // 현재 여행 카드는 absolute 로 떠 있어 콘텐츠를 밀어내지 못한다.
+          // 카드가 있을 때만 그 높이(77)+아래 여백(27)만큼 더 비워 마지막 항목이 가리지 않게 한다.
+          paddingBottom: currentTravel
+            ? verticalScale(32 + 77 + 27)
+            : verticalScale(32),
+        }}
       >
         <Header />
 
@@ -124,8 +130,8 @@ function Header() {
       }}
     >
       <Text
-        className="font-bold text-gray-900"
-        style={{ fontSize: moderateScale(20) }}
+        className="text-gray-900"
+        style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
       >
         트레일러
       </Text>
@@ -203,12 +209,13 @@ function PromoHero() {
             >
               {/* 태그 — Bold 12, X19 / Y122 */}
               <Text
-                className="text-teal-400 font-bold"
+                className="text-teal-400"
                 style={{
                   position: "absolute",
                   left: scale(19),
                   top: verticalScale(40),
-                  fontSize: moderateScale(12),
+                  fontSize: moderateScale(13),
+                  fontWeight: 650 as never,
                 }}
               >
                 {s.tag}
@@ -218,12 +225,13 @@ function PromoHero() {
               {s.lines.map((line, i) => (
                 <Text
                   key={line}
-                  className="text-white font-bold"
+                  className="text-white"
                   style={{
                     position: "absolute",
                     left: scale(19),
-                    top: verticalScale(65.5 + i * 18),
-                    fontSize: moderateScale(16),
+                    top: verticalScale(65.5 + i * 19),
+                    fontSize: moderateScale(17),
+                    fontWeight: 650 as never,
                   }}
                 >
                   {line}
@@ -348,14 +356,22 @@ function SectionHeader() {
   return (
     <View>
       <Text
-        className="font-semibold"
-        style={{ color: "#668DFF", fontSize: moderateScale(14) }}
+        style={{
+          color: "#668DFF",
+          fontSize: moderateScale(14),
+          fontWeight: 650 as never,
+          marginTop: verticalScale(10),
+        }}
       >
-        실시간 여행 피드
+        어디로 떠나볼까요?
       </Text>
       <Text
-        className="text-gray-900 font-bold"
-        style={{ fontSize: moderateScale(20), marginTop: verticalScale(4) }}
+        className="text-gray-900"
+        style={{
+          fontSize: moderateScale(20),
+          marginTop: verticalScale(4),
+          fontWeight: 650 as never,
+        }}
       >
         지금 사람들이 떠나는 여행 보기
       </Text>
@@ -533,8 +549,8 @@ function ThemedPlacesSection() {
         style={{ paddingHorizontal: scale(20) }}
       >
         <Text
-          className="text-gray-900 font-bold"
-          style={{ fontSize: moderateScale(20) }}
+          className="text-gray-900"
+          style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
         >
           테마별 여행지
         </Text>
@@ -616,14 +632,21 @@ function ThemedPlacesContent({
             }}
           >
             <Text
-              className="text-white font-bold"
-              style={{ fontSize: moderateScale(17) }}
+              className="text-white"
+              style={{
+                fontSize: moderateScale(17),
+                fontWeight: 650 as never,
+              }}
             >
               {THEMED_EYEBROW}
             </Text>
             <Text
-              className="text-white font-bold"
-              style={{ fontSize: moderateScale(17), marginTop: verticalScale(4) }}
+              className="text-white"
+              style={{
+                fontSize: moderateScale(17),
+                marginTop: verticalScale(4),
+                fontWeight: 650 as never,
+              }}
               numberOfLines={2}
             >
               {title}
@@ -718,9 +741,19 @@ function ThemedPlaceRow({
   place: ThemePlaceCard;
   last: boolean;
 }) {
+  // 프리시드(seed.ts)에는 content_id 가 없어 상세로 갈 수 없다 → 그때만 눌리지 않게.
+  const contentId = place.content_id;
   return (
-    <View
-      className="flex-row items-center"
+    <Pressable
+      onPress={() =>
+        contentId &&
+        router.push({
+          pathname: "/place/[contentId]",
+          params: { contentId },
+        })
+      }
+      disabled={!contentId}
+      className="flex-row items-center active:opacity-70"
       style={{ marginBottom: last ? 0 : verticalScale(18) }}
     >
       <View
@@ -758,7 +791,7 @@ function ThemedPlaceRow({
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

@@ -17,12 +17,15 @@ import RenameTravelModal from "@/src/features/travel/components/RenameTravelModa
 import TicketWalletModal from "@/src/features/travel/components/ticket/TicketWalletModal";
 import TravelMenuSheet from "@/src/features/travel/components/TravelMenuSheet";
 import TravelSummaryCard from "@/src/features/travel/components/TravelSummaryCard";
+import { pickTravelCoverImage } from "@/src/features/travel/cover-image";
 import { describeScheduleError } from "@/src/features/travel/errors";
 import {
   useCurrentTravel,
   useDeleteTravel,
+  useDeleteTravelCover,
   usePastTravels,
   usePrefetchTravelDetail,
+  useUpdateTravelCover,
 } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
 import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
@@ -90,6 +93,44 @@ export default function CalendarTab() {
   const [menuTravel, setMenuTravel] = useState<MenuTarget | null>(null);
   const [renameTravel, setRenameTravel] = useState<MenuTarget | null>(null);
   const del = useDeleteTravel();
+  const setCover = useUpdateTravelCover();
+  const clearCover = useDeleteTravelCover();
+
+  /** 갤러리에서 고른 사진을 대표 사진으로 올린다. 취소하면 아무 일도 없다. */
+  const changeCover = async (travel: MenuTarget) => {
+    const file = await pickTravelCoverImage();
+    if (!file) return;
+    setCover.mutate(
+      { travelIdx: travel.travel_idx, file },
+      {
+        onError: (e) =>
+          Alert.alert("대표 사진 변경 실패", describeScheduleError(e)),
+      },
+    );
+  };
+
+  /**
+   * 대표 사진 해제. '삭제'가 아니라 기본 썸네일(첫 일정 이미지 → 지역 기본 사진)로
+   * 되돌아가는 동작이라 문구를 그렇게 잡았다.
+   */
+  const confirmRemoveCover = (travel: MenuTarget) => {
+    Alert.alert(
+      "대표 사진을 기본으로 되돌릴까요?",
+      "직접 올린 사진은 삭제되고 기본 썸네일이 다시 보여요.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "되돌리기",
+          style: "destructive",
+          onPress: () =>
+            clearCover.mutate(travel.travel_idx, {
+              onError: (e) =>
+                Alert.alert("대표 사진 해제 실패", describeScheduleError(e)),
+            }),
+        },
+      ],
+    );
+  };
 
   // 헤더 승차권 아이콘 → 티켓 추가 화면. 일정표 상세의 'KTX 티켓 정보 추가하기' 와
   // 같은 컴포넌트/같은 여행(예정된 여행)을 쓰므로 어느 쪽에서 저장해도 결과가 같다.
@@ -139,8 +180,8 @@ export default function CalendarTab() {
         }}
       >
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(20) }}
+          className="text-gray-900"
+          style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
         >
           내 일정
         </Text>
@@ -214,13 +255,23 @@ export default function CalendarTab() {
           onCreate={() => setCreateOpen(true)}
         />
       ) : (
-        <PastTab onMenuPress={setMenuTravel} />
+        <PastTab />
       )}
 
       <TravelMenuSheet
         visible={!!menuTravel}
         onClose={() => setMenuTravel(null)}
         // '내 여행 영상 만들기' 는 아직 미구현 → onMakeVideo 미전달로 비활성 표시.
+        onChangeCover={() => {
+          const t = menuTravel;
+          setMenuTravel(null);
+          if (t) void changeCover(t);
+        }}
+        onRemoveCover={() => {
+          const t = menuTravel;
+          setMenuTravel(null);
+          if (t) confirmRemoveCover(t);
+        }}
         onRename={() => {
           const t = menuTravel;
           setMenuTravel(null);
@@ -405,7 +456,8 @@ function dDayLabel(travel: HomeTravelCard): string {
 /* ------------------------------------------------------------------ */
 /* 다녀온 여행 — 완료 카드 목록(민트)                                    */
 /* ------------------------------------------------------------------ */
-function PastTab({ onMenuPress }: { onMenuPress: (travel: MenuTarget) => void }) {
+/** 다녀온 여행은 열람 전용 — 카드에 ⋮ 를 두지 않는다. */
+function PastTab() {
   const { data, isLoading } = usePastTravels();
   const travels = data?.travels ?? [];
 
@@ -444,7 +496,6 @@ function PastTab({ onMenuPress }: { onMenuPress: (travel: MenuTarget) => void })
           startDate={t.start_date}
           endDate={t.end_date}
           onPress={() => goDetail(t)}
-          onMenuPress={() => onMenuPress(t)}
         />
       ))}
     </ScrollView>

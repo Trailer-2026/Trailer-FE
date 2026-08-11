@@ -87,8 +87,8 @@ export default function FeedTab() {
           }}
         >
           <Text
-            className="font-bold text-white"
-            style={{ fontSize: moderateScale(20) }}
+            className="text-white"
+            style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
           >
             트레일러
           </Text>

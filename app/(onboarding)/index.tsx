@@ -147,9 +147,12 @@ export default function OnboardingScreen() {
               />
 
               <Text
-                className="font-bold text-gray-900 text-center"
+                className="text-gray-900 text-center"
                 style={{
                   fontSize: moderateScale(22),
+                  // Bold(700)와 SemiBold(600) 사이 굵기(Pretendard-650).
+                  // RN 타입엔 650 이 없어 숫자로 준다 — Text 래퍼가 정적 폰트로 매핑한다.
+                  fontWeight: 650 as never,
                   // 영상 슬라이드는 이미지가 scale(14) 만큼 더 커서, 글씨 위치를
                   // 다른 슬라이드와 맞추기 위해 그만큼 위로 당긴다.
                   marginTop:
@@ -199,7 +202,7 @@ export default function OnboardingScreen() {
           style={{ height: verticalScale(54), backgroundColor: "#7292EE" }}
         >
           <Text
-            className="text-white font-semibold"
+            className="text-white font-bold"
             style={{ fontSize: moderateScale(16) }}
           >
             시작하기

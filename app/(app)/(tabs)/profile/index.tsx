@@ -333,7 +333,10 @@ function StatCol({
       style={{ flex: 1, gap: verticalScale(8) }}
     >
       {icon}
-      <Text className="text-gray-700" style={{ fontSize: moderateScale(13) }}>
+      <Text
+        className="text-gray-700"
+        style={{ fontSize: moderateScale(13), fontWeight: 600 }}
+      >
         {label}
       </Text>
     </Pressable>
@@ -371,7 +374,10 @@ function MenuItem({ row }: { row: MenuRow }) {
         <View style={{ width: moderateScale(26), alignItems: "center" }}>
           {row.icon}
         </View>
-        <Text className="text-gray-800" style={{ fontSize: moderateScale(15) }}>
+        <Text
+          className="text-gray-800"
+          style={{ fontSize: moderateScale(15), fontWeight: 600 }}
+        >
           {row.label}
         </Text>
       </View>

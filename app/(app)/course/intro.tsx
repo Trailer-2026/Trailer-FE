@@ -50,14 +50,19 @@ export default function CourseIntroScreen() {
       <View className="flex-1 items-center" style={{ paddingHorizontal: scale(20) }}>
         {/* 안내 문구 */}
         <Text
-          className="text-center font-bold text-gray-900"
+          className="text-center text-gray-900"
           style={{
             marginTop: verticalScale(80),
             fontSize: moderateScale(24),
             lineHeight: moderateScale(34),
+            fontWeight: 650 as never,
           }}
         >
-          <Text style={{ color: ACCENT }}>AI 플래너</Text>에{"\n"}
+          {/* 'AI 플래너'만 한 단계 굵게(700), 나머지 문구는 바깥 650을 물려받는다. */}
+          <Text className="font-bold" style={{ color: ACCENT }}>
+            AI 플래너
+          </Text>
+          에{"\n"}
           오신 것을 환영합니다.
         </Text>
 

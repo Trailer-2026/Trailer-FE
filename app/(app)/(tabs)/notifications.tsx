@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,6 +17,7 @@ import {
   useReadAllNotifications,
   useReadNotification,
 } from "@/src/features/notification/queries";
+import { openNotificationTarget } from "@/src/features/notification/routing";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
   useCurrentTravel,
@@ -86,18 +86,8 @@ export default function NotificationsTab() {
   const onItemPress = useCallback(
     (item: NotificationLogItem) => {
       if (!item.is_read) readOne.mutate(item.notification_log_idx);
-      // 삭제 알림은 원본 여행이 사라졌으니 상세로 갈 수 없다 → AI 일정 생성 진입점으로.
-      // type enum 이 서버 스펙에 명시돼 있지 않아 대소문자·표기 변형에 안전하게 substring 매칭.
-      if (item.type.toUpperCase().includes("DELETE")) {
-        router.push("/course/intro");
-        return;
-      }
-      if (item.travel_idx != null) {
-        router.push({
-          pathname: "/travel/[travelIdx]",
-          params: { travelIdx: item.travel_idx },
-        });
-      }
+      // 이동 규칙은 푸시 탭과 공유한다(routing.ts).
+      openNotificationTarget({ type: item.type, travelIdx: item.travel_idx });
     },
     [readOne],
   );
@@ -123,8 +113,8 @@ export default function NotificationsTab() {
         }}
       >
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(20) }}
+          className="text-gray-900"
+          style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
         >
           알림
         </Text>
@@ -373,38 +363,48 @@ function NotificationCard({
         backgroundColor: unread ? "#EEF2FF" : "transparent",
       }}
     >
-      {/* 미읽음 도트 (읽음이면 자리만 유지) */}
-      <View
-        style={{
-          width: scale(8),
-          height: scale(8),
-          borderRadius: scale(4),
-          backgroundColor: unread ? ACCENT : "transparent",
-          alignSelf: "flex-start",
-          marginTop: verticalScale(6),
-        }}
-      />
+      {/*
+        도트 + 본문을 한 묶음으로 감싼다.
+        바깥 행은 items-center 라 썸네일이 있으면 행 높이가 텍스트보다 커지는데,
+        도트를 바깥 행에 직접 두면 행 기준 위쪽에 붙어 첫 줄과 어긋난다.
+        이 래퍼의 높이는 항상 본문 높이와 같으므로, 썸네일 유무와 무관하게
+        도트가 첫 줄에 정렬된다.
+      */}
+      <View className="flex-row" style={{ flex: 1, gap: scale(12) }}>
+        {/* 미읽음 도트 (읽음이면 자리만 유지) — 첫 줄 가운데에 맞춘다. */}
+        <View
+          style={{
+            width: scale(8),
+            height: scale(8),
+            borderRadius: scale(4),
+            backgroundColor: unread ? ACCENT : "transparent",
+            alignSelf: "flex-start",
+            // (첫 줄 lineHeight 20 - 도트 8) / 2
+            marginTop: verticalScale(6),
+          }}
+        />
 
-      <View style={{ flex: 1 }}>
-        <Text
-          className={unread ? "font-bold text-gray-900" : "text-gray-900"}
-          style={{
-            fontSize: moderateScale(14),
-            lineHeight: moderateScale(20),
-          }}
-          numberOfLines={3}
-        >
-          {item.body}
-        </Text>
-        <Text
-          className="text-gray-400"
-          style={{
-            fontSize: moderateScale(12),
-            marginTop: verticalScale(4),
-          }}
-        >
-          {relativeTime(item.created_at)}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text
+            className={unread ? "font-bold text-gray-900" : "text-gray-900"}
+            style={{
+              fontSize: moderateScale(14),
+              lineHeight: moderateScale(20),
+            }}
+            numberOfLines={3}
+          >
+            {item.body}
+          </Text>
+          <Text
+            className="text-gray-400"
+            style={{
+              fontSize: moderateScale(12),
+              marginTop: verticalScale(4),
+            }}
+          >
+            {relativeTime(item.created_at)}
+          </Text>
+        </View>
       </View>
 
       {showThumb ? (

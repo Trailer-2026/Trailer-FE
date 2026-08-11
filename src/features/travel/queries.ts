@@ -9,6 +9,7 @@ import {
   createTravel,
   deleteSchedule,
   deleteTravel,
+  deleteTravelCoverImage,
   getCurrentTravel,
   getPastTravels,
   getTravelDetail,
@@ -16,6 +17,7 @@ import {
   likeTravel,
   unlikeTravel,
   updateSchedule,
+  updateTravelCoverImage,
   updateTravelTitle,
 } from "./api";
 import { travelKeys } from "./keys";
@@ -23,6 +25,7 @@ import type {
   PastTravelListResponse,
   ScheduleCreateRequest,
   ScheduleUpdateRequest,
+  TravelCoverFile,
   TravelManualCreateRequest,
 } from "./types";
 
@@ -264,5 +267,44 @@ export function useDeleteTravel() {
       queryClient.invalidateQueries({ queryKey: travelKeys.past() });
       queryClient.invalidateQueries({ queryKey: notificationKeys.list() });
     },
+  });
+}
+
+/**
+ * 여행 대표 사진 지정·변경 / 해제.
+ *
+ * 썸네일은 목록 카드(current·past)와 일정표 히어로가 모두 쓰므로 세 캐시를 함께 비운다.
+ * 삭제도 '없앰'이 아니라 기본 규칙 URL 로 되돌아가는 것이라 갱신이 필요하다.
+ */
+function invalidateTravelThumbnails(
+  queryClient: ReturnType<typeof useQueryClient>,
+  travelIdx: number,
+) {
+  queryClient.invalidateQueries({ queryKey: travelKeys.current() });
+  queryClient.invalidateQueries({ queryKey: travelKeys.past() });
+  queryClient.invalidateQueries({ queryKey: travelKeys.detail(travelIdx) });
+}
+
+// travelIdx 를 훅 인자가 아니라 mutate 변수로 받는다 — 목록에서 어떤 카드의 ⋮ 를
+// 눌렀는지가 실행 시점에 정해지고, 시트가 닫히며 선택이 풀려도 안전하다.
+export function useUpdateTravelCover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      travelIdx,
+      file,
+    }: {
+      travelIdx: number;
+      file: TravelCoverFile;
+    }) => updateTravelCoverImage(travelIdx, file),
+    onSuccess: (data) => invalidateTravelThumbnails(queryClient, data.travel_idx),
+  });
+}
+
+export function useDeleteTravelCover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (travelIdx: number) => deleteTravelCoverImage(travelIdx),
+    onSuccess: (data) => invalidateTravelThumbnails(queryClient, data.travel_idx),
   });
 }

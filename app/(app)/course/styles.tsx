@@ -99,10 +99,10 @@ export default function StylesScreen() {
                       </Text>
                     )}
                     <Text
-                      className="font-semibold"
                       style={{
                         fontSize: moderateScale(14),
                         color: selected ? "#5E84F4" : "#4B5563",
+                        fontWeight: 650 as never,
                       }}
                     >
                       {label}

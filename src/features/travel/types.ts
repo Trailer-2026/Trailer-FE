@@ -162,6 +162,22 @@ export type TrainScheduleCreate = {
 };
 
 /**
+ * PATCH/DELETE /api/travels/{travel_idx}/cover-image 응답.
+ * 삭제 시에도 원래 규칙(첫 일정 이미지 → 지역 기본 사진)으로 되돌아간 URL 이 담긴다.
+ */
+export type TravelCoverResponse = {
+  travel_idx: number;
+  cover_image_url: string | null;
+};
+
+/** multipart 업로드에 넣을 이미지 파일 형태. expo-image-picker asset 에서 좁혀서 만든다. */
+export type TravelCoverFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
+
+/**
  * GET /api/travels/{travel_idx}/tickets — 승차권 1매(= 기차 일정 1건).
  * 좌석·호차는 예매 정보라 없을 수 있다.
  */

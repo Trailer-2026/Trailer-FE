@@ -46,8 +46,11 @@ export function StepHeader({ progress, step, steps }: Props) {
 
         {hasLabel ? (
           <Text
-            className="font-semibold"
-            style={{ fontSize: moderateScale(17), color: "#5E84F4" }}
+            style={{
+              fontSize: moderateScale(17),
+              color: "#5E84F4",
+              fontWeight: 650 as never,
+            }}
           >
             {step}/{steps}
           </Text>

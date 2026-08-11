@@ -13,6 +13,8 @@ import type {
   TravelLikeResponse,
   TravelManualCreateRequest,
   TravelResponse,
+  TravelCoverFile,
+  TravelCoverResponse,
   TravelScheduleItem,
   TravelTicket,
   TravelTicketListResponse,
@@ -236,6 +238,50 @@ export async function unlikeTravel(
 ): Promise<TravelLikeResponse> {
   const res = await api.delete<CommonResponse<TravelLikeResponse>>(
     `/api/travels/${travelIdx}/likes`,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * PATCH /api/travels/{travel_idx}/cover-image — 대표 사진 지정·변경(multipart).
+ * 이미 있으면 교체하고 옛 사진은 저장소에서 지운다.
+ * 400: 이미지가 아니거나 빈 파일·10MB 초과 / 404 / 502(저장소 업로드 실패)
+ *
+ * timeout 은 전역 10s 로는 업로드에 부족할 수 있어 30s 로 override 한다.
+ */
+export async function updateTravelCoverImage(
+  travelIdx: number,
+  file: TravelCoverFile,
+): Promise<TravelCoverResponse> {
+  const form = new FormData();
+  // RN 의 FormData 는 { uri, name, type } 객체를 파일 파트로 인식한다. 필드명은 스펙상 "image".
+  form.append("image", {
+    uri: file.uri,
+    name: file.name,
+    type: file.type,
+  } as unknown as Blob);
+
+  // Content-Type 을 직접 지정하지 않는다 — RN 의 XHR 이 FormData 를 감지해
+  // multipart/form-data 와 boundary 를 자동으로 붙인다. 여기서 손대면 boundary 가 빠져 깨진다.
+  const res = await api.patch<CommonResponse<TravelCoverResponse>>(
+    `/api/travels/${travelIdx}/cover-image`,
+    form,
+    { timeout: 30000 },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * DELETE /api/travels/{travel_idx}/cover-image — 대표 사진 해제.
+ * 지정된 사진이 없어도 성공(멱등). 응답엔 원래 규칙으로 복귀한 URL 이 담긴다.
+ */
+export async function deleteTravelCoverImage(
+  travelIdx: number,
+): Promise<TravelCoverResponse> {
+  const res = await api.delete<CommonResponse<TravelCoverResponse>>(
+    `/api/travels/${travelIdx}/cover-image`,
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;

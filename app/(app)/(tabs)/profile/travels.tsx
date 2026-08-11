@@ -104,6 +104,7 @@ export default function TravelsScreen() {
             }
             label="스탬프"
             value={stamps?.achieved_count ?? 0}
+            onPress={() => router.push("/profile/stamps")}
           />
           <StatPill
             icon={
@@ -157,14 +158,19 @@ function StatPill({
   icon,
   label,
   value,
+  onPress,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
+  /** 없으면 눌리지 않는 표시 전용 칩. */
+  onPress?: () => void;
 }) {
   return (
-    <View
-      className="bg-white flex-row items-center justify-center"
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      className="bg-white flex-row items-center justify-center active:opacity-70"
       style={{
         width: scale(129),
         height: verticalScale(41),
@@ -190,7 +196,7 @@ function StatPill({
       >
         {value}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 

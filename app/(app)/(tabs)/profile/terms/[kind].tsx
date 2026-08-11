@@ -47,8 +47,12 @@ export default function TermsDetailScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+          className="text-gray-900"
+style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
           numberOfLines={1}
         >
           {doc?.title ?? "약관"}
