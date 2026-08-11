@@ -21,7 +21,9 @@ import {
   useToggleTravelLike,
 } from "@/src/features/travel/queries";
 import type { PastTravelCard } from "@/src/features/travel/types";
+import { useMyStamps } from "@/src/features/stamp/queries";
 import { useMyProfile } from "@/src/features/user/queries";
+import { HEADER_HEIGHT } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#668DFF";
@@ -32,8 +34,7 @@ const MY_BG = require("../../../../assets/images/style/my_background.png");
 const STAMP_ICON = require("../../../../assets/images/style/stamp.png");
 const VIDEO_ICON = require("../../../../assets/images/style/video.png");
 
-// TODO(stats): 스탬프·내영상 개수 API 연동 시 교체 (현재 프로필 응답엔 없음)
-const STAMP_COUNT = 0;
+// TODO(stats): 내 영상 개수는 아직 대응 API 가 없다.
 const VIDEO_COUNT = 0;
 
 export default function TravelsScreen() {
@@ -41,6 +42,7 @@ export default function TravelsScreen() {
   const insets = useSafeAreaInsets();
 
   const { data: profile } = useMyProfile();
+  const { data: stamps } = useMyStamps();
   const current = useCurrentTravel();
   const past = usePastTravels();
 
@@ -71,14 +73,18 @@ export default function TravelsScreen() {
           paddingBottom: verticalScale(20),
         }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
-        </Pressable>
+        {/* 뒤로 버튼 줄 — 다른 화면 상단바와 같은 높이(44)에 세로 중앙. */}
+        <View style={{ height: HEADER_HEIGHT, justifyContent: "center" }}>
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
+          </Pressable>
+        </View>
 
         <Text
           className="font-bold text-gray-900"
           numberOfLines={1}
-          style={{ fontSize: moderateScale(24), marginTop: verticalScale(20) }}
+          // 뒤로 줄이 상단바 높이(44)로 고정되면서 아래 여백이 남는다 → 그만큼 붙인다.
+          style={{ fontSize: moderateScale(24), marginTop: verticalScale(4) }}
         >
           {nickname}
         </Text>
@@ -97,7 +103,7 @@ export default function TravelsScreen() {
               />
             }
             label="스탬프"
-            value={STAMP_COUNT}
+            value={stamps?.achieved_count ?? 0}
           />
           <StatPill
             icon={

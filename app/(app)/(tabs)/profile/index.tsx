@@ -254,6 +254,7 @@ export default function ProfileTab() {
                   contentFit="contain"
                 />
               }
+              onPress={() => router.push("/profile/stamps")}
             />
             <ColDivider />
             <StatCol
