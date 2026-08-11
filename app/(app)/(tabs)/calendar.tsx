@@ -255,7 +255,7 @@ export default function CalendarTab() {
           onCreate={() => setCreateOpen(true)}
         />
       ) : (
-        <PastTab />
+        <PastTab onMenuPress={setMenuTravel} />
       )}
 
       <TravelMenuSheet
@@ -456,8 +456,7 @@ function dDayLabel(travel: HomeTravelCard): string {
 /* ------------------------------------------------------------------ */
 /* 다녀온 여행 — 완료 카드 목록(민트)                                    */
 /* ------------------------------------------------------------------ */
-/** 다녀온 여행은 열람 전용 — 카드에 ⋮ 를 두지 않는다. */
-function PastTab() {
+function PastTab({ onMenuPress }: { onMenuPress: (travel: MenuTarget) => void }) {
   const { data, isLoading } = usePastTravels();
   const travels = data?.travels ?? [];
 
@@ -496,6 +495,7 @@ function PastTab() {
           startDate={t.start_date}
           endDate={t.end_date}
           onPress={() => goDetail(t)}
+          onMenuPress={() => onMenuPress(t)}
         />
       ))}
     </ScrollView>
