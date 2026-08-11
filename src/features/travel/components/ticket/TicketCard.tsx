@@ -1,5 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -8,7 +8,7 @@ import { formatClockTime, formatDaySlash, formatTicketDate } from "../../format"
 import type { TravelTicket } from "../../types";
 
 const ACCENT = "#5E84F4";
-const TICKET_MINT = "#7ED8C3";
+const TICKET_MINT = "#81E4D0";
 const BOX_BG = "#F1F4FB";
 const LINE = "#E5E7EB";
 
@@ -63,22 +63,21 @@ export default function TicketCard({
         </Text>
       </View>
 
+      {/* 흰 배경 위에 얹히므로 경계는 hairline(1 물리픽셀) 테두리로만 준다. */}
       <View
         className="bg-white"
         style={{
-          borderRadius: scale(10),
-          overflow: "hidden",
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: LINE,
         }}
       >
         {/* 민트 띠 — 승차 일자 */}
         <View
-          className="flex-row items-center justify-between"
+          className="justify-center"
           style={{
             backgroundColor: TICKET_MINT,
+            height: verticalScale(30),
             paddingHorizontal: scale(16),
-            paddingVertical: verticalScale(10),
           }}
         >
           <Text
@@ -87,38 +86,28 @@ export default function TicketCard({
           >
             {formatTicketDate(ticket.date)}
           </Text>
-          <Text
-            className="text-white font-semibold"
-            style={{ fontSize: moderateScale(12) }}
-          >
-            좌석지정권 1매
-          </Text>
         </View>
 
         {/* 구간 · 시각 */}
         <View
           style={{
             paddingHorizontal: scale(16),
-            paddingTop: verticalScale(26),
+            paddingTop: verticalScale(36),
             paddingBottom: verticalScale(20),
           }}
         >
-          <View className="flex-row items-center justify-center" style={{ gap: scale(18) }}>
+          <View className="flex-row items-center justify-center" style={{ gap: scale(42) }}>
             <Text
               className="font-bold text-gray-900"
-              style={{ fontSize: moderateScale(22) }}
+              style={{ fontSize: moderateScale(20) }}
               numberOfLines={1}
             >
               {ticket.dep_station}
             </Text>
-            <Feather
-              name="arrow-right"
-              size={moderateScale(24)}
-              color="#111827"
-            />
+            <RouteArrow />
             <Text
               className="font-bold text-gray-900"
-              style={{ fontSize: moderateScale(22) }}
+              style={{ fontSize: moderateScale(20) }}
               numberOfLines={1}
             >
               {ticket.arr_station}
@@ -127,7 +116,7 @@ export default function TicketCard({
 
           <View
             className="flex-row items-center justify-center"
-            style={{ gap: scale(40), marginTop: verticalScale(12) }}
+            style={{ gap: scale(96), marginTop: verticalScale(12) }}
           >
             <TimeText value={ticket.dep_time} />
             <TimeText value={ticket.arr_time} />
@@ -140,7 +129,6 @@ export default function TicketCard({
             style={{
               marginHorizontal: scale(16),
               backgroundColor: BOX_BG,
-              borderRadius: scale(6),
               paddingHorizontal: scale(16),
               paddingVertical: verticalScale(14),
             }}
@@ -224,6 +212,35 @@ export default function TicketCard({
           </Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+const ARROW_HEAD = 12;
+
+/**
+ * 구간 화살표 — 선 길이 30, 촉은 작게.
+ *
+ * Feather 의 arrow-right 는 선과 촉 비율이 고정이라 길이만 늘리면 촉도 같이 커진다.
+ * 그래서 선은 View 로 긋고 촉만 작은 chevron 으로 붙인다.
+ *
+ * chevron-right 는 24 viewBox 안에서 x=9~15 를 차지한다. 즉 아이콘 상자 왼쪽
+ * 9/24(=0.375)만큼 안쪽에서 촉이 시작한다. 딱 그만큼만 당기면 폰트 렌더링 여백 때문에
+ * 여전히 틈이 보여서, 조금 더(0.55) 당겨 선 끝에 겹치게 둔다.
+ */
+function RouteArrow() {
+  const head = moderateScale(ARROW_HEAD);
+  return (
+    <View className="flex-row items-center">
+      <View
+        style={{ width: scale(30), height: 1.5, backgroundColor: "#111827" }}
+      />
+      <Feather
+        name="chevron-right"
+        size={head}
+        color="#111827"
+        style={{ marginLeft: -head * 0.55 }}
+      />
     </View>
   );
 }

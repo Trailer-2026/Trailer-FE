@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { describeScheduleError } from "../../errors";
@@ -120,8 +121,7 @@ export default function TicketWalletModal({
           className="flex-row items-center justify-between"
           style={{
             paddingHorizontal: scale(20),
-            paddingTop: verticalScale(16),
-            paddingBottom: verticalScale(10),
+            ...headerBarStyle(),
           }}
         >
           <View className="flex-row items-center">
