@@ -23,6 +23,7 @@ import { describeRenderError } from "@/src/features/video/errors";
 import { DEFAULT_RENDER_OPTIONS } from "@/src/features/video/options";
 import { useRenderPhotosOnly } from "@/src/features/video/queries";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 /** 사진→영상 렌더에 필요한 최소 사진 수(서버도 2장 미만이면 400). */
@@ -107,7 +108,7 @@ export default function ReelsEditScreen() {
       {/* 헤더: 뒤로 / 생성하기 */}
       <View
         className="flex-row items-center justify-between"
-        style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(16) }}
+        style={{ paddingHorizontal: scale(20), ...headerBarStyle() }}
       >
         <Pressable
           onPress={() => router.back()}

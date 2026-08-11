@@ -8,10 +8,14 @@ import {
   LEGAL_DOCUMENTS,
   type LegalDocumentKind,
 } from "@/src/features/legal/documents";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
+// marketing 은 약관 목록(LEGAL_MENU)에는 없고 알림 설정의 '동의항목 보기'로만 들어온다.
 function isKind(v: string | undefined): v is LegalDocumentKind {
-  return v === "service" || v === "location" || v === "privacy";
+  return (
+    v === "service" || v === "location" || v === "privacy" || v === "marketing"
+  );
 }
 
 /**
@@ -31,9 +35,8 @@ export default function TermsDetailScreen() {
       <View
         className="flex-row items-center"
         style={{
-          paddingTop: insets.top + verticalScale(16),
+          ...headerBarStyle(insets.top),
           paddingHorizontal: scale(16),
-          paddingBottom: verticalScale(6),
         }}
       >
         <Pressable
@@ -44,8 +47,12 @@ export default function TermsDetailScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+          className="text-gray-900"
+style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
           numberOfLines={1}
         >
           {doc?.title ?? "약관"}

@@ -5,16 +5,18 @@ import { useState } from "react";
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
 import type { PlaceSearchResult } from "@/src/features/place/types";
+import {
+  buildSelectableDays,
+  type TravelDayOption,
+} from "@/src/features/travel/days";
 import { describeScheduleError } from "@/src/features/travel/errors";
 import {
   useCreateSchedule,
   useTravelDetail,
 } from "@/src/features/travel/queries";
-import type {
-  ScheduleCreateRequest,
-  TravelDay,
-} from "@/src/features/travel/types";
-import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+import type { ScheduleCreateRequest } from "@/src/features/travel/types";
+import { headerBarStyle } from "@/src/utils/header";
+import { moderateScale, scale } from "@/src/utils/responsive";
 
 import { formatDayDate } from "../../format";
 import {
@@ -75,10 +77,14 @@ export default function AddScheduleModal({
   // 캐시가 비어 있는 진입점(탭 헤더 등)에서 첫 조회 중일 때.
   if (isLoading || !data) return <LoadingSheet title={title} onClose={onClose} />;
 
+  // 선택지는 여행 기간에서 만든다 — 상세의 days 는 항목이 있는 날만 올 수 있어서
+  // 방금 만든 빈 여행에서는 고를 날짜가 하나도 없게 된다.
+  const days = buildSelectableDays(data);
+
   if (kind === "visit") {
     return (
       <VisitForm
-        days={data.days}
+        days={days}
         initialDayNo={initialDayNo}
         saving={create.isPending}
         onClose={onClose}
@@ -88,7 +94,7 @@ export default function AddScheduleModal({
   }
   return (
     <TrainForm
-      days={data.days}
+      days={days}
       saving={create.isPending}
       onClose={onClose}
       onSubmit={submit}
@@ -112,8 +118,7 @@ function LoadingSheet({
           className="flex-row items-center"
           style={{
             paddingHorizontal: scale(20),
-            paddingTop: verticalScale(16),
-            paddingBottom: verticalScale(10),
+            ...headerBarStyle(),
           }}
         >
           <Pressable
@@ -127,8 +132,12 @@ function LoadingSheet({
             <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
           </Pressable>
           <Text
-            className="font-bold text-gray-900"
-            style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+            className="text-gray-900"
+  style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
           >
             {title}
           </Text>
@@ -151,7 +160,7 @@ function VisitForm({
   onClose,
   onSubmit,
 }: {
-  days: TravelDay[];
+  days: TravelDayOption[];
   initialDayNo?: number;
   saving: boolean;
   onClose: () => void;
@@ -233,7 +242,7 @@ function TrainForm({
   onClose,
   onSubmit,
 }: {
-  days: TravelDay[];
+  days: TravelDayOption[];
   saving: boolean;
   onClose: () => void;
   onSubmit: (body: ScheduleCreateRequest) => void;
@@ -255,14 +264,16 @@ function TrainForm({
   const [seatNo, setSeatNo] = useState("");
   const [memo, setMemo] = useState("");
 
-  // 열차번호는 선택 항목. 필수는 출발/도착역·일자·시각뿐이다.
+  // 서버가 kind=train 에서 요구하는 필수값 전부(누락 시 400).
   const canSave =
     !!depDate &&
     !!arrDate &&
     isValidTime(startTime) &&
     isValidTime(endTime) &&
     depStation.trim() !== "" &&
-    arrStation.trim() !== "";
+    arrStation.trim() !== "" &&
+    trainGrade.trim() !== "" &&
+    trainNo.trim() !== "";
 
   const handleSave = () => {
     if (!depDate || !arrDate) return;
@@ -274,8 +285,8 @@ function TrainForm({
       end_time: toApiTime(endTime),
       dep_station: depStation.trim(),
       arr_station: arrStation.trim(),
-      ...(trainNo.trim() ? { train_no: trainNo.trim() } : {}),
-      ...(trainGrade.trim() ? { train_grade: trainGrade.trim() } : {}),
+      train_grade: trainGrade.trim(),
+      train_no: trainNo.trim(),
       ...(carNo.trim() ? { car_no: carNo.trim() } : {}),
       ...(seatNo.trim() ? { seat_no: seatNo.trim() } : {}),
       ...(memo.trim() ? { memo: memo.trim() } : {}),
@@ -333,7 +344,15 @@ function TrainForm({
         onChangeText={setEndTime}
       />
       <Field
-        label="열차번호(선택)"
+        label="열차 등급"
+        required
+        value={trainGrade}
+        onChangeText={setTrainGrade}
+        placeholder="KTX, ITX-새마을 등"
+      />
+      <Field
+        label="열차번호"
+        required
         value={trainNo}
         onChangeText={setTrainNo}
         placeholder="101"
@@ -349,12 +368,6 @@ function TrainForm({
         value={seatNo}
         onChangeText={setSeatNo}
         placeholder="3A"
-      />
-      <Field
-        label="열차 등급(선택)"
-        value={trainGrade}
-        onChangeText={setTrainGrade}
-        placeholder="KTX, ITX-새마을 등"
       />
       <Field
         label="메모(선택)"

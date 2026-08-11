@@ -153,12 +153,53 @@ export type TrainScheduleCreate = {
   end_time: string; // "HH:MM:SS" 도착
   dep_station: string;
   arr_station: string;
-  /** 열차번호·등급은 선택 — 티켓에 없거나 모를 수 있어 비워두면 아예 보내지 않는다. */
-  train_no?: string;
-  train_grade?: string;
+  /** 서버가 kind=train 에서 필수로 요구한다(누락 시 400). */
+  train_no: string;
+  train_grade: string;
   car_no?: string;
   seat_no?: string;
   memo?: string;
+};
+
+/**
+ * PATCH/DELETE /api/travels/{travel_idx}/cover-image 응답.
+ * 삭제 시에도 원래 규칙(첫 일정 이미지 → 지역 기본 사진)으로 되돌아간 URL 이 담긴다.
+ */
+export type TravelCoverResponse = {
+  travel_idx: number;
+  cover_image_url: string | null;
+};
+
+/** multipart 업로드에 넣을 이미지 파일 형태. expo-image-picker asset 에서 좁혀서 만든다. */
+export type TravelCoverFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
+
+/**
+ * GET /api/travels/{travel_idx}/tickets — 승차권 1매(= 기차 일정 1건).
+ * 좌석·호차는 예매 정보라 없을 수 있다.
+ */
+export type TravelTicket = {
+  schedule_idx: number;
+  day_no: number;
+  /** 승차 일자 "YYYY-MM-DD" */
+  date: string;
+  train_grade: string;
+  train_no: string;
+  dep_station: string;
+  arr_station: string;
+  /** "HH:MM:SS" */
+  dep_time: string;
+  arr_time: string;
+  car_no: string | null;
+  seat_no: string | null;
+};
+
+export type TravelTicketListResponse = {
+  travel_idx: number;
+  tickets: TravelTicket[];
 };
 
 /**

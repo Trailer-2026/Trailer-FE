@@ -9,6 +9,7 @@ import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
 import { addDays, isSameDay, startOfDay, toIsoDate } from "@/src/features/course/date";
 import { describeScheduleError } from "@/src/features/travel/errors";
 import { useCreateManualTravel } from "@/src/features/travel/queries";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
@@ -16,7 +17,7 @@ const TEAL = "#B0E6DB";
 const BORDER = "#E5E7EB";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const DATE_RANGE = 60; // 오늘부터 선택 가능한 일수
+const DATE_RANGE = 30; // 오늘부터 한 달 이내만 출발일로 고를 수 있다
 
 // 숙박 수(nights) → 라벨. 종료일 = 출발일 + nights.
 const DURATIONS: { nights: number; label: string }[] = [
@@ -76,9 +77,8 @@ export default function ManualTravelScreen() {
       <View
         className="flex-row items-center"
         style={{
-          paddingTop: verticalScale(16),
+          ...headerBarStyle(),
           paddingHorizontal: scale(20),
-          paddingBottom: verticalScale(10),
         }}
       >
         <Pressable
@@ -92,8 +92,12 @@ export default function ManualTravelScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+          className="text-gray-900"
+style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
         >
           직접 일정 만들기
         </Text>

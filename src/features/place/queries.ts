@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Theme } from "@/src/features/course/types";
 import { useDebouncedValue } from "@/src/utils/useDebouncedValue";
 
-import { getThemedPlaces, searchPlaces } from "./api";
+import { getPlaceDetail, getThemedPlaces, searchPlaces } from "./api";
 import { placeKeys } from "./keys";
 import { NATURE_SEED } from "./seed";
 
@@ -43,5 +43,18 @@ export function usePlaceSearch(query: string) {
     queryFn: () => searchPlaces(debounced),
     enabled: debounced.length >= 1,
     staleTime: 1000 * 60,
+  });
+}
+
+/**
+ * 여행지 상세.
+ * TourAPI 실시간 조회라 응답이 느린 편 → 한 번 받아온 건 5분간 재사용한다.
+ */
+export function usePlaceDetail(contentId?: string) {
+  return useQuery({
+    queryKey: placeKeys.detail(contentId ?? ""),
+    queryFn: () => getPlaceDetail(contentId!),
+    enabled: !!contentId,
+    staleTime: FIXED_STALE_MS,
   });
 }

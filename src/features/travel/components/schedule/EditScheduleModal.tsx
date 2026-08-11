@@ -48,7 +48,6 @@ export default function EditScheduleModal({
   const [startTime, setStartTime] = useState(formatClockTime(item.start_time));
   const [endTime, setEndTime] = useState(formatClockTime(item.end_time));
   const [memo, setMemo] = useState(item.memo ?? "");
-  const [imageUrl, setImageUrl] = useState(item.image_url ?? "");
   // 열차 필드
   const [trainNo, setTrainNo] = useState(item.train_no ?? "");
   const [trainGrade, setTrainGrade] = useState(item.train_grade ?? "");
@@ -92,8 +91,7 @@ export default function EditScheduleModal({
       if (carNo.trim() !== (item.car_no ?? "")) body.car_no = carNo.trim();
       if (seatNo.trim() !== (item.seat_no ?? "")) body.seat_no = seatNo.trim();
     } else {
-      if (imageUrl.trim() !== (item.image_url ?? ""))
-        body.image_url = imageUrl.trim();
+      // 이미지는 이 화면에서 다루지 않는다(image_url 은 그대로 유지).
       // 장소 재검색으로 좌표가 바뀐 경우만
       if (coords) {
         if (coords.lat !== item.latitude) body.latitude = coords.lat;
@@ -130,6 +128,7 @@ export default function EditScheduleModal({
   return (
     <ModalShell
       visible={visible}
+      leading="back"
       title="일정 편집"
       onClose={onClose}
       onSave={handleSave}
@@ -158,12 +157,6 @@ export default function EditScheduleModal({
             label="종료 시각"
             value={endTime}
             onChangeText={setEndTime}
-          />
-          <Field
-            label="이미지 URL(선택)"
-            value={imageUrl}
-            onChangeText={setImageUrl}
-            placeholder="https://…"
           />
         </>
       ) : (

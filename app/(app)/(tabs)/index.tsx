@@ -8,6 +8,7 @@ import {
   ImageBackground,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,13 +26,35 @@ import {
 } from "@/src/features/travel/format";
 import { useCurrentTravel } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
+import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // Figma 내보내기 아이콘 에셋 (Metro 는 대소문자 구분 — 실제 파일명 케이스와 정확히 일치시킬 것)
 const ICONS = {
   ticket: require("../../../assets/images/Ticket.png"),
-  main: require("../../../assets/images/Main.png"),
+  main: require("../../../assets/images/Main1.png"),
 };
+
+/** 메인 배너 슬라이드 3장 — 좌우로 넘겨 본다. */
+const HERO_SLIDES = [
+  {
+    image: require("../../../assets/images/Main1.png"),
+    tag: "AI 일정추천",
+    lines: ["취향만 고르면", "일정은 AI가 짜드려요"],
+  },
+  {
+    image: require("../../../assets/images/Main2.png"),
+    tag: "여행 영상 제작",
+    lines: ["천천히 가는 만큼,", "더 많이 담아갑니다"],
+  },
+  {
+    image: require("../../../assets/images/Main3.png"),
+    tag: "내일로패스",
+    lines: ["우리의 청춘을 연결하는", "한 장의 패스"],
+  },
+] as const;
+
+const HERO_HEIGHT = verticalScale(198);
 
 const TOOLTIP_COLOR = "#5E84F4"; // 상단 + 아래 말풍선
 const TOOLTIP_W = scale(100);
@@ -58,7 +81,13 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: verticalScale(32) }}
+        contentContainerStyle={{
+          // 현재 여행 카드는 absolute 로 떠 있어 콘텐츠를 밀어내지 못한다.
+          // 카드가 있을 때만 그 높이(77)+아래 여백(27)만큼 더 비워 마지막 항목이 가리지 않게 한다.
+          paddingBottom: currentTravel
+            ? verticalScale(32 + 77 + 27)
+            : verticalScale(32),
+        }}
       >
         <Header />
 
@@ -95,12 +124,14 @@ function Header() {
       className="flex-row items-center justify-between"
       style={{
         paddingHorizontal: scale(20),
+        // 앱 전체 상단바와 같은 높이로 맞추기 위한 여백.
+        marginTop: verticalScale(6),
         height: verticalScale(44),
       }}
     >
       <Text
-        className="font-bold text-gray-900"
-        style={{ fontSize: moderateScale(20) }}
+        className="text-gray-900"
+        style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
       >
         트레일러
       </Text>
@@ -140,6 +171,8 @@ function Header() {
 /* State A: 여행 없음 — 프로모션 히어로                                 */
 /* ------------------------------------------------------------------ */
 function PromoHero() {
+  const { width } = useWindowDimensions();
+  const [slide, setSlide] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
   // 홈을 떠날 때 다음 문구로 넘겨, 다시 들어오면 번갈아 보이게 한다(초기 진입 깜빡임 없음).
   useFocusEffect(
@@ -153,77 +186,78 @@ function PromoHero() {
 
   return (
     <View>
-      {/* 배경 이미지 배너 (기차탭) 360 x 198 */}
+      {/* 배경 이미지 배너 360 x 198 — 좌우로 3장 넘김 */}
       <View
         className="overflow-hidden"
-        style={{ height: verticalScale(198), ...CARD_ELEVATION }}
+        style={{ height: HERO_HEIGHT, ...CARD_ELEVATION }}
       >
-        <ImageBackground
-          source={ICONS.main}
-          resizeMode="cover"
-          style={{ flex: 1 }}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          // 화면 폭을 슬라이드 한 장으로 삼는다(배너가 좌우 여백 없이 꽉 참).
+          onMomentumScrollEnd={(e) =>
+            setSlide(Math.round(e.nativeEvent.contentOffset.x / width))
+          }
         >
-          {/* AI 일정추천 — Bold 12, X19 / Y122 */}
-          <Text
-            className="text-teal-400 font-bold"
-            style={{
-              position: "absolute",
-              left: scale(19),
-              top: verticalScale(40),
-              fontSize: moderateScale(12),
-            }}
-          >
-            AI 일정추천
-          </Text>
-
-          {/* 본문 — 16, X19 / Y147.5, 165.5 */}
-          <Text
-            className="text-white font-bold"
-            style={{
-              position: "absolute",
-              left: scale(19),
-              top: verticalScale(65.5),
-              fontSize: moderateScale(16),
-            }}
-          >
-            내일로패스 끊고
-          </Text>
-          <Text
-            className="text-white font-bold"
-            style={{
-              position: "absolute",
-              left: scale(19),
-              top: verticalScale(83.5),
-              fontSize: moderateScale(16),
-            }}
-          >
-            여행의 순간을 즐겨요
-          </Text>
-
-          {/* 우하단 인디케이터 배지 */}
-          <View
-            className="absolute flex-row items-center bg-black/40 rounded-full"
-            style={{
-              bottom: verticalScale(14),
-              right: scale(14),
-              paddingHorizontal: scale(10),
-              paddingVertical: verticalScale(4),
-              gap: scale(4),
-            }}
-          >
-            <Text
-              className="text-white font-semibold"
-              style={{ fontSize: moderateScale(12) }}
+          {HERO_SLIDES.map((s) => (
+            <ImageBackground
+              key={s.tag}
+              source={s.image}
+              resizeMode="cover"
+              style={{ width, height: HERO_HEIGHT }}
             >
-              1/3
-            </Text>
-            <MaterialCommunityIcons
-              name="plus"
-              size={moderateScale(13)}
-              color="#FFFFFF"
-            />
-          </View>
-        </ImageBackground>
+              {/* 태그 — Bold 12, X19 / Y122 */}
+              <Text
+                className="text-teal-400"
+                style={{
+                  position: "absolute",
+                  left: scale(19),
+                  top: verticalScale(40),
+                  fontSize: moderateScale(13),
+                  fontWeight: 650 as never,
+                }}
+              >
+                {s.tag}
+              </Text>
+
+              {/* 본문 2줄 — 16, X19 / Y147.5, 165.5 */}
+              {s.lines.map((line, i) => (
+                <Text
+                  key={line}
+                  className="text-white"
+                  style={{
+                    position: "absolute",
+                    left: scale(19),
+                    top: verticalScale(65.5 + i * 19),
+                    fontSize: moderateScale(17),
+                    fontWeight: 650 as never,
+                  }}
+                >
+                  {line}
+                </Text>
+              ))}
+            </ImageBackground>
+          ))}
+        </ScrollView>
+
+        {/* 우하단 인디케이터 — 넘길 때마다 숫자만 바뀐다 */}
+        <View
+          className="absolute items-center bg-black/40 rounded-full"
+          style={{
+            bottom: verticalScale(14),
+            right: scale(14),
+            paddingHorizontal: scale(10),
+            paddingVertical: verticalScale(4),
+          }}
+        >
+          <Text
+            className="text-white font-semibold"
+            style={{ fontSize: moderateScale(12) }}
+          >
+            {slide + 1}/{HERO_SLIDES.length}
+          </Text>
+        </View>
       </View>
 
       {/* 말풍선 — 문구에 따라 위치만 다르고, 둘 다 같은 CSS 텍스트(font-semibold) */}
@@ -282,14 +316,17 @@ function PromoHero() {
         </View>
       </View>
 
-      {/* 내일로 패스 예약하기 — 360 x 29, #F2F2F2 */}
+      {/* 내일로 패스 예약하기 — 360 x 29, #F2F2F2. 탭하면 코레일 안내 페이지(웹) */}
       <Pressable
-        className="flex-row items-center justify-center"
+        onPress={() => openExternalUrl(NAEILRO_PASS_URL)}
+        className="flex-row items-center justify-center active:opacity-70"
         style={{
           height: verticalScale(29),
           backgroundColor: "#F2F2F2",
           gap: scale(6),
         }}
+        accessibilityRole="link"
+        accessibilityLabel="내일로 패스 예약하기"
       >
         <Image
           source={ICONS.ticket}
@@ -319,14 +356,22 @@ function SectionHeader() {
   return (
     <View>
       <Text
-        className="font-semibold"
-        style={{ color: "#668DFF", fontSize: moderateScale(14) }}
+        style={{
+          color: "#668DFF",
+          fontSize: moderateScale(14),
+          fontWeight: 650 as never,
+          marginTop: verticalScale(10),
+        }}
       >
-        실시간 여행 피드
+        어디로 떠나볼까요?
       </Text>
       <Text
-        className="text-gray-900 font-bold"
-        style={{ fontSize: moderateScale(20), marginTop: verticalScale(4) }}
+        className="text-gray-900"
+        style={{
+          fontSize: moderateScale(20),
+          marginTop: verticalScale(4),
+          fontWeight: 650 as never,
+        }}
       >
         지금 사람들이 떠나는 여행 보기
       </Text>
@@ -504,8 +549,8 @@ function ThemedPlacesSection() {
         style={{ paddingHorizontal: scale(20) }}
       >
         <Text
-          className="text-gray-900 font-bold"
-          style={{ fontSize: moderateScale(20) }}
+          className="text-gray-900"
+          style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
         >
           테마별 여행지
         </Text>
@@ -587,14 +632,21 @@ function ThemedPlacesContent({
             }}
           >
             <Text
-              className="text-white font-bold"
-              style={{ fontSize: moderateScale(17) }}
+              className="text-white"
+              style={{
+                fontSize: moderateScale(17),
+                fontWeight: 650 as never,
+              }}
             >
               {THEMED_EYEBROW}
             </Text>
             <Text
-              className="text-white font-bold"
-              style={{ fontSize: moderateScale(17), marginTop: verticalScale(4) }}
+              className="text-white"
+              style={{
+                fontSize: moderateScale(17),
+                marginTop: verticalScale(4),
+                fontWeight: 650 as never,
+              }}
               numberOfLines={2}
             >
               {title}
@@ -689,9 +741,19 @@ function ThemedPlaceRow({
   place: ThemePlaceCard;
   last: boolean;
 }) {
+  // 프리시드(seed.ts)에는 content_id 가 없어 상세로 갈 수 없다 → 그때만 눌리지 않게.
+  const contentId = place.content_id;
   return (
-    <View
-      className="flex-row items-center"
+    <Pressable
+      onPress={() =>
+        contentId &&
+        router.push({
+          pathname: "/place/[contentId]",
+          params: { contentId },
+        })
+      }
+      disabled={!contentId}
+      className="flex-row items-center active:opacity-70"
       style={{ marginBottom: last ? 0 : verticalScale(18) }}
     >
       <View
@@ -729,7 +791,7 @@ function ThemedPlaceRow({
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

@@ -65,3 +65,14 @@ export async function logoutAll(refreshToken: string): Promise<void> {
   if (USE_MOCK) return;
   await api.post("/api/auth/logout-all", { refresh_token: refreshToken });
 }
+
+/**
+ * DELETE /api/auth/me — 회원 탈퇴.
+ * 서버가 사용자를 소프트 삭제(deleted_at)하고 모든 refresh token·FCM 토큰을 정리한다.
+ * 탈퇴 후 같은 소셜 계정으로 다시 로그인하면 **새 유저**로 가입된다(이전 기록과 무관).
+ * 응답 data 는 null. access token 인증 필요.
+ */
+export async function deleteAccount(): Promise<void> {
+  if (USE_MOCK) return;
+  await api.delete<CommonResponse<null>>("/api/auth/me");
+}

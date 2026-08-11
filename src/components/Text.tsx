@@ -16,12 +16,18 @@ import {
  */
 
 // app/_layout.tsx 의 useFonts 키와 일치해야 함.
+//
+// ⚠️ 700(=font-bold / fontWeight:"bold")도 Pretendard-650 을 쓴다.
+//    앱 전체 굵은 글씨를 한 단계 얇게 통일하기로 해서, 화면 83곳의 className 을
+//    일일이 고치는 대신 여기 매핑 한 곳에서 처리한다.
+//    다시 진짜 Bold 로 되돌리려면 700 의 family 를 "Pretendard-Bold" 로 바꾸면 된다.
+//    (Pretendard-Bold.otf 는 계속 로드돼 있으므로 그것만 바꾸면 즉시 복구)
 const STATIC_FAMILIES: { weight: number; family: string }[] = [
   { weight: 400, family: "Pretendard-Regular" },
   { weight: 500, family: "Pretendard-Medium" },
   { weight: 600, family: "Pretendard-SemiBold" },
-  { weight: 650, family: "Pretendard-650" }, // 제목(700)보다 얇고 SemiBold(600)보다 굵은 본문용
-  { weight: 700, family: "Pretendard-Bold" },
+  { weight: 650, family: "Pretendard-650" },
+  { weight: 700, family: "Pretendard-650" },
 ];
 
 function toNumber(w: TextStyle["fontWeight"]): number {

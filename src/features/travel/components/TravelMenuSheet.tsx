@@ -15,6 +15,8 @@ export default function TravelMenuSheet({
   visible,
   onClose,
   onMakeVideo,
+  onChangeCover,
+  onRemoveCover,
   onRename,
   onDelete,
 }: {
@@ -22,6 +24,8 @@ export default function TravelMenuSheet({
   onClose: () => void;
   /** 아직 미구현이면 undefined 로 두면 비활성 표시. */
   onMakeVideo?: () => void;
+  onChangeCover: () => void;
+  onRemoveCover: () => void;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -47,6 +51,9 @@ export default function TravelMenuSheet({
           }}
         >
           <Row label="내 여행 영상 만들기" onPress={onMakeVideo} />
+          <Row label="대표 사진 바꾸기" onPress={onChangeCover} />
+          {/* 해제해도 사진이 사라지는 게 아니라 기본 썸네일로 돌아간다 — 문구로 구분. */}
+          <Row label="대표 사진 기본으로" onPress={onRemoveCover} />
           <Row label="여행 이름 바꾸기" onPress={onRename} />
           <Row label="삭제하기" onPress={onDelete} danger />
         </Pressable>

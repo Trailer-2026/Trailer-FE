@@ -36,13 +36,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
+        // TR 로고(Entry.png) + '트레일러' 를 합쳐 만든 이미지.
+        // 네이티브 스플래시는 이미지 한 장만 그릴 수 있어(텍스트 렌더 불가) 미리 합쳐 둔다.
+        // 원본을 바꾸려면 Entry.png 로 다시 합성할 것.
+        image: "./assets/images/splash-entry.png",
+        // Android 12+ 는 스플래시 아이콘을 원형으로 마스킹한다(288dp 캔버스의 안쪽 2/3=192dp 만 보임).
+        // 200 이면 로고 오른쪽 끝이 안전선을 넘어 깎여서 190 으로 줄였다.
+        imageWidth: 190,
         resizeMode: "contain",
         // 앱 진입 버퍼링 화면 색.
-        backgroundColor: "#7292EE",
+        backgroundColor: "#5E84F4",
         dark: {
-          backgroundColor: "#7292EE",
+          backgroundColor: "#5E84F4",
         },
       },
     ],

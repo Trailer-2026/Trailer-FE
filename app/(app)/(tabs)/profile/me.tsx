@@ -11,6 +11,7 @@ import { Text } from "@/src/components/Text";
 import { pickProfileImage } from "@/src/features/user/image";
 import { useMyProfile, useUpdateProfileImage } from "@/src/features/user/queries";
 import { ProviderIcon } from "@/src/features/user/social-icon";
+import { HEADER_HEIGHT } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const HEADER_BG = "#EDF0FB";
@@ -50,7 +51,8 @@ export default function MyProfileScreen() {
             paddingBottom: verticalScale(28),
           }}
         >
-          <View style={{ height: verticalScale(40), justifyContent: "center" }}>
+          {/* 뒤로+제목 줄 — 다른 화면 상단바와 같은 높이(44)에 세로 중앙. */}
+          <View style={{ height: HEADER_HEIGHT, justifyContent: "center" }}>
             <Pressable
               onPress={() => router.back()}
               hitSlop={8}
@@ -59,8 +61,12 @@ export default function MyProfileScreen() {
             >
               <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
               <Text
-                className="font-bold text-gray-900"
-                style={{ fontSize: moderateScale(17), marginLeft: scale(10) }}
+                className="text-gray-900"
+                style={{
+                  fontSize: moderateScale(17),
+                  marginLeft: scale(10),
+                  fontWeight: 650 as never,
+                }}
               >
                 내 프로필
               </Text>
