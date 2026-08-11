@@ -8,6 +8,7 @@ import {
   ImageBackground,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,8 +32,29 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 // Figma 내보내기 아이콘 에셋 (Metro 는 대소문자 구분 — 실제 파일명 케이스와 정확히 일치시킬 것)
 const ICONS = {
   ticket: require("../../../assets/images/Ticket.png"),
-  main: require("../../../assets/images/Main.png"),
+  main: require("../../../assets/images/Main1.png"),
 };
+
+/** 메인 배너 슬라이드 3장 — 좌우로 넘겨 본다. */
+const HERO_SLIDES = [
+  {
+    image: require("../../../assets/images/Main1.png"),
+    tag: "AI 일정추천",
+    lines: ["취향만 고르면", "일정은 AI가 짜드려요"],
+  },
+  {
+    image: require("../../../assets/images/Main2.png"),
+    tag: "여행 영상 제작",
+    lines: ["천천히 가는 만큼,", "더 많이 담아갑니다"],
+  },
+  {
+    image: require("../../../assets/images/Main3.png"),
+    tag: "내일로패스",
+    lines: ["우리의 청춘을 연결하는", "한 장의 패스"],
+  },
+] as const;
+
+const HERO_HEIGHT = verticalScale(198);
 
 const TOOLTIP_COLOR = "#5E84F4"; // 상단 + 아래 말풍선
 const TOOLTIP_W = scale(100);
@@ -96,6 +118,8 @@ function Header() {
       className="flex-row items-center justify-between"
       style={{
         paddingHorizontal: scale(20),
+        // 앱 전체 상단바와 같은 높이로 맞추기 위한 여백.
+        marginTop: verticalScale(6),
         height: verticalScale(44),
       }}
     >
@@ -141,6 +165,8 @@ function Header() {
 /* State A: 여행 없음 — 프로모션 히어로                                 */
 /* ------------------------------------------------------------------ */
 function PromoHero() {
+  const { width } = useWindowDimensions();
+  const [slide, setSlide] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
   // 홈을 떠날 때 다음 문구로 넘겨, 다시 들어오면 번갈아 보이게 한다(초기 진입 깜빡임 없음).
   useFocusEffect(
@@ -154,77 +180,76 @@ function PromoHero() {
 
   return (
     <View>
-      {/* 배경 이미지 배너 (기차탭) 360 x 198 */}
+      {/* 배경 이미지 배너 360 x 198 — 좌우로 3장 넘김 */}
       <View
         className="overflow-hidden"
-        style={{ height: verticalScale(198), ...CARD_ELEVATION }}
+        style={{ height: HERO_HEIGHT, ...CARD_ELEVATION }}
       >
-        <ImageBackground
-          source={ICONS.main}
-          resizeMode="cover"
-          style={{ flex: 1 }}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          // 화면 폭을 슬라이드 한 장으로 삼는다(배너가 좌우 여백 없이 꽉 참).
+          onMomentumScrollEnd={(e) =>
+            setSlide(Math.round(e.nativeEvent.contentOffset.x / width))
+          }
         >
-          {/* AI 일정추천 — Bold 12, X19 / Y122 */}
-          <Text
-            className="text-teal-400 font-bold"
-            style={{
-              position: "absolute",
-              left: scale(19),
-              top: verticalScale(40),
-              fontSize: moderateScale(12),
-            }}
-          >
-            AI 일정추천
-          </Text>
-
-          {/* 본문 — 16, X19 / Y147.5, 165.5 */}
-          <Text
-            className="text-white font-bold"
-            style={{
-              position: "absolute",
-              left: scale(19),
-              top: verticalScale(65.5),
-              fontSize: moderateScale(16),
-            }}
-          >
-            내일로패스 끊고
-          </Text>
-          <Text
-            className="text-white font-bold"
-            style={{
-              position: "absolute",
-              left: scale(19),
-              top: verticalScale(83.5),
-              fontSize: moderateScale(16),
-            }}
-          >
-            여행의 순간을 즐겨요
-          </Text>
-
-          {/* 우하단 인디케이터 배지 */}
-          <View
-            className="absolute flex-row items-center bg-black/40 rounded-full"
-            style={{
-              bottom: verticalScale(14),
-              right: scale(14),
-              paddingHorizontal: scale(10),
-              paddingVertical: verticalScale(4),
-              gap: scale(4),
-            }}
-          >
-            <Text
-              className="text-white font-semibold"
-              style={{ fontSize: moderateScale(12) }}
+          {HERO_SLIDES.map((s) => (
+            <ImageBackground
+              key={s.tag}
+              source={s.image}
+              resizeMode="cover"
+              style={{ width, height: HERO_HEIGHT }}
             >
-              1/3
-            </Text>
-            <MaterialCommunityIcons
-              name="plus"
-              size={moderateScale(13)}
-              color="#FFFFFF"
-            />
-          </View>
-        </ImageBackground>
+              {/* 태그 — Bold 12, X19 / Y122 */}
+              <Text
+                className="text-teal-400 font-bold"
+                style={{
+                  position: "absolute",
+                  left: scale(19),
+                  top: verticalScale(40),
+                  fontSize: moderateScale(12),
+                }}
+              >
+                {s.tag}
+              </Text>
+
+              {/* 본문 2줄 — 16, X19 / Y147.5, 165.5 */}
+              {s.lines.map((line, i) => (
+                <Text
+                  key={line}
+                  className="text-white font-bold"
+                  style={{
+                    position: "absolute",
+                    left: scale(19),
+                    top: verticalScale(65.5 + i * 18),
+                    fontSize: moderateScale(16),
+                  }}
+                >
+                  {line}
+                </Text>
+              ))}
+            </ImageBackground>
+          ))}
+        </ScrollView>
+
+        {/* 우하단 인디케이터 — 넘길 때마다 숫자만 바뀐다 */}
+        <View
+          className="absolute items-center bg-black/40 rounded-full"
+          style={{
+            bottom: verticalScale(14),
+            right: scale(14),
+            paddingHorizontal: scale(10),
+            paddingVertical: verticalScale(4),
+          }}
+        >
+          <Text
+            className="text-white font-semibold"
+            style={{ fontSize: moderateScale(12) }}
+          >
+            {slide + 1}/{HERO_SLIDES.length}
+          </Text>
+        </View>
       </View>
 
       {/* 말풍선 — 문구에 따라 위치만 다르고, 둘 다 같은 CSS 텍스트(font-semibold) */}

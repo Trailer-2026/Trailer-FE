@@ -38,10 +38,11 @@ import {
   type TrainInfo,
 } from "@/src/features/course/types";
 import { useCreateTravel } from "@/src/features/travel/queries";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // http:// 이미지가 안드로이드 cleartext 로 막히거나 서버가 null 로 줄 때의 대체 이미지.
-const PLACEHOLDER_IMAGE = require("../../../assets/images/Main.png");
+const PLACEHOLDER_IMAGE = require("../../../assets/images/Main1.png");
 
 // 플랜 요약 아이콘 (PNG 에셋).
 const ICON_TRAVEL_TIME = require("../../../assets/images/style/Train.png");
@@ -178,8 +179,7 @@ export default function ResultScreen() {
         className="flex-row items-center"
         style={{
           paddingHorizontal: scale(20),
-          paddingTop: verticalScale(16),
-          paddingBottom: verticalScale(6),
+          ...headerBarStyle(),
           gap: scale(3),
         }}
       >
