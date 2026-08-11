@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import TimeWheelSheet from "./TimeWheelSheet";
@@ -92,9 +93,13 @@ export function ModalShell({
           className="flex-row items-center justify-between"
           style={{
             paddingHorizontal: scale(20),
-            // 뒤로 헤더는 앱 공통 화면(약관·프로필 등)과 같은 위 여백을 준다.
-            paddingTop: verticalScale(back ? 16 : 12),
-            paddingBottom: verticalScale(back ? 10 : 12),
+            // 뒤로 헤더는 탭 상단바와 같은 위치에 오도록 앱 공통 기하를 쓴다.
+            ...(back
+              ? headerBarStyle()
+              : {
+                  paddingTop: verticalScale(12),
+                  paddingBottom: verticalScale(12),
+                }),
             borderBottomWidth: 1,
             borderBottomColor: BORDER,
           }}

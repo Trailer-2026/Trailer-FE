@@ -18,6 +18,7 @@ import PlayIcon from "@/src/components/icons/PlayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
+import { HEADER_HEIGHT, HEADER_TOP_GAP } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { describeScheduleError } from "../errors";
@@ -38,7 +39,7 @@ const RAIL_LINE = "#D9DCE1";
 const HOLLOW_RING = "#D1D5DB";
 
 const KTX_LOGO = require("../../../../assets/images/style/ktx.png");
-const PLACEHOLDER = require("../../../../assets/images/Main.png");
+const PLACEHOLDER = require("../../../../assets/images/Main1.png");
 
 const RAIL_W = scale(30);
 const RAIL_GAP = scale(12);
@@ -297,9 +298,10 @@ function Hero({
             style={{
               position: "absolute",
               left: scale(20),
-              top: verticalScale(12),
+              // 히어로 위에 떠 있지만 다른 화면 상단바와 같은 높이에 오도록 맞춘다.
+              top: HEADER_TOP_GAP,
+              height: HEADER_HEIGHT,
               width: scale(28),
-              height: scale(28),
               justifyContent: "center",
             }}
             accessibilityRole="button"

@@ -15,7 +15,8 @@ import {
   useTravelDetail,
 } from "@/src/features/travel/queries";
 import type { ScheduleCreateRequest } from "@/src/features/travel/types";
-import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+import { headerBarStyle } from "@/src/utils/header";
+import { moderateScale, scale } from "@/src/utils/responsive";
 
 import { formatDayDate } from "../../format";
 import {
@@ -117,8 +118,7 @@ function LoadingSheet({
           className="flex-row items-center"
           style={{
             paddingHorizontal: scale(20),
-            paddingTop: verticalScale(16),
-            paddingBottom: verticalScale(10),
+            ...headerBarStyle(),
           }}
         >
           <Pressable

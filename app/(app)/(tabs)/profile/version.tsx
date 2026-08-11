@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 export default function VersionScreen() {
@@ -22,9 +23,8 @@ export default function VersionScreen() {
       <View
         className="flex-row items-center"
         style={{
-          paddingTop: insets.top + verticalScale(16),
+          ...headerBarStyle(insets.top),
           paddingHorizontal: scale(16),
-          paddingBottom: verticalScale(6),
         }}
       >
         <Pressable

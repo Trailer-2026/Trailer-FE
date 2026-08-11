@@ -81,6 +81,8 @@ export default function FeedTab() {
           className="flex-row items-center justify-between"
           style={{
             paddingHorizontal: scale(20),
+            // 앱 전체 상단바와 같은 높이로 맞추기 위한 여백.
+            marginTop: verticalScale(6),
             height: verticalScale(44),
           }}
         >

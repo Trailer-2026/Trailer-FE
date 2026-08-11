@@ -133,6 +133,8 @@ export default function CalendarTab() {
         className="flex-row items-center justify-between bg-white"
         style={{
           paddingHorizontal: scale(20),
+          // 앱 전체 상단바와 같은 높이로 맞추기 위한 여백(다른 화면의 헤더 paddingTop 과 동일).
+          marginTop: verticalScale(6),
           height: verticalScale(44),
         }}
       >

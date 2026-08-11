@@ -9,6 +9,7 @@ import { PrimaryButton } from "@/src/features/course/components/PrimaryButton";
 import { addDays, isSameDay, startOfDay, toIsoDate } from "@/src/features/course/date";
 import { describeScheduleError } from "@/src/features/travel/errors";
 import { useCreateManualTravel } from "@/src/features/travel/queries";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
@@ -76,9 +77,8 @@ export default function ManualTravelScreen() {
       <View
         className="flex-row items-center"
         style={{
-          paddingTop: verticalScale(16),
+          ...headerBarStyle(),
           paddingHorizontal: scale(20),
-          paddingBottom: verticalScale(10),
         }}
       >
         <Pressable
