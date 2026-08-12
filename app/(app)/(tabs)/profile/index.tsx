@@ -108,7 +108,7 @@ export default function ProfileTab() {
         />
       ),
       // 별도 북마크 기능이 없어 릴스 좋아요가 곧 저장이다(서버 설명 기준).
-      onPress: () => router.push("/profile/reels?list=liked"),
+      onPress: () => router.push("/profile/bookmarks"),
     },
   ];
   const menu2: MenuRow[] = [

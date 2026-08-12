@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
@@ -17,7 +17,7 @@ import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
 import { Text } from "@/src/components/Text";
-import { useLikedReels, useMyReels } from "@/src/features/user/queries";
+import { useMyReels } from "@/src/features/user/queries";
 import type { MyReelsItem } from "@/src/features/user/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -33,16 +33,9 @@ const GAP = 2;
  * 뽑으려면 별도 라이브러리가 필요해 그리드에서는 재생하지 않는다.
  */
 export default function MyReelsGridScreen() {
-  // list=liked 면 좋아요(=북마크)한 릴스, 없으면 내가 만든 릴스.
-  const { list } = useLocalSearchParams<{ list?: string }>();
-  const liked = list === "liked";
-
   const { width } = useWindowDimensions();
   const cell = (width - GAP * (COLS - 1)) / COLS;
 
-  // 훅은 조건부로 못 부르니 둘 다 부르고 필요한 쪽만 쓴다(안 쓰는 쪽은 enabled=false).
-  const mineQuery = useMyReels(!liked);
-  const likedQuery = useLikedReels(liked);
   const {
     data: reels = [],
     isLoading,
@@ -52,15 +45,13 @@ export default function MyReelsGridScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = liked ? likedQuery : mineQuery;
+  } = useMyReels();
 
   // ⋯ 로 연 항목 (null 이면 닫힘)
   const [menuFor, setMenuFor] = useState<MyReelsItem | null>(null);
 
   const openPlayer = (item: MyReelsItem) =>
-    router.push(
-      `/profile/reels-player?reels_idx=${item.reels_idx}${liked ? "&list=liked" : ""}`,
-    );
+    router.push(`/profile/reels-player?reels_idx=${item.reels_idx}`);
 
   const openStudio = (item: MyReelsItem) => {
     setMenuFor(null);
@@ -99,7 +90,7 @@ export default function MyReelsGridScreen() {
           className="font-semibold text-gray-900"
           style={{ fontSize: moderateScale(16) }}
         >
-          {liked ? "북마크" : "내 영상"}
+          내 영상
         </Text>
       </View>
 
@@ -113,7 +104,7 @@ export default function MyReelsGridScreen() {
           style={{ paddingHorizontal: scale(24), gap: verticalScale(10) }}
         >
           <Text className="text-gray-700" style={{ fontSize: moderateScale(14) }}>
-            {liked ? "북마크를" : "내 영상을"} 불러오지 못했어요.
+            내 영상을 불러오지 못했어요.
           </Text>
           <Text
             className="text-center text-gray-400"
@@ -144,12 +135,10 @@ export default function MyReelsGridScreen() {
           style={{ gap: verticalScale(12) }}
         >
           <Text className="text-gray-500" style={{ fontSize: moderateScale(14) }}>
-            {liked
-              ? "좋아요한 영상이 없어요. 피드에서 하트를 눌러보세요."
-              : "아직 만든 영상이 없어요."}
+            아직 만든 영상이 없어요.
           </Text>
           <Pressable
-            onPress={() => router.push(liked ? "/feed" : "/reels/create")}
+            onPress={() => router.push("/reels/create")}
             className="rounded-full active:opacity-80"
             style={{
               backgroundColor: ACCENT,
@@ -161,7 +150,7 @@ export default function MyReelsGridScreen() {
               className="font-semibold text-white"
               style={{ fontSize: moderateScale(13) }}
             >
-              {liked ? "릴스 보러가기" : "여행영상 만들기"}
+              여행영상 만들기
             </Text>
           </Pressable>
         </View>
@@ -189,8 +178,7 @@ export default function MyReelsGridScreen() {
               item={item}
               size={cell}
               onPress={() => openPlayer(item)}
-              // 좋아요 목록은 남의 영상이라 편집할 수 없다 → 더보기 자체를 숨긴다.
-              onMenu={liked ? undefined : () => setMenuFor(item)}
+              onMenu={() => setMenuFor(item)}
             />
           )}
         />
@@ -215,8 +203,7 @@ function GridCell({
   item: MyReelsItem;
   size: number;
   onPress: () => void;
-  /** 없으면 더보기(⋯) 버튼을 그리지 않는다(남의 영상). */
-  onMenu?: () => void;
+  onMenu: () => void;
 }) {
   // 세로(9:16) 영상이라 칸도 세로로 길게. 1.5 면 3열에서도 화면이 답답하지 않다.
   const height = size * 1.5;
@@ -243,7 +230,6 @@ function GridCell({
       )}
 
       {/* ⋯ — 누르면 편집 메뉴. 칸 탭(재생)과 겹치지 않게 눌리는 영역을 분리한다. */}
-      {onMenu ? (
       <Pressable
         onPress={onMenu}
         hitSlop={10}
@@ -266,7 +252,6 @@ function GridCell({
           ⋯
         </Text>
       </Pressable>
-      ) : null}
 
       {/* 지역 — 좌상단 핀 배지(API 규격) */}
       {item.region ? (
