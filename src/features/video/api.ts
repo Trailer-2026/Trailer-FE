@@ -86,6 +86,15 @@ export async function renderPhotosOrdered(
 /** 서버 상한(100MB). 넘으면 413 이 오는데 그 응답은 공통 봉투가 아니라 안내가 어렵다. */
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
+/** 업로드 전 파일 크기(바이트). 읽을 수 없으면 null — 그때는 서버 판정에 맡긴다. */
+export function videoFileSize(uri: string): number | null {
+  try {
+    return new File(uri).size ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 직접 만든 영상을 릴스로 업로드. POST /api/videos/reels/upload (multipart/form-data).
  *
@@ -97,8 +106,9 @@ export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 export async function uploadReelsVideo(
   video: { uri: string; name: string; type: string },
   title?: string,
+  onProgress?: (percent: number) => void,
 ): Promise<ReelsUploadResponse> {
-  const size = new File(video.uri).size;
+  const size = videoFileSize(video.uri);
   if (size != null && size > MAX_UPLOAD_BYTES) {
     throw new Error("100MB 이하 영상만 업로드할 수 있어요.");
   }
@@ -114,8 +124,15 @@ export async function uploadReelsVideo(
   const res = await api.post<CommonResponse<ReelsUploadResponse>>(
     "/api/videos/reels/upload",
     form,
-    // 최대 100MB 업로드 — 모바일 회선에서 전역 10s 로는 못 끝낸다.
-    { timeout: 300000 },
+    {
+      // 최대 100MB 업로드 — 모바일 회선에서 전역 10s 로는 못 끝낸다.
+      timeout: 300000,
+      // 폰 업링크로 수십 MB 는 수 분이 걸린다 — 진행률이 없으면 멈춘 것처럼 보인다.
+      onUploadProgress: (e) => {
+        if (!onProgress || !e.total) return;
+        onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+      },
+    },
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;

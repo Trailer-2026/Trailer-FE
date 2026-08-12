@@ -82,7 +82,9 @@ export function useUploadReelsVideo() {
     mutationFn: (vars: {
       video: { uri: string; name: string; type: string };
       title?: string;
-    }) => uploadReelsVideo(vars.video, vars.title),
+      /** 0~100 — 호출부가 버튼에 진행률을 그린다. */
+      onProgress?: (percent: number) => void;
+    }) => uploadReelsVideo(vars.video, vars.title, vars.onProgress),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
       queryClient.invalidateQueries({ queryKey: reelsKeys.all });
