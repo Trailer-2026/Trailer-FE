@@ -44,10 +44,16 @@ export async function postReelsComment(
  */
 export async function getRecommendedReels(
   exclude: number[],
+  limit?: number,
 ): Promise<ReelsRecommendItem[]> {
   const res = await api.get<CommonResponse<ReelsRecommendItem[]>>(
     "/api/videos/reels/recommend",
-    { params: exclude.length ? { exclude: exclude.join(",") } : undefined },
+    {
+      params: {
+        ...(exclude.length ? { exclude: exclude.join(",") } : {}),
+        ...(limit ? { limit } : {}),
+      },
+    },
   );
   return res.data.data ?? [];
 }

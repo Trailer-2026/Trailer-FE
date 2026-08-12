@@ -20,6 +20,8 @@ import { Text } from "@/src/components/Text";
 import type { Theme } from "@/src/features/course/types";
 import { useThemedPlaces } from "@/src/features/place/queries";
 import type { ThemePlaceCard } from "@/src/features/place/types";
+import { useReelsPreview } from "@/src/features/reels/queries";
+import type { Reels } from "@/src/features/reels/types";
 import {
   formatTravelPeriod,
   travelStatusLabel,
@@ -60,13 +62,6 @@ const TOOLTIP_COLOR = "#5E84F4"; // 상단 + 아래 말풍선
 const TOOLTIP_W = scale(100);
 // 말풍선 문구 — 홈에 들어올 때마다 번갈아 노출.
 const TOOLTIP_MESSAGES = ["AI 일정 만들기", "여행영상 만들기"] as const;
-
-// 실시간 여행 피드(추천) 카드 — 임의 배경 이미지 + 캡션
-const FEED_CARDS = [
-  { id: "1", caption: "경주에서 해볼만한 것" },
-  { id: "2", caption: "부산에서 20대가 노는 곳" },
-  { id: "3", caption: "여수 밤바다 즐기기" },
-];
 
 // 안드로이드 카드 입체감용 공통 스타일 (NativeWind shadow-* 가 흐릿하게 보이는 문제 보완)
 const CARD_ELEVATION = {
@@ -379,7 +374,22 @@ function SectionHeader() {
   );
 }
 
+/** 추천 릴스 3개(GET /api/videos/reels/recommend?limit=3). 탭하면 피드 탭으로. */
 function FeedCarousel() {
+  const { data: reels = [], isLoading } = useReelsPreview(3);
+
+  if (isLoading) {
+    return (
+      <View
+        className="items-center justify-center"
+        style={{ height: verticalScale(250) }}
+      >
+        <ActivityIndicator color="#9CA3AF" />
+      </View>
+    );
+  }
+  if (reels.length === 0) return null;
+
   return (
     <ScrollView
       horizontal
@@ -389,42 +399,32 @@ function FeedCarousel() {
         gap: scale(12),
       }}
     >
-      {FEED_CARDS.map((card) => (
-        <FeedCard key={card.id} {...card} />
+      {reels.map((r) => (
+        <FeedCard key={r.reels_idx} reels={r} />
       ))}
     </ScrollView>
   );
 }
 
-function FeedCard({ caption }: { caption: string }) {
+function FeedCard({ reels }: { reels: Reels }) {
   return (
-    <View
-      className="overflow-hidden"
+    <Pressable
+      onPress={() => router.navigate("/feed")}
+      className="overflow-hidden active:opacity-80"
       style={{
         width: scale(168),
         height: verticalScale(250),
         borderRadius: scale(16),
         ...CARD_ELEVATION,
       }}
+      accessibilityRole="button"
+      accessibilityLabel={reels.caption || "추천 여행영상"}
     >
-      {/* TODO: 임의 배경(Main.png 임시) — 추후 카드별 실제 이미지로 교체 */}
-      <ImageBackground
-        source={ICONS.main}
-        resizeMode="cover"
+      {/* 썸네일. 렌더 전 옛 릴스는 thumbnail_url 이 null → Main1 로 폴백 */}
+      <ThemedRemoteImage
+        uri={reels.thumbnail_url}
         style={{ flex: 1, justifyContent: "flex-end" }}
       >
-        {/* 우상단 더보기 */}
-        <View
-          className="absolute"
-          style={{ top: verticalScale(10), right: scale(10) }}
-        >
-          <MaterialCommunityIcons
-            name="dots-vertical"
-            size={moderateScale(20)}
-            color="#FFFFFF"
-          />
-        </View>
-
         {/* 하단 캡션 (가독성용 어두운 오버레이) */}
         <View
           className="bg-black/40"
@@ -435,13 +435,27 @@ function FeedCard({ caption }: { caption: string }) {
         >
           <Text
             className="text-white font-semibold"
+            numberOfLines={2}
             style={{ fontSize: moderateScale(15) }}
           >
-            {caption}
+            {reels.caption}
           </Text>
+          {/* 지역 태그 — 옛 릴스는 null 이라 숨긴다 */}
+          {reels.location ? (
+            <Text
+              className="text-white/80"
+              numberOfLines={1}
+              style={{
+                fontSize: moderateScale(12),
+                marginTop: verticalScale(4),
+              }}
+            >
+              {reels.location}
+            </Text>
+          ) : null}
         </View>
-      </ImageBackground>
-    </View>
+      </ThemedRemoteImage>
+    </Pressable>
   );
 }
 

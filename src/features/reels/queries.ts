@@ -145,6 +145,18 @@ function toReels(item: ReelsRecommendItem): Reels {
 }
 
 /**
+ * 홈 '지금 사람들이 떠나는 여행' 카드용 — 추천에서 limit 개만 받는다.
+ * 피드와 달리 무한 스크롤이 없어 useQuery 하나로 끝난다.
+ */
+export function useReelsPreview(limit: number) {
+  return useQuery({
+    queryKey: reelsKeys.preview(limit),
+    queryFn: async () => (await getRecommendedReels([], limit)).map(toReels),
+    staleTime: 1000 * 60, // 1분 — 홈을 오갈 때마다 다시 받지 않게
+  });
+}
+
+/**
  * 릴스 추천 무한 스크롤.
  *
  * 페이지 파라미터는 지금까지 받은 reels_idx 전부(= exclude). 서버는 제외하고 남은 게
