@@ -216,14 +216,13 @@ export default function FeedTab() {
     [isMyReels, downloadingIdx],
   );
 
-  // 지금 화면을 채우고 있는 카드 = 재생할 카드.
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // 지금 화면을 채우고 있는 카드의 위치 = 재생할 카드.
+  // 한 바퀴 돌면 같은 릴스가 다시 오므로 reels_idx 가 아니라 인덱스로 판정한다.
   const [visiblePosition, setVisiblePosition] = useState(0);
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const token = viewableItems[0];
       if (!token) return; // 카드 전환 중 — 직전 상태를 유지해 재생이 끊기지 않게 한다
-      setActiveIdx((token.item as Reels).reels_idx);
       if (token.index != null) setVisiblePosition(token.index);
     },
   ).current;
@@ -235,8 +234,7 @@ export default function FeedTab() {
     p.loop = true;
   });
 
-  const activeUrl =
-    reels.find((r) => r.reels_idx === activeIdx)?.video_url ?? null;
+  const activeUrl = reels[visiblePosition]?.video_url ?? null;
 
   // 보이는 카드가 바뀌면 소스만 갈아끼운다(플레이어 재생성 없음).
   useEffect(() => {
@@ -269,11 +267,11 @@ export default function FeedTab() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: Reels }) => (
+    ({ item, index }: { item: Reels; index: number }) => (
       <ReelsCard
         reels={{ ...item, ...likes[item.reels_idx] }}
         height={viewportHeight}
-        active={isFocused && item.reels_idx === activeIdx}
+        active={isFocused && index === visiblePosition}
         player={player}
         onToggleLike={toggleLike}
         onOpenComments={setCommentsFor}
@@ -287,7 +285,7 @@ export default function FeedTab() {
       viewportHeight,
       toggleLike,
       likes,
-      activeIdx,
+      visiblePosition,
       isFocused,
       player,
       onShare,
@@ -308,7 +306,8 @@ export default function FeedTab() {
         <FlatList
           ref={listRef}
           data={reels}
-          keyExtractor={(item) => String(item.reels_idx)}
+          // 한 바퀴 돌면 같은 reels_idx 가 다시 들어오므로 위치까지 붙여 유일하게 만든다.
+          keyExtractor={(item, index) => `${item.reels_idx}-${index}`}
           renderItem={renderItem}
           pagingEnabled
           snapToInterval={viewportHeight}

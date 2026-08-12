@@ -164,11 +164,18 @@ export function useReelsPreview(limit: number) {
 }
 
 /**
+ * exclude 로 넘길 최대 개수 — 쿼리스트링이 무한정 길어지면 요청이 깨진다.
+ * 넘치면 오래 본 것부터 버린다(그만큼 다시 나올 수 있다).
+ */
+const EXCLUDE_LIMIT = 200;
+
+/**
  * 릴스 추천 무한 스크롤.
  *
- * 페이지 파라미터는 지금까지 받은 reels_idx 전부(= exclude). 서버는 제외하고 남은 게
- * 없으면 exclude 를 무시하고 처음부터 다시 추천하므로, 새 릴스가 하나도 없는 페이지가
- * 오면 한 바퀴 돈 것으로 보고 멈춘다.
+ * 페이지 파라미터는 지금까지 본 reels_idx 전부(= exclude) — 서버가 그만큼 빼고 새로 뽑는다.
+ * 남은 게 없으면 서버가 exclude 를 무시하고 처음부터 다시 추천하는데, 그 반복분도 그대로
+ * 이어 붙여 스크롤이 끊기지 않게 한다(릴스가 아예 없을 때만 멈춘다).
+ * 같은 릴스가 여러 번 들어올 수 있으므로 화면 쪽 key·재생 판정은 인덱스 기준이다(feed.tsx).
  */
 export function useRecommendedReels() {
   return useInfiniteQuery({
@@ -176,24 +183,12 @@ export function useRecommendedReels() {
     queryFn: ({ pageParam }) => getRecommendedReels(pageParam),
     initialPageParam: [] as number[],
     getNextPageParam: (lastPage, allPages) => {
-      const seen = new Set(
-        allPages.slice(0, -1).flatMap((page) => page.map((r) => r.reels_idx)),
-      );
-      if (lastPage.every((r) => seen.has(r.reels_idx))) return undefined;
-      lastPage.forEach((r) => seen.add(r.reels_idx));
-      return [...seen];
+      if (lastPage.length === 0) return undefined; // 추천할 릴스가 하나도 없다
+      const seen = allPages.flatMap((page) => page.map((r) => r.reels_idx));
+      return seen.slice(-EXCLUDE_LIMIT);
     },
     // 스크롤 도중 목록이 뒤바뀌지 않도록 자동 갱신은 하지 않는다.
     staleTime: Infinity,
-    select: (data) => {
-      const seen = new Set<number>();
-      const list: Reels[] = [];
-      for (const item of data.pages.flat()) {
-        if (seen.has(item.reels_idx)) continue; // 서버가 한 바퀴 돌아 겹친 항목
-        seen.add(item.reels_idx);
-        list.push(toReels(item));
-      }
-      return list;
-    },
+    select: (data) => data.pages.flat().map(toReels),
   });
 }
