@@ -20,7 +20,10 @@ import { Text } from "@/src/components/Text";
 import type { Theme } from "@/src/features/course/types";
 import { useThemedPlaces } from "@/src/features/place/queries";
 import type { ThemePlaceCard } from "@/src/features/place/types";
-import { useReelsPreview } from "@/src/features/reels/queries";
+import {
+  HOME_PREVIEW_LIMIT,
+  useReelsPreview,
+} from "@/src/features/reels/queries";
 import type { Reels } from "@/src/features/reels/types";
 import {
   formatTravelPeriod,
@@ -387,9 +390,9 @@ function SectionHeader() {
   );
 }
 
-/** 추천 릴스 3개(GET /api/videos/reels/recommend?limit=3). 탭하면 피드 탭으로. */
+/** 추천 릴스 3개(GET /api/videos/reels/recommend?limit=3). 탭하면 그 릴스부터 피드에서 본다. */
 function FeedCarousel() {
-  const { data: reels = [], isLoading } = useReelsPreview(3);
+  const { data: reels = [], isLoading } = useReelsPreview(HOME_PREVIEW_LIMIT);
 
   if (isLoading) {
     return (
@@ -422,7 +425,14 @@ function FeedCarousel() {
 function FeedCard({ reels }: { reels: Reels }) {
   return (
     <Pressable
-      onPress={() => router.navigate("/feed")}
+      // 피드가 이 릴스를 맨 앞에 세운다 — 데이터는 이미 받아 둔 preview 캐시에서 꺼내
+      // 쓰므로 추가 요청이 없다.
+      onPress={() =>
+        router.navigate({
+          pathname: "/feed",
+          params: { reelsIdx: String(reels.reels_idx) },
+        })
+      }
       className="overflow-hidden active:opacity-80"
       style={{
         width: scale(168),

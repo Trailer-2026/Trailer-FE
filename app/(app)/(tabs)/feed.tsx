@@ -1,10 +1,11 @@
 import { useIsFocused } from "@react-navigation/native";
+import { useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer } from "expo-video";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +24,9 @@ import ShareUpIcon from "@/src/components/icons/ShareUpIcon";
 import { Text } from "@/src/components/Text";
 import CommentsSheet from "@/src/features/reels/components/CommentsSheet";
 import ReelsCard from "@/src/features/reels/components/ReelsCard";
+import { reelsKeys } from "@/src/features/reels/keys";
 import {
+  HOME_PREVIEW_LIMIT,
   useRecommendedReels,
   useToggleReelsLike,
 } from "@/src/features/reels/queries";
@@ -40,8 +43,39 @@ const TOOLTIP_COLOR = "#5E84F4";
 
 export default function FeedTab() {
   const insets = useSafeAreaInsets();
-  const { data: reels = [], isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useRecommendedReels();
+  const {
+    data: recommended = [],
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useRecommendedReels();
+
+  // 홈 '지금 사람들이 떠나는 여행' 카드로 들어온 경우 그 릴스를 맨 앞에 세운다.
+  // 실물 데이터는 홈이 이미 받아 둔 preview 캐시에서 꺼내므로 추가 요청이 없다.
+  const { reelsIdx: fromHome } = useLocalSearchParams<{ reelsIdx?: string }>();
+  const queryClient = useQueryClient();
+  const listRef = useRef<FlatList<Reels>>(null);
+  const [pinned, setPinned] = useState<Reels | null>(null);
+  useEffect(() => {
+    if (!fromHome) return;
+    const preview = queryClient.getQueryData<Reels[]>(
+      reelsKeys.preview(HOME_PREVIEW_LIMIT),
+    );
+    // 캐시가 비었으면(앱 재시작 후 딥링크 등) 그냥 평소 추천 목록으로 둔다.
+    setPinned(preview?.find((r) => String(r.reels_idx) === fromHome) ?? null);
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    // 파라미터는 한 번만 소비한다 — 남겨 두면 탭바로 다시 들어올 때마다 맨 앞으로 튄다.
+    router.setParams({ reelsIdx: "" });
+  }, [fromHome, queryClient]);
+
+  const reels = useMemo(
+    () =>
+      pinned
+        ? [pinned, ...recommended.filter((r) => r.reels_idx !== pinned.reels_idx)]
+        : recommended,
+    [pinned, recommended],
+  );
 
   // 다른 탭으로 가면 소리까지 멈추도록 — 포커스가 없으면 재생 중인 카드도 없다.
   const isFocused = useIsFocused();
@@ -227,6 +261,7 @@ export default function FeedTab() {
         </View>
       ) : viewportHeight > 0 ? (
         <FlatList
+          ref={listRef}
           data={reels}
           keyExtractor={(item) => String(item.reels_idx)}
           renderItem={renderItem}

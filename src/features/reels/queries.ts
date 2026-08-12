@@ -144,6 +144,9 @@ function toReels(item: ReelsRecommendItem): Reels {
   };
 }
 
+/** 홈 카드 개수. 피드가 캐시에서 같은 목록을 찾을 때도 이 값을 쓴다. */
+export const HOME_PREVIEW_LIMIT = 3;
+
 /**
  * 홈 '지금 사람들이 떠나는 여행' 카드용 — 추천에서 limit 개만 받는다.
  * 피드와 달리 무한 스크롤이 없어 useQuery 하나로 끝난다.
