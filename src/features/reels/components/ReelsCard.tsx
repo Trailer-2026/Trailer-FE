@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { VideoView, type VideoPlayer } from "expo-video";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
 import CommentIcon from "@/src/components/icons/CommentIcon";
@@ -63,15 +64,59 @@ export default function ReelsCard({
   sharing = false,
 }: Props) {
   const ActionIcon = mine ? DownloadIcon : ShareIcon;
+
+  // 화면을 탭하면 재생/일시정지. 카드가 바뀌면(호출부가 플레이어를 다시 재생시킨다)
+  // 표시를 원래대로 돌려 놓는다.
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    setPaused(false);
+  }, [active, reels.reels_idx]);
+
+  const togglePlay = () => {
+    if (!active || !reels.video_url) return;
+    if (player.playing) {
+      player.pause();
+      setPaused(true);
+    } else {
+      player.play();
+      setPaused(false);
+    }
+  };
+
   return (
     <View className="w-full bg-black" style={{ height }}>
       {reels.video_url && active ? (
-        <VideoView
-          player={player}
-          style={{ width: "100%", height: "100%" }}
-          contentFit="cover"
-          nativeControls={false}
-        />
+        <Pressable onPress={togglePlay} style={{ width: "100%", height: "100%" }}>
+          <VideoView
+            player={player}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            nativeControls={false}
+          />
+          {/* 일시정지 표시 — 탭으로 멈춘 상태임을 알린다 */}
+          {paused ? (
+            <View
+              className="absolute inset-0 items-center justify-center"
+              pointerEvents="none"
+            >
+              <View
+                className="items-center justify-center rounded-full"
+                style={{
+                  width: moderateScale(64),
+                  height: moderateScale(64),
+                  backgroundColor: "rgba(0,0,0,0.45)",
+                }}
+              >
+                <Text
+                  className="text-white"
+                  style={{ fontSize: moderateScale(24) }}
+                >
+                  ▶
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </Pressable>
       ) : reels.thumbnail_url ? (
         <Image
           source={{ uri: reels.thumbnail_url }}

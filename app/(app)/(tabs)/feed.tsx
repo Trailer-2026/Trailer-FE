@@ -1,5 +1,3 @@
-import Feather from "@expo/vector-icons/Feather";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useIsFocused } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   Share,
   View,
@@ -27,6 +24,7 @@ import ShareUpIcon from "@/src/components/icons/ShareUpIcon";
 import { Text } from "@/src/components/Text";
 import CommentsSheet from "@/src/features/reels/components/CommentsSheet";
 import ReelsCard from "@/src/features/reels/components/ReelsCard";
+import ReportBlockSheet from "@/src/features/reels/components/ReportBlockSheet";
 import { reelsKeys } from "@/src/features/reels/keys";
 import {
   HOME_PREVIEW_LIMIT,
@@ -43,8 +41,6 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // "내 여행영상 만들기" 말풍선 — 메인탭 말풍선과 동일한 CSS 텍스트 버블(색·굵기 통일).
 const TOOLTIP_COLOR = "#5E84F4";
-/** 신고 등 위험 동작 문구 색 — 편집 화면(studio)과 같은 값. */
-const DANGER = "#E5484D";
 
 export default function FeedTab() {
   const insets = useSafeAreaInsets();
@@ -448,131 +444,14 @@ export default function FeedTab() {
         onClose={() => setCommentsFor(null)}
       />
 
-      <MoreSheet
-        reels={moreFor}
+      <ReportBlockSheet
+        visible={moreFor != null}
+        name={moreFor?.author.name ?? "영상"}
+        reportLabel="이 릴스 신고하기"
         onClose={() => setMoreFor(null)}
-        onReport={(r) => blockAuthor(r, "report")}
-        onBlock={(r) => blockAuthor(r, "block")}
+        onReport={() => moreFor && blockAuthor(moreFor, "report")}
+        onBlock={() => moreFor && blockAuthor(moreFor, "block")}
       />
     </View>
-  );
-}
-
-/** ⋯ 메뉴 — 신고·차단 두 줄. 신고 API 가 아직 없어 둘 다 차단으로 처리한다. */
-function MoreSheet({
-  reels,
-  onClose,
-  onReport,
-  onBlock,
-}: {
-  reels: Reels | null;
-  onClose: () => void;
-  onReport: (reels: Reels) => void;
-  onBlock: (reels: Reels) => void;
-}) {
-  return (
-    <Modal
-      visible={reels != null}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
-      <Pressable
-        className="flex-1 justify-end"
-        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        onPress={onClose}
-      >
-        {/* 시트 본문 — 배경 탭으로 닫히지 않게 이벤트를 여기서 끊는다. */}
-        <Pressable
-          onPress={() => {}}
-          style={{
-            backgroundColor: "#1C1C1C",
-            borderTopLeftRadius: scale(16),
-            borderTopRightRadius: scale(16),
-            paddingTop: verticalScale(8),
-            paddingBottom: verticalScale(16),
-          }}
-        >
-          <View
-            style={{
-              paddingHorizontal: scale(20),
-              paddingTop: verticalScale(8),
-              paddingBottom: verticalScale(4),
-            }}
-          >
-            <Text
-              className="text-gray-500"
-              numberOfLines={1}
-              style={{ fontSize: moderateScale(11) }}
-            >
-              {reels?.author.name ?? "영상"}
-            </Text>
-          </View>
-
-          <SheetRow
-            label="이 릴스 신고하기"
-            color={DANGER}
-            icon={
-              <MaterialCommunityIcons
-                name="alarm-light"
-                size={moderateScale(18)}
-                color={DANGER}
-              />
-            }
-            onPress={() => reels && onReport(reels)}
-          />
-          <SheetRow
-            label="이 사용자 차단하기"
-            icon={
-              <Feather
-                name="slash"
-                size={moderateScale(17)}
-                color="#FFFFFF"
-              />
-            }
-            onPress={() => reels && onBlock(reels)}
-          />
-          <SheetRow label="닫기" muted onPress={onClose} />
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function SheetRow({
-  label,
-  muted = false,
-  color,
-  icon,
-  onPress,
-}: {
-  label: string;
-  muted?: boolean;
-  /** 문구 색 override — 신고처럼 위험 동작만 지정한다. */
-  color?: string;
-  icon?: React.ReactNode;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:opacity-60"
-      style={{
-        paddingHorizontal: scale(20),
-        paddingVertical: verticalScale(14),
-        gap: scale(10),
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      {icon}
-      <Text
-        className={muted ? "text-gray-500" : "font-semibold text-white"}
-        style={{ fontSize: moderateScale(14), ...(color ? { color } : null) }}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }

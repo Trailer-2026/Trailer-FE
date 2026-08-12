@@ -15,6 +15,8 @@ import { describeApiError } from "@/src/api/errors";
 import HeartIcon from "@/src/components/icons/HeartIcon";
 import { Text } from "@/src/components/Text";
 import { useBlockUser, useMyProfile } from "@/src/features/user/queries";
+
+import ReportBlockSheet from "./ReportBlockSheet";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import {
@@ -94,20 +96,29 @@ export default function CommentsSheet({
     inputRef.current?.focus();
   };
 
-  // 댓글 길게 누르기 → 차단 메뉴. Alert 의 destructive 버튼이 곧 확인 단계라 한 단계로 끝낸다.
-  const confirmBlock = (comment: ReelsComment) => {
-    if (me?.user_idx === comment.user_idx) return;
+  // 댓글 길게 누르기 → 릴스 ⋯ 와 같은 신고·차단 시트(신고 API 가 없어 둘 다 차단으로 처리).
+  const [moreFor, setMoreFor] = useState<ReelsComment | null>(null);
+
+  const confirmBlock = (comment: ReelsComment, reason: "report" | "block") => {
+    setMoreFor(null);
     const nickname = comment.nickname ?? "이 사용자";
     Alert.alert(
-      `${nickname}님을 차단할까요?`,
+      reason === "report"
+        ? `${nickname}님의 댓글을 신고할까요?`
+        : `${nickname}님을 차단할까요?`,
       "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
       [
         { text: "취소", style: "cancel" },
         {
-          text: "차단하기",
+          text: reason === "report" ? "신고하기" : "차단하기",
           style: "destructive",
           onPress: () =>
             block.mutate(comment.user_idx, {
+              onSuccess: () =>
+                Alert.alert(
+                  reason === "report" ? "신고했어요" : "차단했어요",
+                  "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
+                ),
               onError: (err) =>
                 Alert.alert("차단 실패", describeApiError(err)),
             }),
@@ -142,6 +153,7 @@ export default function CommentsSheet({
   };
 
   return (
+    <>
     <Modal
       visible={reelsIdx != null}
       transparent
@@ -252,7 +264,7 @@ export default function CommentsSheet({
                   depth={item.depth}
                   onReply={startReply}
                   onToggleLike={toggleLike}
-                  onLongPress={confirmBlock}
+                  onLongPress={setMoreFor}
                   blockable={me?.user_idx !== item.comment.user_idx}
                 />
               )}
@@ -347,6 +359,16 @@ export default function CommentsSheet({
         </Pressable>
       </Pressable>
     </Modal>
+
+    <ReportBlockSheet
+      visible={moreFor != null}
+      name={moreFor?.nickname ?? "이 사용자"}
+      reportLabel="이 댓글 신고하기"
+      onClose={() => setMoreFor(null)}
+      onReport={() => moreFor && confirmBlock(moreFor, "report")}
+      onBlock={() => moreFor && confirmBlock(moreFor, "block")}
+    />
+    </>
   );
 }
 
