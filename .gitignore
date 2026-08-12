@@ -53,3 +53,6 @@ GoogleService-Info.plist
 
 # IDE (개인 설정)
 .idea/
+
+# Figma 개인 토큰 (디자인 스펙 조회용 — 앱 번들과 무관)
+.figma-token
