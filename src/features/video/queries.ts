@@ -1,13 +1,16 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
+import { reelsKeys } from "@/src/features/reels/keys";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
+import { userKeys } from "@/src/features/user/keys";
 import {
   cutVideoSection,
   getBgmTracks,
   getRenderStatus,
   insertImageClip,
   renderPhotosOrdered,
+  uploadReelsVideo,
 } from "./api";
 import { videoKeys } from "./keys";
 import type { RenderOptions } from "./types";
@@ -66,6 +69,24 @@ export function useRenderPhotosOrdered() {
       photos: ReelsMediaAsset[];
       options: RenderOptions;
     }) => renderPhotosOrdered(photos, options),
+  });
+}
+
+/**
+ * 직접 만든 영상 업로드. 응답 시점에 이미 완성된 릴스라 폴링 없이 목록만 갱신한다.
+ * (내 영상 목록 + 릴스 추천·홈 카드)
+ */
+export function useUploadReelsVideo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      video: { uri: string; name: string; type: string };
+      title?: string;
+    }) => uploadReelsVideo(vars.video, vars.title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
+    },
   });
 }
 

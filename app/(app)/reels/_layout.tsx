@@ -10,6 +10,8 @@ export default function ReelsLayout() {
       }}
     >
       <Stack.Screen name="create" />
+      {/* 직접 만든 영상 업로드 — 렌더 파이프라인을 타지 않는 단독 화면 */}
+      <Stack.Screen name="upload" />
       <Stack.Screen name="gallery" />
       <Stack.Screen name="edit" />
       {/* 렌더 진행률 → 완료. 추적은 전역(RenderTracker)이 하므로 화면을 떠나도 된다. */}

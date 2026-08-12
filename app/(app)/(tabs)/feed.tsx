@@ -316,10 +316,9 @@ export default function FeedTab() {
             <Pressable
               className="active:opacity-60"
               hitSlop={moderateScale(8)}
-              // TODO(공유): 시스템 공유 시트 연결 — 이번 범위 밖.
-              onPress={() => {}}
+              onPress={() => router.push("/reels/upload")}
               accessibilityRole="button"
-              accessibilityLabel="공유"
+              accessibilityLabel="영상 업로드"
             >
               <ShareUpIcon
                 width={moderateScale(20)}

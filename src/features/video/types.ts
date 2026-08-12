@@ -48,6 +48,18 @@ export type VideoEditResponse = {
   elapsed_seconds: number;
 };
 
+/**
+ * POST /api/videos/reels/upload 의 data.
+ * 렌더를 거치지 않아 응답 시점에 이미 완성된 릴스다(진행률 폴링 없음).
+ * 지역 태그(region)는 좌표를 알 수 없어 항상 null — 홈 카드에서 지역 핀이 숨겨진다.
+ */
+export type ReelsUploadResponse = {
+  reels_idx: number;
+  url: string | null;
+  /** 서버가 대표 프레임을 뽑아 저장한다. 실패하면 null. */
+  thumbnail_url: string | null;
+};
+
 /** GET /api/videos/render/{reels_idx} 및 렌더 시작 응답의 data. */
 export type VideoRenderStatusResponse = {
   /** 릴스 PK — 진행률 조회·다운로드·편집 공용 키 */

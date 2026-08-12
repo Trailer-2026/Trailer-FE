@@ -8,6 +8,7 @@ import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { preparePhotoForUpload } from "./photo-upload";
 import type {
   BgmTrackResponse,
+  ReelsUploadResponse,
   RenderOptions,
   VideoEditResponse,
   VideoRenderStatusResponse,
@@ -77,6 +78,44 @@ export async function renderPhotosOrdered(
     "/api/videos/render/photos-ordered",
     form,
     { timeout: 60000 },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/** 서버 상한(100MB). 넘으면 413 이 오는데 그 응답은 공통 봉투가 아니라 안내가 어렵다. */
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+/**
+ * 직접 만든 영상을 릴스로 업로드. POST /api/videos/reels/upload (multipart/form-data).
+ *
+ * 렌더를 거치지 않아 응답 시점에 이미 완성된 릴스다 — 진행률 폴링 없이 바로
+ * 추천 피드·마이페이지에 뜬다. title 을 비우면 제목 없는 릴스가 된다.
+ * 400: 영상 파일이 아니거나 손상·빈 파일·100MB 초과 / 401 / 502: 저장소 업로드 실패.
+ * 100MB 는 보내기 전에 걸러 낸다(413 은 nginx 가 끊어 공통 봉투가 아니다).
+ */
+export async function uploadReelsVideo(
+  video: { uri: string; name: string; type: string },
+  title?: string,
+): Promise<ReelsUploadResponse> {
+  const size = new File(video.uri).size;
+  if (size != null && size > MAX_UPLOAD_BYTES) {
+    throw new Error("100MB 이하 영상만 업로드할 수 있어요.");
+  }
+
+  const form = new FormData();
+  form.append("video", {
+    uri: video.uri,
+    name: video.name,
+    type: video.type,
+  } as unknown as Blob);
+  if (title?.trim()) form.append("title", title.trim());
+
+  const res = await api.post<CommonResponse<ReelsUploadResponse>>(
+    "/api/videos/reels/upload",
+    form,
+    // 최대 100MB 업로드 — 모바일 회선에서 전역 10s 로는 못 끝낸다.
+    { timeout: 300000 },
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
