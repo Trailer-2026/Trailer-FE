@@ -1,3 +1,5 @@
+import { isAxiosError } from "axios";
+
 import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
 
@@ -11,7 +13,11 @@ import type {
   TravelLikeResponse,
   TravelManualCreateRequest,
   TravelResponse,
+  TravelCoverFile,
+  TravelCoverResponse,
   TravelScheduleItem,
+  TravelTicket,
+  TravelTicketListResponse,
   TravelUpdateRequest,
 } from "./types";
 
@@ -84,6 +90,55 @@ export async function getTravelDetail(
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
+}
+
+/**
+ * GET /api/travels/{travel_idx}/tickets — 승차권 목록(승차권 1매 = 기차 일정 1건).
+ *
+ * 이 엔드포인트는 **AI 추천 일정을 승인해 저장한 여행에서만** 열려 있고, '직접 일정
+ * 만들기'로 만든 여행은 404 로 응답한다. 그 경우 이미 있는 일정표 상세의 kind=train
+ * 항목으로 같은 모양을 만들어 돌려준다 → 어떤 여행이든 승차권 화면이 동일하게 보인다.
+ */
+export async function getTravelTickets(
+  travelIdx: number,
+): Promise<TravelTicket[]> {
+  try {
+    const res = await api.get<CommonResponse<TravelTicketListResponse>>(
+      `/api/travels/${travelIdx}/tickets`,
+    );
+    return res.data.data?.tickets ?? [];
+  } catch (e) {
+    if (isAxiosError(e) && e.response?.status === 404) {
+      return ticketsFromDetail(await getTravelDetail(travelIdx));
+    }
+    throw e;
+  }
+}
+
+/** 일정표 상세의 기차 항목 → 승차권 목록(폴백). 역·시각이 없는 항목은 제외. */
+function ticketsFromDetail(detail: TravelDetail): TravelTicket[] {
+  const out: TravelTicket[] = [];
+  detail.days.forEach((day) => {
+    day.items.forEach((item) => {
+      if (item.kind !== "train") return;
+      if (!item.dep_station || !item.arr_station) return;
+      if (!item.start_time || !item.end_time) return;
+      out.push({
+        schedule_idx: item.schedule_idx,
+        day_no: day.day_no,
+        date: day.date,
+        train_grade: item.train_grade ?? "",
+        train_no: item.train_no ?? "",
+        dep_station: item.dep_station,
+        arr_station: item.arr_station,
+        dep_time: item.start_time,
+        arr_time: item.end_time,
+        car_no: item.car_no,
+        seat_no: item.seat_no,
+      });
+    });
+  });
+  return out;
 }
 
 /**
@@ -183,6 +238,50 @@ export async function unlikeTravel(
 ): Promise<TravelLikeResponse> {
   const res = await api.delete<CommonResponse<TravelLikeResponse>>(
     `/api/travels/${travelIdx}/likes`,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * PATCH /api/travels/{travel_idx}/cover-image — 대표 사진 지정·변경(multipart).
+ * 이미 있으면 교체하고 옛 사진은 저장소에서 지운다.
+ * 400: 이미지가 아니거나 빈 파일·10MB 초과 / 404 / 502(저장소 업로드 실패)
+ *
+ * timeout 은 전역 10s 로는 업로드에 부족할 수 있어 30s 로 override 한다.
+ */
+export async function updateTravelCoverImage(
+  travelIdx: number,
+  file: TravelCoverFile,
+): Promise<TravelCoverResponse> {
+  const form = new FormData();
+  // RN 의 FormData 는 { uri, name, type } 객체를 파일 파트로 인식한다. 필드명은 스펙상 "image".
+  form.append("image", {
+    uri: file.uri,
+    name: file.name,
+    type: file.type,
+  } as unknown as Blob);
+
+  // Content-Type 을 직접 지정하지 않는다 — RN 의 XHR 이 FormData 를 감지해
+  // multipart/form-data 와 boundary 를 자동으로 붙인다. 여기서 손대면 boundary 가 빠져 깨진다.
+  const res = await api.patch<CommonResponse<TravelCoverResponse>>(
+    `/api/travels/${travelIdx}/cover-image`,
+    form,
+    { timeout: 30000 },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * DELETE /api/travels/{travel_idx}/cover-image — 대표 사진 해제.
+ * 지정된 사진이 없어도 성공(멱등). 응답엔 원래 규칙으로 복귀한 URL 이 담긴다.
+ */
+export async function deleteTravelCoverImage(
+  travelIdx: number,
+): Promise<TravelCoverResponse> {
+  const res = await api.delete<CommonResponse<TravelCoverResponse>>(
+    `/api/travels/${travelIdx}/cover-image`,
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;

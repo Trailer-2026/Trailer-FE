@@ -2,7 +2,11 @@ import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
 import type { Theme } from "@/src/features/course/types";
 
-import type { PlaceSearchResult, ThemedPlacesResponse } from "./types";
+import type {
+  PlaceDetail,
+  PlaceSearchResult,
+  ThemedPlacesResponse,
+} from "./types";
 
 /**
  * GET /api/places/themed
@@ -34,4 +38,24 @@ export async function searchPlaces(
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data.places;
+}
+
+/**
+ * GET /api/places/{content_id} — 여행지 상세.
+ * 맛집·역 조회가 실패해도 상세 자체는 내려온다(각각 빈 배열·null).
+ * 404: TourAPI 에 없거나 좌표가 없어 상세를 만들 수 없음 / 502: TourAPI 호출 실패.
+ *
+ * 실시간 TourAPI + 카카오 로컬을 함께 부르는 합성 응답이라 전역 10s 로는 모자랄 수 있어
+ * timeout 을 20s 로 넉넉히 준다.
+ */
+export async function getPlaceDetail(
+  contentId: string,
+  restaurantLimit = 6,
+): Promise<PlaceDetail> {
+  const res = await api.get<CommonResponse<PlaceDetail>>(
+    `/api/places/${contentId}`,
+    { params: { restaurant_limit: restaurantLimit }, timeout: 20000 },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
 }

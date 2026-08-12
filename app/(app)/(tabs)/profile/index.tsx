@@ -1,4 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
+import { useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Alert, ImageBackground, Pressable, ScrollView, View } from "react-native";
@@ -11,7 +12,8 @@ import InfoIcon from "@/src/components/icons/InfoIcon";
 import LogoutIcon from "@/src/components/icons/LogoutIcon";
 import TermsIcon from "@/src/components/icons/TermsIcon";
 import { Text } from "@/src/components/Text";
-import { logout } from "@/src/features/auth/api";
+import { deleteAccount, logout } from "@/src/features/auth/api";
+import { describeAuthError } from "@/src/features/auth/errors";
 import { getRefreshToken } from "@/src/features/auth/storage";
 import { useAuthStore } from "@/src/features/auth/store";
 import { useMyProfile } from "@/src/features/user/queries";
@@ -36,8 +38,19 @@ type MenuRow = {
 export default function ProfileTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const clear = useAuthStore((s) => s.clear);
   const { data: profile, isLoading } = useMyProfile();
+
+  /**
+   * 로컬 세션 종료 — 토큰 삭제 + 서버 응답 캐시 비우기.
+   * 캐시를 비우지 않으면 다른 계정으로 다시 로그인했을 때 이전 사용자의 프로필·여행이
+   * 잠깐 그대로 보인다(react-query 캐시는 토큰과 무관하게 남는다).
+   */
+  async function endSession() {
+    await clear();
+    queryClient.clear();
+  }
 
   async function handleLogout() {
     try {
@@ -46,16 +59,38 @@ export default function ProfileTab() {
     } catch {
       // 서버 로그아웃 실패해도 로컬 토큰은 삭제
     } finally {
-      await clear();
+      await endSession();
     }
   }
 
-  // TODO(account): 실제 계정 비활성화 API 연동 시 교체. 현재는 로그아웃으로 동작(개발용).
-  function confirmDeactivate() {
-    Alert.alert("계정", "계정에서 로그아웃할까요?", [
+  function confirmLogout() {
+    Alert.alert("로그아웃", "계정에서 로그아웃할까요?", [
       { text: "취소", style: "cancel" },
       { text: "로그아웃", style: "destructive", onPress: handleLogout },
     ]);
+  }
+
+  async function handleWithdraw() {
+    try {
+      await deleteAccount();
+    } catch (e) {
+      // 탈퇴가 실패했으면 로그인 상태를 유지해야 한다(로컬만 지우면 유령 계정이 남는다).
+      Alert.alert("탈퇴 실패", describeAuthError(e));
+      return;
+    }
+    // 서버가 refresh·FCM 토큰을 이미 정리했으므로 로컬 세션만 끝내면 된다.
+    await endSession();
+  }
+
+  function confirmWithdraw() {
+    Alert.alert(
+      "정말 탈퇴할까요?",
+      "여행 일정, 사진, 알림 설정이 모두 삭제되고 되돌릴 수 없어요.\n같은 계정으로 다시 가입하면 새 계정으로 시작돼요.",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "탈퇴하기", style: "destructive", onPress: handleWithdraw },
+      ],
+    );
   }
 
   const nickname = profile?.nickname ?? (isLoading ? "불러오는 중…" : "게스트");
@@ -114,8 +149,8 @@ export default function ProfileTab() {
       onPress: () => router.push("/profile/version"),
     },
     {
-      key: "deactivate",
-      label: "계정 비활성화",
+      key: "logout",
+      label: "로그아웃",
       icon: (
         <LogoutIcon
           width={moderateScale(24)}
@@ -123,7 +158,15 @@ export default function ProfileTab() {
           color={MENU_ICON}
         />
       ),
-      onPress: confirmDeactivate,
+      onPress: confirmLogout,
+    },
+    {
+      key: "withdraw",
+      label: "회원 탈퇴",
+      icon: (
+        <Feather name="user-x" size={moderateScale(22)} color={MENU_ICON} />
+      ),
+      onPress: confirmWithdraw,
     },
   ];
 
@@ -213,6 +256,7 @@ export default function ProfileTab() {
                   contentFit="contain"
                 />
               }
+              onPress={() => router.push("/profile/stamps")}
             />
             <ColDivider />
             <StatCol
@@ -292,7 +336,10 @@ function StatCol({
       style={{ flex: 1, gap: verticalScale(8) }}
     >
       {icon}
-      <Text className="text-gray-700" style={{ fontSize: moderateScale(13) }}>
+      <Text
+        className="text-gray-700"
+        style={{ fontSize: moderateScale(13), fontWeight: 600 }}
+      >
         {label}
       </Text>
     </Pressable>
@@ -330,7 +377,10 @@ function MenuItem({ row }: { row: MenuRow }) {
         <View style={{ width: moderateScale(26), alignItems: "center" }}>
           {row.icon}
         </View>
-        <Text className="text-gray-800" style={{ fontSize: moderateScale(15) }}>
+        <Text
+          className="text-gray-800"
+          style={{ fontSize: moderateScale(15), fontWeight: 600 }}
+        >
           {row.label}
         </Text>
       </View>

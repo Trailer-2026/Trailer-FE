@@ -6,6 +6,7 @@ import BackIcon from "@/src/components/icons/BackIcon";
 import ForwardIcon from "@/src/components/icons/ForwardIcon";
 import { Text } from "@/src/components/Text";
 import { LEGAL_MENU } from "@/src/features/legal/documents";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 /** 약관 및 정책 목록 — 세 문서로의 진입점(> 로 상세로 이동). */
@@ -19,9 +20,8 @@ export default function TermsIndexScreen() {
       <View
         className="flex-row items-center"
         style={{
-          paddingTop: insets.top + verticalScale(16),
+          ...headerBarStyle(insets.top),
           paddingHorizontal: scale(16),
-          paddingBottom: verticalScale(6),
         }}
       >
         <Pressable
@@ -32,8 +32,12 @@ export default function TermsIndexScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(17), marginLeft: scale(8) }}
+          className="text-gray-900"
+style={{
+            fontSize: moderateScale(17),
+            marginLeft: scale(8),
+            fontWeight: 650 as never,
+          }}
         >
           약관 및 정책
         </Text>

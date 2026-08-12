@@ -11,6 +11,7 @@ import MediaSourceSheet, {
   type MediaSource,
 } from "@/src/features/reels/components/MediaSourceSheet";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 /**
@@ -42,7 +43,8 @@ export default function ReelsCreateScreen() {
 
       {/* 뒤로가기 */}
       <View
-        style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(16) }}
+        className="flex-row items-center"
+        style={{ paddingHorizontal: scale(20), ...headerBarStyle() }}
       >
         <Pressable
           onPress={() => router.back()}

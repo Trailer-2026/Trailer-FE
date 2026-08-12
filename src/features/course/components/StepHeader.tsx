@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 
 import { Text } from "@/src/components/Text";
 import BackIcon from "@/src/components/icons/BackIcon";
+import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 type Props = {
@@ -28,8 +29,7 @@ export function StepHeader({ progress, step, steps }: Props) {
         className="flex-row items-center justify-between"
         style={{
           paddingHorizontal: scale(20),
-          paddingTop: verticalScale(16),
-          paddingBottom: verticalScale(10),
+          ...headerBarStyle(),
         }}
       >
         <Pressable
@@ -46,8 +46,11 @@ export function StepHeader({ progress, step, steps }: Props) {
 
         {hasLabel ? (
           <Text
-            className="font-semibold"
-            style={{ fontSize: moderateScale(17), color: "#5E84F4" }}
+            style={{
+              fontSize: moderateScale(17),
+              color: "#5E84F4",
+              fontWeight: 650 as never,
+            }}
           >
             {step}/{steps}
           </Text>

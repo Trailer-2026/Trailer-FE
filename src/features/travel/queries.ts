@@ -9,12 +9,15 @@ import {
   createTravel,
   deleteSchedule,
   deleteTravel,
+  deleteTravelCoverImage,
   getCurrentTravel,
   getPastTravels,
   getTravelDetail,
+  getTravelTickets,
   likeTravel,
   unlikeTravel,
   updateSchedule,
+  updateTravelCoverImage,
   updateTravelTitle,
 } from "./api";
 import { travelKeys } from "./keys";
@@ -22,6 +25,7 @@ import type {
   PastTravelListResponse,
   ScheduleCreateRequest,
   ScheduleUpdateRequest,
+  TravelCoverFile,
   TravelManualCreateRequest,
 } from "./types";
 
@@ -139,18 +143,38 @@ export function usePrefetchTravelDetail(travelIdx?: number) {
 }
 
 /**
- * 일정 항목 추가/편집/삭제. 성공 시 해당 여행의 상세(detail)를 invalidate 해
- * 타임라인이 자동 갱신되게 한다.
+ * 여행의 승차권 목록.
+ * - travelIdx 가 없으면 비활성.
+ * - '직접 만들기' 여행은 서버가 404 를 주는데, api 층에서 상세로 폴백하므로
+ *   호출부는 신경 쓸 필요 없다.
  */
+export function useTravelTickets(travelIdx?: number) {
+  return useQuery({
+    queryKey: travelKeys.tickets(travelIdx ?? -1),
+    queryFn: () => getTravelTickets(travelIdx!),
+    enabled: travelIdx != null,
+    staleTime: 1000 * 60, // 1분
+  });
+}
+
+/**
+ * 일정 항목 추가/편집/삭제 성공 시 해당 여행의 캐시를 함께 무효화한다.
+ * 기차 항목은 승차권 화면에도 그대로 나오므로 detail 과 tickets 를 같이 비운다.
+ */
+function invalidateTravelCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  travelIdx: number,
+) {
+  queryClient.invalidateQueries({ queryKey: travelKeys.detail(travelIdx) });
+  queryClient.invalidateQueries({ queryKey: travelKeys.tickets(travelIdx) });
+}
+
 export function useCreateSchedule(travelIdx: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: ScheduleCreateRequest) =>
       createSchedule(travelIdx, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: travelKeys.detail(travelIdx),
-      }),
+    onSuccess: () => invalidateTravelCaches(queryClient, travelIdx),
   });
 }
 
@@ -164,10 +188,7 @@ export function useUpdateSchedule(travelIdx: number) {
       scheduleIdx: number;
       body: ScheduleUpdateRequest;
     }) => updateSchedule(travelIdx, scheduleIdx, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: travelKeys.detail(travelIdx),
-      }),
+    onSuccess: () => invalidateTravelCaches(queryClient, travelIdx),
   });
 }
 
@@ -176,10 +197,7 @@ export function useDeleteSchedule(travelIdx: number) {
   return useMutation({
     mutationFn: (scheduleIdx: number) =>
       deleteSchedule(travelIdx, scheduleIdx),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: travelKeys.detail(travelIdx),
-      }),
+    onSuccess: () => invalidateTravelCaches(queryClient, travelIdx),
   });
 }
 
@@ -249,5 +267,44 @@ export function useDeleteTravel() {
       queryClient.invalidateQueries({ queryKey: travelKeys.past() });
       queryClient.invalidateQueries({ queryKey: notificationKeys.list() });
     },
+  });
+}
+
+/**
+ * 여행 대표 사진 지정·변경 / 해제.
+ *
+ * 썸네일은 목록 카드(current·past)와 일정표 히어로가 모두 쓰므로 세 캐시를 함께 비운다.
+ * 삭제도 '없앰'이 아니라 기본 규칙 URL 로 되돌아가는 것이라 갱신이 필요하다.
+ */
+function invalidateTravelThumbnails(
+  queryClient: ReturnType<typeof useQueryClient>,
+  travelIdx: number,
+) {
+  queryClient.invalidateQueries({ queryKey: travelKeys.current() });
+  queryClient.invalidateQueries({ queryKey: travelKeys.past() });
+  queryClient.invalidateQueries({ queryKey: travelKeys.detail(travelIdx) });
+}
+
+// travelIdx 를 훅 인자가 아니라 mutate 변수로 받는다 — 목록에서 어떤 카드의 ⋮ 를
+// 눌렀는지가 실행 시점에 정해지고, 시트가 닫히며 선택이 풀려도 안전하다.
+export function useUpdateTravelCover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      travelIdx,
+      file,
+    }: {
+      travelIdx: number;
+      file: TravelCoverFile;
+    }) => updateTravelCoverImage(travelIdx, file),
+    onSuccess: (data) => invalidateTravelThumbnails(queryClient, data.travel_idx),
+  });
+}
+
+export function useDeleteTravelCover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (travelIdx: number) => deleteTravelCoverImage(travelIdx),
+    onSuccess: (data) => invalidateTravelThumbnails(queryClient, data.travel_idx),
   });
 }

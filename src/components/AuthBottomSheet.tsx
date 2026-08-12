@@ -121,8 +121,10 @@ export function AuthBottomSheet({
         }}
       >
         <Text
-          className="font-bold text-gray-900"
-          style={{ fontSize: moderateScale(20) }}
+          className="text-gray-900"
+          // Bold(700)와 SemiBold(600) 사이 굵기(Pretendard-650).
+          // RN 타입엔 650 이 없어 숫자로 준다 — Text 래퍼가 정적 폰트로 매핑한다.
+          style={{ fontSize: moderateScale(20), fontWeight: 650 as never }}
         >
           {title}
         </Text>

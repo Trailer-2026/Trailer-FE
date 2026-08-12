@@ -6,9 +6,11 @@ import {
   onNotificationOpenedApp,
 } from "@react-native-firebase/messaging";
 
+import { openNotificationTarget, targetFromFcmData } from "./routing";
+
 /**
  * FCM 메시지 수신 처리 핸들러 모음.
- * 지금은 콘솔 로그 + 라우팅/인앱표시 자리(TODO)만 잡은 골격 단계.
+ * 알림 탭 시 이동 규칙은 알림함과 공유한다(routing.ts).
  */
 
 /**
@@ -39,8 +41,7 @@ export function setupNotificationOpenHandlers(): () => void {
       "[fcm] 백그라운드에서 알림 탭:",
       JSON.stringify(remoteMessage),
     );
-    // TODO: remoteMessage.data 기반으로 해당 화면으로 라우팅 이동
-    //   예) if (remoteMessage?.data?.screen) router.push(...)
+    openNotificationTarget(targetFromFcmData(remoteMessage?.data));
   });
 
   // 종료 상태에서 알림 탭 → 앱 실행 (실행 시 1회 확인)
@@ -50,7 +51,8 @@ export function setupNotificationOpenHandlers(): () => void {
       "[fcm] 종료 상태에서 알림 탭으로 실행:",
       JSON.stringify(remoteMessage),
     );
-    // TODO: remoteMessage.data 기반으로 초기 라우팅 이동
+    // 이 함수는 화면(Stack)이 이미 마운트된 뒤 호출되므로 바로 push 해도 안전하다.
+    openNotificationTarget(targetFromFcmData(remoteMessage.data));
   });
 
   return unsubscribe;

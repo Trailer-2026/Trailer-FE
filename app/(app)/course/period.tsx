@@ -60,8 +60,12 @@ export default function PeriodScreen() {
 
         {/* 출발 날짜 (현재 날짜 기반 가로 스트립) */}
         <Text
-          className="font-semibold text-gray-800"
-          style={{ fontSize: moderateScale(14), marginTop: verticalScale(28) }}
+          className="text-gray-800"
+          style={{
+            fontSize: moderateScale(14),
+            marginTop: verticalScale(28),
+            fontWeight: 650 as never,
+          }}
         >
           출발 날짜
         </Text>
@@ -122,8 +126,12 @@ export default function PeriodScreen() {
 
         {/* 여행 기간 (숙박 수) */}
         <Text
-          className="font-semibold text-gray-800"
-          style={{ fontSize: moderateScale(14), marginTop: verticalScale(28) }}
+          className="text-gray-800"
+          style={{
+            fontSize: moderateScale(14),
+            marginTop: verticalScale(28),
+            fontWeight: 650 as never,
+          }}
         >
           여행 기간
         </Text>
