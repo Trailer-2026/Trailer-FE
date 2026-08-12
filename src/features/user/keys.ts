@@ -8,6 +8,4 @@ export const userKeys = {
   profile: () => [...userKeys.all, "profile"] as const,
   myReels: () => [...userKeys.all, "reels"] as const,
   likedReels: () => [...userKeys.all, "reels", "liked"] as const,
-  /** 좋아요 여부만 모아 둔 인덱스(피드에서 하트 초기 상태로 쓴다) */
-  likedIndex: () => [...userKeys.all, "reels", "liked", "index"] as const,
 };

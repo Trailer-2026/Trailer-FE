@@ -24,6 +24,15 @@ export type ReelsRecommendItem = {
   reels_idx: number;
   url: string;
   title: string | null;
+  /** 지역 태그("강원" 등). 렌더 전에 만들어진 옛 릴스는 null */
+  region: string | null;
+  /** 카드 이미지. 옛 릴스는 null → url 영상의 첫 프레임으로 대체 */
+  thumbnail_url: string | null;
+  like_count: number;
+  /** 답글 포함 */
+  comment_count: number;
+  /** 내가 누른 좋아요. 비로그인은 항상 false */
+  is_liked: boolean;
   nickname: string | null;
   profile_image: string | null;
 };

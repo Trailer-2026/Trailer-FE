@@ -17,12 +17,7 @@ import {
 import { userKeys } from "@/src/features/user/keys";
 
 import { reelsKeys } from "./keys";
-import type {
-  LikeResponse,
-  Reels,
-  ReelsComment,
-  ReelsRecommendItem,
-} from "./types";
+import type { Reels, ReelsComment, ReelsRecommendItem } from "./types";
 
 /** 릴스 댓글 목록. 시트를 열었을 때만(reelsIdx 가 있을 때만) 요청한다. */
 export function useReelsComments(reelsIdx: number | null) {
@@ -57,8 +52,8 @@ export function useCreateReelsComment(reelsIdx: number | null) {
 /**
  * 릴스 좋아요 토글.
  *
- * 추천 API 가 liked/like_count 를 주지 않아 캐시에 덮어쓸 목록이 없다 —
- * 호출부(feed.tsx)가 응답값을 화면 상태로 들고 있는다.
+ * 추천 목록의 liked/like_count 는 서버가 내려주므로 초기 상태는 그걸 쓰고,
+ * 누른 뒤의 확정값은 호출부(feed.tsx)가 화면 상태로 덮어쓴다.
  */
 export function useToggleReelsLike() {
   const queryClient = useQueryClient();
@@ -66,25 +61,11 @@ export function useToggleReelsLike() {
     mutationFn: (vars: { reelsIdx: number; liked: boolean }) =>
       vars.liked ? unlikeReels(vars.reelsIdx) : likeReels(vars.reelsIdx),
     // 좋아요가 곧 북마크라 목록이 바뀐다(하트를 풀면 목록에서 빠진다).
-    onSuccess: (data, vars) => {
-      // 목록은 다시 받아오고(순서·구성이 서버 기준),
+    onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: userKeys.likedReels(),
         exact: true,
-      });
-      // 피드용 인덱스는 응답값으로 직접 고친다 — 여기서 무효화하면 좋아요를 누를 때마다
-      // 수백 건짜리 목록을 다시 받게 된다.
-      queryClient.setQueryData<Map<number, LikeResponse>>(
-        userKeys.likedIndex(),
-        (index) => {
-          if (!index) return index;
-          const next = new Map(index);
-          if (data.liked) next.set(vars.reelsIdx, data);
-          else next.delete(vars.reelsIdx);
-          return next;
-        },
-      );
-    },
+      }),
   });
 }
 
@@ -148,18 +129,18 @@ export function useToggleCommentLike(reelsIdx: number | null) {
   });
 }
 
-/** 추천 응답 → 화면이 쓰는 Reels. 좋아요·댓글 수는 추천 API 가 주지 않아 0 으로 둔다. */
+/** 추천 응답 → 화면이 쓰는 Reels. 필드명만 맞춰 옮긴다(is_liked → liked, region → location). */
 function toReels(item: ReelsRecommendItem): Reels {
   return {
     reels_idx: item.reels_idx,
     author: { name: item.nickname ?? "알 수 없음", avatar_url: item.profile_image },
     video_url: item.url,
-    thumbnail_url: null,
+    thumbnail_url: item.thumbnail_url,
     caption: item.title ?? "",
-    location: null,
-    like_count: 0,
-    liked: false,
-    comment_count: 0,
+    location: item.region,
+    like_count: item.like_count,
+    liked: item.is_liked,
+    comment_count: item.comment_count,
   };
 }
 

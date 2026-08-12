@@ -56,39 +56,6 @@ export function useLikedReels(enabled = true) {
   });
 }
 
-/** 좋아요 인덱스 한 번에 받아올 최대 개수 — 100개씩 3페이지면 대부분 덮인다. */
-const LIKED_INDEX_LIMIT = 100;
-const LIKED_INDEX_MAX_PAGES = 3;
-
-/**
- * 피드용 좋아요 인덱스 — reels_idx → { liked, like_count }.
- *
- * 추천 API 가 liked/like_count 를 주지 않아서, 피드를 열 때 이 목록을 미리 받아
- * 하트의 초기 상태로 쓴다. 목록이 아주 길면 앞의 몇 페이지만 본다(그 뒤는 눌러 보면 서버가 확정).
- */
-export function useLikedReelsIndex() {
-  return useQuery({
-    queryKey: userKeys.likedIndex(),
-    queryFn: async () => {
-      const index = new Map<number, { liked: boolean; like_count: number }>();
-      let cursor: number | null = null;
-      for (let page = 0; page < LIKED_INDEX_MAX_PAGES; page += 1) {
-        const res = await getLikedReels(cursor, LIKED_INDEX_LIMIT);
-        for (const item of res.items) {
-          index.set(item.reels_idx, {
-            liked: true, // 이 목록에 있다 = 내가 누른 것
-            like_count: item.like_count,
-          });
-        }
-        if (res.next_cursor == null) break;
-        cursor = res.next_cursor;
-      }
-      return index;
-    },
-    staleTime: 1000 * 60, // 1분 — 피드를 오갈 때마다 다시 받지 않게
-  });
-}
-
 /**
  * 사용자 차단. 성공하면 릴스 캐시 전체(추천 목록 + 댓글)를 무효화한다.
  * 서버가 차단 상대의 릴스·댓글을 걸러서 주므로, 다시 받아오면 화면에서 사라진다.
