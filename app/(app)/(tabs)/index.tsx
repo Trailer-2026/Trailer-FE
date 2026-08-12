@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -55,6 +55,9 @@ const HERO_SLIDES = [
     lines: ["우리의 청춘을 연결하는", "한 장의 패스"],
   },
 ] as const;
+
+/** 끝에서 한 번 더 넘기면 1번으로 돌아가도록 첫 장을 뒤에 복제해 둔다(순환). */
+const HERO_LOOP = [...HERO_SLIDES, HERO_SLIDES[0]];
 
 const HERO_HEIGHT = verticalScale(198);
 
@@ -168,6 +171,7 @@ function Header() {
 function PromoHero() {
   const { width } = useWindowDimensions();
   const [slide, setSlide] = useState(0);
+  const heroRef = useRef<ScrollView>(null);
   const [msgIdx, setMsgIdx] = useState(0);
   // 홈을 떠날 때 다음 문구로 넘겨, 다시 들어오면 번갈아 보이게 한다(초기 진입 깜빡임 없음).
   useFocusEffect(
@@ -187,17 +191,26 @@ function PromoHero() {
         style={{ height: HERO_HEIGHT, ...CARD_ELEVATION }}
       >
         <ScrollView
+          ref={heroRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           // 화면 폭을 슬라이드 한 장으로 삼는다(배너가 좌우 여백 없이 꽉 참).
-          onMomentumScrollEnd={(e) =>
-            setSlide(Math.round(e.nativeEvent.contentOffset.x / width))
-          }
+          onMomentumScrollEnd={(e) => {
+            const i = Math.round(e.nativeEvent.contentOffset.x / width);
+            // 마지막 뒤의 복제 슬라이드(= 1번 사진)에 닿았으면 애니메이션 없이 실제 1번으로
+            // 되돌린다 — 사용자에겐 3장이 끊김 없이 순환하는 것으로 보인다.
+            if (i === HERO_SLIDES.length) {
+              heroRef.current?.scrollTo({ x: 0, animated: false });
+              setSlide(0);
+            } else {
+              setSlide(i);
+            }
+          }}
         >
-          {HERO_SLIDES.map((s) => (
+          {HERO_LOOP.map((s, si) => (
             <ImageBackground
-              key={s.tag}
+              key={`${s.tag}-${si}`}
               source={s.image}
               resizeMode="cover"
               style={{ width, height: HERO_HEIGHT }}
