@@ -10,6 +10,7 @@ import {
   getRenderStatus,
   insertImageClip,
   renderPhotosOrdered,
+  updateReelsTitle,
   uploadReelsVideo,
 } from "./api";
 import { videoKeys } from "./keys";
@@ -85,6 +86,22 @@ export function useUploadReelsVideo() {
       /** 0~100 — 호출부가 버튼에 진행률을 그린다. */
       onProgress?: (percent: number) => void;
     }) => uploadReelsVideo(vars.video, vars.title, vars.onProgress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
+    },
+  });
+}
+
+/**
+ * 릴스 제목 수정. 영상은 그대로라 목록만 갱신하면 새 제목이 바로 내려온다.
+ * (내 영상 목록 + 추천 피드·홈 카드)
+ */
+export function useUpdateReelsTitle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { reelsIdx: number; title: string | null }) =>
+      updateReelsTitle(vars.reelsIdx, vars.title),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
       queryClient.invalidateQueries({ queryKey: reelsKeys.all });

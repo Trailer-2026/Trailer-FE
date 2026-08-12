@@ -19,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
+import EditPencilIcon from "@/src/components/icons/EditPencilIcon";
 import { Text } from "@/src/components/Text";
 import { captureFromCamera } from "@/src/features/reels/capture";
 import MediaSourceSheet, {
@@ -28,9 +29,11 @@ import VideoTimeline from "@/src/features/reels/components/VideoTimeline";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import { formatClock, toReelsMediaAsset } from "@/src/features/reels/media";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
+import TitleInputCard from "@/src/features/video/components/TitleInputCard";
 import {
   useCutVideoSection,
   useInsertImageClip,
+  useUpdateReelsTitle,
 } from "@/src/features/video/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -64,9 +67,10 @@ const PREVIEW_BATCH = 12;
  * 편집이 끝나면 응답의 새 video_url 로 플레이어 소스를 갈아끼운다(릴스 PK 는 그대로).
  */
 export default function ReelsStudioScreen() {
-  const { reels_idx, url } = useLocalSearchParams<{
+  const { reels_idx, url, title: titleParam } = useLocalSearchParams<{
     reels_idx?: string;
     url?: string;
+    title?: string;
   }>();
   const reelsIdx =
     reels_idx != null && Number.isFinite(Number(reels_idx))
@@ -93,6 +97,30 @@ export default function ReelsStudioScreen() {
   const cut = useCutVideoSection();
   const insert = useInsertImageClip();
   const busy = cut.isPending || insert.isPending;
+
+  // 제목 — 목록에서 넘겨받은 값으로 시작하고, 수정 성공 시 화면 상태만 갈아끼운다
+  // (영상·PK 는 그대로라 화면을 다시 받을 이유가 없다).
+  const [title, setTitle] = useState(titleParam ?? "");
+  const [titleDraft, setTitleDraft] = useState("");
+  const [titleOpen, setTitleOpen] = useState(false);
+  const updateTitle = useUpdateReelsTitle();
+
+  const saveTitle = () => {
+    if (reelsIdx == null) return;
+    const next = titleDraft.trim();
+    updateTitle.mutate(
+      // 빈 값은 null 로 보내 '제목 없음' 릴스로 만든다.
+      { reelsIdx, title: next || null },
+      {
+        onSuccess: () => {
+          setTitle(next);
+          setTitleOpen(false);
+        },
+        // 400(렌더 미완료) / 404(남의 릴스·없음) 는 서버 문구를 그대로 노출.
+        onError: (err) => Alert.alert("제목 수정 실패", describeApiError(err)),
+      },
+    );
+  };
 
   const player = useVideoPlayer(source, (p) => {
     p.loop = true;
@@ -411,6 +439,36 @@ export default function ReelsStudioScreen() {
         </Pressable>
       </View>
 
+      {/* 제목 — 탭하면 수정. 렌더가 끝난 릴스만 수정 가능하다(그 외엔 서버가 400). */}
+      {reelsIdx != null ? (
+        <Pressable
+          onPress={() => {
+            setTitleDraft(title);
+            setTitleOpen(true);
+          }}
+          className="flex-row items-center justify-center active:opacity-70"
+          style={{
+            paddingHorizontal: scale(20),
+            marginTop: verticalScale(10),
+            gap: scale(6),
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="제목 수정"
+        >
+          <Text
+            numberOfLines={1}
+            className={title ? "text-white" : "text-gray-500"}
+            style={{ maxWidth: scale(240), fontSize: moderateScale(14) }}
+          >
+            {title || "제목 없음"}
+          </Text>
+          <EditPencilIcon
+            width={moderateScale(14)}
+            height={moderateScale(14)}
+          />
+        </Pressable>
+      ) : null}
+
       {/* 미리보기 — 네이티브 컨트롤로 넘겨 보면서 지점을 고른다. */}
       <View className="flex-1 items-center justify-center">
         {source ? (
@@ -557,6 +615,16 @@ export default function ReelsStudioScreen() {
         visible={sheetOpen}
         onSelect={onInsert}
         onClose={() => setSheetOpen(false)}
+      />
+
+      <TitleInputCard
+        visible={titleOpen}
+        title={titleDraft}
+        onChangeTitle={setTitleDraft}
+        onCancel={() => setTitleOpen(false)}
+        onSubmit={saveTitle}
+        heading="제목 수정"
+        submitting={updateTitle.isPending}
       />
     </SafeAreaView>
   );

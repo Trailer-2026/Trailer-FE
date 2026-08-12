@@ -4,20 +4,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
 import { MAX_UPLOAD_BYTES, videoFileSize } from "@/src/features/video/api";
+import TitleInputCard from "@/src/features/video/components/TitleInputCard";
 import { useUploadReelsVideo } from "@/src/features/video/queries";
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -26,9 +20,6 @@ const ACCENT = "#4FD1C5";
 
 /** 업로드하기 알약 높이 = 우측 원형 화살표 지름(끝단을 딱 맞춘다). */
 const BUTTON_H = verticalScale(56);
-
-/** 서버 title 상한. */
-const TITLE_MAX = 100;
 
 type PickedVideo = {
   uri: string;
@@ -266,152 +257,18 @@ export default function ReelsUploadScreen() {
       </View>
 
       <TitleInputCard
-        video={picked}
+        visible={picked != null}
         title={title}
         onChangeTitle={setTitle}
         onCancel={() => setPicked(null)}
         onSubmit={startUpload}
+        heading="제목을 정해주세요"
+        hint={picked?.size != null ? formatMb(picked.size) : undefined}
+        submitLabel="업로드"
       />
 
       <UploadDoneCard visible={done} onConfirm={goMyReels} />
     </SafeAreaView>
-  );
-}
-
-/** 업로드 직전 제목 입력. 비워 두면 제목 없는 릴스로 올라간다. */
-function TitleInputCard({
-  video,
-  title,
-  onChangeTitle,
-  onCancel,
-  onSubmit,
-}: {
-  video: PickedVideo | null;
-  title: string;
-  onChangeTitle: (value: string) => void;
-  onCancel: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <Modal
-      visible={video != null}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={onCancel}
-    >
-      <View
-        className="flex-1 items-center justify-center"
-        style={{
-          backgroundColor: "rgba(0,0,0,0.65)",
-          paddingHorizontal: scale(28),
-        }}
-      >
-        <View
-          className="w-full"
-          style={{
-            backgroundColor: "#1C1C1C",
-            borderRadius: scale(20),
-            borderWidth: 1,
-            borderColor: "#333333",
-            paddingVertical: verticalScale(24),
-            paddingHorizontal: scale(20),
-            elevation: 12,
-            shadowColor: "#000000",
-          }}
-        >
-          <Text
-            className="text-white"
-            style={{ fontSize: moderateScale(17), fontWeight: 650 as never }}
-          >
-            제목을 정해주세요
-          </Text>
-          <Text
-            className="font-medium"
-            style={{
-              color: "#9CA3AF",
-              fontSize: moderateScale(12),
-              marginTop: verticalScale(6),
-            }}
-          >
-            비워 두면 제목 없이 올라가요
-            {video?.size != null ? ` · ${formatMb(video.size)}` : ""}
-          </Text>
-
-          <TextInput
-            value={title}
-            onChangeText={onChangeTitle}
-            placeholder="예) 강릉 바다 드라이브"
-            placeholderTextColor="#6B7280"
-            maxLength={TITLE_MAX}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={onSubmit}
-            className="text-white"
-            style={{
-              marginTop: verticalScale(16),
-              height: verticalScale(46),
-              borderRadius: scale(12),
-              backgroundColor: "#262626",
-              paddingHorizontal: scale(14),
-              fontSize: moderateScale(14),
-            }}
-          />
-          <Text
-            className="text-right"
-            style={{
-              color: "#6B7280",
-              fontSize: moderateScale(11),
-              marginTop: verticalScale(6),
-            }}
-          >
-            {title.length}/{TITLE_MAX}
-          </Text>
-
-          <View
-            className="flex-row"
-            style={{ marginTop: verticalScale(16), gap: scale(10) }}
-          >
-            <Pressable
-              onPress={onCancel}
-              className="flex-1 items-center justify-center active:opacity-80"
-              style={{
-                height: verticalScale(46),
-                borderRadius: 999,
-                backgroundColor: "#333333",
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="취소"
-            >
-              <Text
-                className="font-bold text-white"
-                style={{ fontSize: moderateScale(15) }}
-              >
-                취소
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={onSubmit}
-              className="flex-1 items-center justify-center active:opacity-80"
-              style={{
-                height: verticalScale(46),
-                borderRadius: 999,
-                backgroundColor: ACCENT,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="업로드"
-            >
-              <Text
-                className="font-bold"
-                style={{ color: "#06322E", fontSize: moderateScale(15) }}
-              >
-                업로드
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 }
 

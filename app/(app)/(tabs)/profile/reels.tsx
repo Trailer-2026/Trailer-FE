@@ -64,8 +64,9 @@ export default function MyReelsGridScreen() {
 
   const openStudio = (item: MyReelsItem) => {
     setMenuFor(null);
+    // title 도 함께 넘겨 편집 화면이 현재 제목을 그대로 보여주고 고칠 수 있게 한다.
     router.push(
-      `/reels/studio?reels_idx=${item.reels_idx}&url=${encodeURIComponent(item.url)}`,
+      `/reels/studio?reels_idx=${item.reels_idx}&url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title ?? "")}`,
     );
   };
 

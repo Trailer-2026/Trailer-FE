@@ -139,6 +139,23 @@ export async function uploadReelsVideo(
 }
 
 /**
+ * 릴스 제목 수정. PATCH /api/videos/reels/{reels_idx}/title
+ *
+ * 영상은 그대로 두고 제목만 교체하므로 릴스 PK·url·썸네일은 바뀌지 않는다 —
+ * 목록 캐시만 갱신하면 새 제목이 바로 보인다. null/빈 문자열이면 제목 없는 릴스가 된다.
+ * 404: 없거나 남의 릴스 / 400: 아직 렌더가 끝나지 않음 / 422: 100자 초과 / 401.
+ */
+export async function updateReelsTitle(
+  reelsIdx: number,
+  title: string | null,
+): Promise<void> {
+  await api.patch<CommonResponse<unknown>>(
+    `/api/videos/reels/${reelsIdx}/title`,
+    { title },
+  );
+}
+
+/**
  * 내 완성 영상 다운로드. GET /api/videos/reels/{reels_idx}/download
  *
  * mp4 첨부 파일로 내려오므로 axios(JSON) 대신 파일 다운로드 API 를 쓴다.
