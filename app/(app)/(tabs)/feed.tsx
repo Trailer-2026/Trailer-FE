@@ -1,3 +1,5 @@
+import Feather from "@expo/vector-icons/Feather";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useIsFocused } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
@@ -41,6 +43,8 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // "내 여행영상 만들기" 말풍선 — 메인탭 말풍선과 동일한 CSS 텍스트 버블(색·굵기 통일).
 const TOOLTIP_COLOR = "#5E84F4";
+/** 신고 등 위험 동작 문구 색 — 편집 화면(studio)과 같은 값. */
+const DANGER = "#E5484D";
 
 export default function FeedTab() {
   const insets = useSafeAreaInsets();
@@ -508,10 +512,25 @@ function MoreSheet({
 
           <SheetRow
             label="이 릴스 신고하기"
+            color={DANGER}
+            icon={
+              <MaterialCommunityIcons
+                name="alarm-light"
+                size={moderateScale(18)}
+                color={DANGER}
+              />
+            }
             onPress={() => reels && onReport(reels)}
           />
           <SheetRow
             label="이 사용자 차단하기"
+            icon={
+              <Feather
+                name="slash"
+                size={moderateScale(17)}
+                color="#FFFFFF"
+              />
+            }
             onPress={() => reels && onBlock(reels)}
           />
           <SheetRow label="닫기" muted onPress={onClose} />
@@ -524,26 +543,33 @@ function MoreSheet({
 function SheetRow({
   label,
   muted = false,
+  color,
+  icon,
   onPress,
 }: {
   label: string;
   muted?: boolean;
+  /** 문구 색 override — 신고처럼 위험 동작만 지정한다. */
+  color?: string;
+  icon?: React.ReactNode;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className="active:opacity-60"
+      className="flex-row items-center active:opacity-60"
       style={{
         paddingHorizontal: scale(20),
         paddingVertical: verticalScale(14),
+        gap: scale(10),
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
+      {icon}
       <Text
         className={muted ? "text-gray-500" : "font-semibold text-white"}
-        style={{ fontSize: moderateScale(14) }}
+        style={{ fontSize: moderateScale(14), ...(color ? { color } : null) }}
       >
         {label}
       </Text>
