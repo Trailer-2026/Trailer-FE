@@ -25,6 +25,8 @@ type Props = {
   onOpenComments: (reelsIdx: number) => void;
   /** 내 영상이면 다운로드, 남의 영상이면 링크 공유 — 분기는 호출부(feed)가 한다. */
   onShare: (reels: Reels) => void;
+  /** ⋯ — 신고·차단 메뉴. 없으면 ⋯ 버튼을 그리지 않는다(내 영상 재생 화면). */
+  onOpenMore?: (reels: Reels) => void;
   /** 내 영상 — 버튼을 공유 대신 다운로드 아이콘으로 바꾼다. */
   mine?: boolean;
   /** 다운로드·링크 조회 진행 중 — 버튼을 스피너로 바꾸고 중복 탭을 막는다. */
@@ -56,6 +58,7 @@ export default function ReelsCard({
   onToggleLike,
   onOpenComments,
   onShare,
+  onOpenMore,
   mine = false,
   sharing = false,
 }: Props) {
@@ -165,6 +168,24 @@ export default function ReelsCard({
             />
           )}
         </Pressable>
+
+        {/* ⋯ — 신고·차단. 공유 바로 아래. */}
+        {onOpenMore ? (
+        <Pressable
+          className="items-center active:opacity-60"
+          hitSlop={moderateScale(8)}
+          onPress={() => onOpenMore(reels)}
+          accessibilityRole="button"
+          accessibilityLabel="더보기"
+        >
+          <Text
+            className="font-bold text-white"
+            style={{ fontSize: moderateScale(22), lineHeight: moderateScale(22) }}
+          >
+            ⋯
+          </Text>
+        </Pressable>
+        ) : null}
       </View>
 
       {/* 하단 정보: 작성자 · 캡션 · 위치 */}

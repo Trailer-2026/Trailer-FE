@@ -38,6 +38,8 @@ function toReels(item: MyReelsItem): Reels {
     author: {
       name: item.nickname ?? "알 수 없음",
       avatar_url: item.profile_image,
+      // 목록 응답에 작성자 PK 가 없다 — 이 화면은 차단 메뉴를 띄우지 않으므로 필요 없다.
+      user_idx: null,
     },
     video_url: item.url,
     thumbnail_url: item.thumbnail_url,

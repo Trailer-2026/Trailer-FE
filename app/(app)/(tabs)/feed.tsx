@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   Share,
   View,
@@ -31,7 +32,7 @@ import {
   useToggleReelsLike,
 } from "@/src/features/reels/queries";
 import type { LikeResponse, Reels } from "@/src/features/reels/types";
-import { useMyProfile } from "@/src/features/user/queries";
+import { useBlockUser, useMyProfile } from "@/src/features/user/queries";
 import {
   downloadMyReelsVideo,
   getReelsShareUrl,
@@ -117,6 +118,49 @@ export default function FeedTab() {
 
   // 댓글 시트를 연 릴스. null 이면 닫힘.
   const [commentsFor, setCommentsFor] = useState<number | null>(null);
+
+  // ⋯ 메뉴를 연 릴스. 신고·차단 모두 차단 API 로 처리한다(신고 API 는 아직 없다).
+  const [moreFor, setMoreFor] = useState<Reels | null>(null);
+  const block = useBlockUser();
+
+  const blockAuthor = useCallback(
+    (target: Reels, reason: "report" | "block") => {
+      setMoreFor(null);
+      const userIdx = target.author.user_idx;
+      if (userIdx == null) {
+        // 추천 API 응답에 작성자 PK 가 없으면 차단 대상을 특정할 수 없다.
+        Alert.alert(
+          "처리할 수 없어요",
+          "작성자 정보를 받지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+        return;
+      }
+      Alert.alert(
+        reason === "report"
+          ? `${target.author.name}님의 릴스를 신고할까요?`
+          : `${target.author.name}님을 차단할까요?`,
+        "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
+        [
+          { text: "취소", style: "cancel" },
+          {
+            text: reason === "report" ? "신고하기" : "차단하기",
+            style: "destructive",
+            onPress: () =>
+              block.mutate(userIdx, {
+                onSuccess: () =>
+                  Alert.alert(
+                    reason === "report" ? "신고했어요" : "차단했어요",
+                    "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
+                  ),
+                onError: (err) =>
+                  Alert.alert("실패", describeApiError(err)),
+              }),
+          },
+        ],
+      );
+    },
+    [block],
+  );
 
   // 공유/다운로드 —
   // 추천 API 가 작성자 user_idx 를 주지 않아 내 영상 판별은 닉네임 비교로 한다.
@@ -234,6 +278,7 @@ export default function FeedTab() {
         onToggleLike={toggleLike}
         onOpenComments={setCommentsFor}
         onShare={onShare}
+        onOpenMore={setMoreFor}
         mine={isMyReels(item)}
         sharing={downloadingIdx === item.reels_idx}
       />
@@ -398,6 +443,110 @@ export default function FeedTab() {
         reelsIdx={commentsFor}
         onClose={() => setCommentsFor(null)}
       />
+
+      <MoreSheet
+        reels={moreFor}
+        onClose={() => setMoreFor(null)}
+        onReport={(r) => blockAuthor(r, "report")}
+        onBlock={(r) => blockAuthor(r, "block")}
+      />
     </View>
+  );
+}
+
+/** ⋯ 메뉴 — 신고·차단 두 줄. 신고 API 가 아직 없어 둘 다 차단으로 처리한다. */
+function MoreSheet({
+  reels,
+  onClose,
+  onReport,
+  onBlock,
+}: {
+  reels: Reels | null;
+  onClose: () => void;
+  onReport: (reels: Reels) => void;
+  onBlock: (reels: Reels) => void;
+}) {
+  return (
+    <Modal
+      visible={reels != null}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        className="flex-1 justify-end"
+        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        onPress={onClose}
+      >
+        {/* 시트 본문 — 배경 탭으로 닫히지 않게 이벤트를 여기서 끊는다. */}
+        <Pressable
+          onPress={() => {}}
+          style={{
+            backgroundColor: "#1C1C1C",
+            borderTopLeftRadius: scale(16),
+            borderTopRightRadius: scale(16),
+            paddingTop: verticalScale(8),
+            paddingBottom: verticalScale(16),
+          }}
+        >
+          <View
+            style={{
+              paddingHorizontal: scale(20),
+              paddingTop: verticalScale(8),
+              paddingBottom: verticalScale(4),
+            }}
+          >
+            <Text
+              className="text-gray-500"
+              numberOfLines={1}
+              style={{ fontSize: moderateScale(11) }}
+            >
+              {reels?.author.name ?? "영상"}
+            </Text>
+          </View>
+
+          <SheetRow
+            label="이 릴스 신고하기"
+            onPress={() => reels && onReport(reels)}
+          />
+          <SheetRow
+            label="이 사용자 차단하기"
+            onPress={() => reels && onBlock(reels)}
+          />
+          <SheetRow label="닫기" muted onPress={onClose} />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function SheetRow({
+  label,
+  muted = false,
+  onPress,
+}: {
+  label: string;
+  muted?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="active:opacity-60"
+      style={{
+        paddingHorizontal: scale(20),
+        paddingVertical: verticalScale(14),
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Text
+        className={muted ? "text-gray-500" : "font-semibold text-white"}
+        style={{ fontSize: moderateScale(14) }}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }

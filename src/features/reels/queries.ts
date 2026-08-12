@@ -133,7 +133,11 @@ export function useToggleCommentLike(reelsIdx: number | null) {
 function toReels(item: ReelsRecommendItem): Reels {
   return {
     reels_idx: item.reels_idx,
-    author: { name: item.nickname ?? "알 수 없음", avatar_url: item.profile_image },
+    author: {
+      name: item.nickname ?? "알 수 없음",
+      avatar_url: item.profile_image,
+      user_idx: item.user_idx ?? null,
+    },
     video_url: item.url,
     thumbnail_url: item.thumbnail_url,
     caption: item.title ?? "",
