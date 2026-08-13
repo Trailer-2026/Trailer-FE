@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -75,11 +74,16 @@ export default function MyReelsListScreen() {
     );
   };
 
-  // TODO: 삭제 API 나오면 여기서 호출 + 목록 캐시 무효화.
-  const removeReels = () => {
+  // 삭제 확인 창에 걸린 항목 (null 이면 닫힘)
+  const [confirmDelete, setConfirmDelete] = useState<MyReelsItem | null>(null);
+
+  const askDelete = (item: MyReelsItem) => {
     setMenu(null);
-    Alert.alert("삭제 준비 중", "영상 삭제는 곧 지원될 예정이에요.");
+    setConfirmDelete(item);
   };
+
+  // TODO: 삭제 API 나오면 여기서 호출 + 목록 캐시 무효화. 지금은 창만 닫는다.
+  const confirmDeleteReels = () => setConfirmDelete(null);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -228,7 +232,13 @@ export default function MyReelsListScreen() {
         screenWidth={width}
         onClose={() => setMenu(null)}
         onEdit={openStudio}
-        onDelete={removeReels}
+        onDelete={askDelete}
+      />
+
+      <DeleteConfirmDialog
+        item={confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={confirmDeleteReels}
       />
     </SafeAreaView>
   );
@@ -392,7 +402,7 @@ function ItemMenu({
                 height={moderateScale(18)}
               />
             }
-            label="수정"
+            label="수정하기"
             onPress={() => onEdit(state.item)}
           />
           <MenuRow
@@ -403,10 +413,103 @@ function ItemMenu({
                 color={TEXT_MAIN}
               />
             }
-            label="삭제"
+            label="삭제하기"
             onPress={() => onDelete(state.item)}
           />
         </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+/**
+ * 삭제 확인 창 — Figma '내영상' 삭제 확인 시안(254x178 흰 카드 + 25% 딤).
+ * 실제 삭제 API 는 아직 없어 '삭제'를 눌러도 창만 닫힌다.
+ */
+function DeleteConfirmDialog({
+  item,
+  onCancel,
+  onConfirm,
+}: {
+  item: MyReelsItem | null;
+  onCancel: () => void;
+  onConfirm: (item: MyReelsItem) => void;
+}) {
+  if (!item) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+        onPress={onCancel}
+      >
+        {/* 카드 안을 눌러도 닫히지 않게 이벤트를 막는다. */}
+        <Pressable
+          onPress={() => {}}
+          style={{
+            width: scale(254),
+            backgroundColor: "#FFFFFF",
+            borderRadius: scale(4),
+            paddingHorizontal: scale(21),
+            paddingTop: verticalScale(23),
+            paddingBottom: verticalScale(16),
+            elevation: 8,
+            shadowColor: "#000",
+          }}
+        >
+          <Text
+            className="font-bold"
+            style={{ fontSize: moderateScale(18), color: "#1C1C1C" }}
+          >
+            영상을 삭제하시겠습니까?
+          </Text>
+          <Text
+            className="font-medium"
+            style={{
+              fontSize: moderateScale(13),
+              lineHeight: moderateScale(20),
+              color: TEXT_MAIN,
+              marginTop: verticalScale(16),
+            }}
+          >
+            영상을 삭제하면 영구적으로{"\n"}삭제되며 실행취소할 수 없습니다.
+          </Text>
+
+          <View
+            className="flex-row justify-end"
+            style={{ gap: scale(32), marginTop: verticalScale(24) }}
+          >
+            <Pressable
+              onPress={onCancel}
+              hitSlop={10}
+              className="active:opacity-60"
+              accessibilityRole="button"
+              accessibilityLabel="취소"
+            >
+              <Text
+                className="font-bold"
+                style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
+              >
+                취소
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onConfirm(item)}
+              hitSlop={10}
+              className="active:opacity-60"
+              accessibilityRole="button"
+              accessibilityLabel="삭제"
+            >
+              <Text
+                className="font-bold"
+                style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
+              >
+                삭제
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );
