@@ -3,7 +3,11 @@ import { useEffect } from "react";
 
 import { notificationKeys } from "../notification/keys";
 
+import type { ReelsMediaAsset } from "@/src/features/reels/types";
+import { preparePhotoForUpload } from "@/src/features/video/photo-upload";
+
 import {
+  addTravelImages,
   createManualTravel,
   createSchedule,
   createTravel,
@@ -22,8 +26,11 @@ import {
 } from "./api";
 import { travelKeys } from "./keys";
 import type {
+  PastTravelCard,
   PastTravelListResponse,
   ScheduleCreateRequest,
+  TravelDetail,
+  TravelScheduleItem,
   ScheduleUpdateRequest,
   TravelCoverFile,
   TravelManualCreateRequest,
@@ -49,12 +56,110 @@ function setLikedInPast(
  * - 홈 진입 시 자동 실행.
  * - 저장 직후 mutation 이 invalidate 하므로 자동 갱신됨.
  */
+/**
+ * ⚠️ 개발용 임시 스위치 — '여행 완료' 상태 화면을 서버 데이터 없이 확인하기 위한 목업.
+ *
+ * 켜면 진행중 여행이 없는 것처럼(=홈 하단 카드 사라짐), 그 여행이 '다녀온 여행'에
+ * 들어간 것처럼 보인다. 서버는 건드리지 않고 화면만 바꾼다.
+ * 확인이 끝나면 이 상수를 false 로 되돌릴 것. (__DEV__ 라 릴리스 빌드에는 영향 없음)
+ */
+const MOCK_TRAVEL_COMPLETED = __DEV__ && false;
+
+/** 목업 여행의 PK. 서버에 없는 값이라 실제 조회는 전부 목업으로 대체한다. */
+const MOCK_TRAVEL_IDX = -1;
+
+/** 목업 '다녀온 여행' 1건 — 목록·상세가 같은 값을 쓴다. */
+const MOCK_PAST_TRAVEL: PastTravelCard = {
+  travel_idx: MOCK_TRAVEL_IDX,
+  title: "부산 여행",
+  start_date: "2026-08-01",
+  end_date: "2026-08-03",
+  status: "COMPLETED",
+  cover_image_url: null,
+  liked: false,
+};
+
+/** 목업 여행 상세 — 완료 화면(일정표 + '내 여행 영상 만들기')을 그리는 데 필요한 최소 데이터. */
+function mockTravelDetail(): TravelDetail {
+  const item = (
+    schedule_idx: number,
+    sequence: number,
+    kind: string,
+    title: string,
+    start_time: string,
+    extra: Partial<TravelScheduleItem> = {},
+  ): TravelScheduleItem => ({
+    schedule_idx,
+    sequence,
+    kind,
+    title,
+    train_no: null,
+    train_grade: null,
+    dep_station: null,
+    arr_station: null,
+    car_no: null,
+    seat_no: null,
+    start_time,
+    end_time: null,
+    latitude: null,
+    longitude: null,
+    image_url: null,
+    memo: null,
+    ...extra,
+  });
+
+  return {
+    travel_idx: MOCK_TRAVEL_IDX,
+    title: MOCK_PAST_TRAVEL.title,
+    start_date: MOCK_PAST_TRAVEL.start_date,
+    end_date: MOCK_PAST_TRAVEL.end_date,
+    region: "부산",
+    status: "COMPLETED",
+    days: [
+      {
+        day_no: 1,
+        date: MOCK_PAST_TRAVEL.start_date,
+        items: [
+          item(-101, 1, "train", "KTX 101 서울→부산", "09:00:00", {
+            train_no: "101",
+            train_grade: "KTX",
+            dep_station: "서울",
+            arr_station: "부산",
+            car_no: "3",
+            seat_no: "12A",
+            end_time: "11:40:00",
+          }),
+          item(-102, 2, "visit", "감천문화마을", "13:00:00", {
+            latitude: 35.0975,
+            longitude: 129.0107,
+          }),
+        ],
+      },
+      {
+        day_no: 2,
+        date: "2026-08-02",
+        items: [
+          item(-103, 1, "visit", "해운대 해수욕장", "10:00:00", {
+            latitude: 35.1587,
+            longitude: 129.1604,
+          }),
+        ],
+      },
+    ],
+  };
+}
+
 export function useCurrentTravel() {
-  return useQuery({
+  const query = useQuery({
     queryKey: travelKeys.current(),
     queryFn: getCurrentTravel,
+    // 목업 모드에선 응답을 어차피 버리므로 요청 자체를 보내지 않는다(로그인 전 401 소음 방지).
+    enabled: !MOCK_TRAVEL_COMPLETED,
     staleTime: 1000 * 60, // 1분
   });
+  // 여행이 끝나면 서버가 data=null 을 주므로, 목업도 null 로 맞춘다.
+  if (MOCK_TRAVEL_COMPLETED) return { ...query, data: null };
+  return query;
 }
 
 /**
@@ -62,11 +167,28 @@ export function useCurrentTravel() {
  * 없으면 travels=[] 로 온다.
  */
 export function usePastTravels() {
-  return useQuery({
+  const query = useQuery({
     queryKey: travelKeys.past(),
     queryFn: getPastTravels,
+    // 목업 모드에선 서버를 보지 않는다 — 목록을 목업으로 통째 대체하므로 요청이 무의미하다.
+    enabled: !MOCK_TRAVEL_COMPLETED,
     staleTime: 1000 * 60, // 1분
   });
+
+  // 목업: '다녀온 여행' 을 완료된 여행 1건으로 대체한다.
+  // 상세도 useTravelDetail 이 같은 목업을 돌려주므로 카드를 눌러 완료 화면까지 볼 수 있다.
+  if (MOCK_TRAVEL_COMPLETED) {
+    const mocked = [MOCK_PAST_TRAVEL];
+    return {
+      ...query,
+      // 서버 조회를 껐으므로(로그인 전이어도) 목업은 항상 보인다.
+      isLoading: false,
+      isError: false,
+      data: { travels: mocked, total: mocked.length },
+    };
+  }
+
+  return query;
 }
 
 /**
@@ -116,12 +238,24 @@ export function useToggleTravelLike() {
  * - 404/401 은 호출부(TravelDetailView)에서 isAxiosError status 로 분기.
  */
 export function useTravelDetail(travelIdx?: number) {
-  return useQuery({
+  const mocked = MOCK_TRAVEL_COMPLETED && travelIdx === MOCK_TRAVEL_IDX;
+  const query = useQuery({
     queryKey: travelKeys.detail(travelIdx ?? -1),
     queryFn: () => getTravelDetail(travelIdx!),
-    enabled: travelIdx != null,
+    // 목업 여행은 서버에 없다 — 요청을 보내지 않고 아래에서 목업으로 응답한다.
+    enabled: travelIdx != null && !mocked,
     staleTime: 1000 * 60, // 1분
   });
+  if (mocked) {
+    return {
+      ...query,
+      isLoading: false,
+      isError: false,
+      error: null,
+      data: mockTravelDetail(),
+    };
+  }
+  return query;
 }
 
 /**
@@ -306,5 +440,35 @@ export function useDeleteTravelCover() {
   return useMutation({
     mutationFn: (travelIdx: number) => deleteTravelCoverImage(travelIdx),
     onSuccess: (data) => invalidateTravelThumbnails(queryClient, data.travel_idx),
+  });
+}
+
+/**
+ * 여행 사진 붙이기. 업로드 전 리사이즈·EXIF(GPS·촬영시각) 재주입까지 여기서 한다 —
+ * 서버가 EXIF GPS 로 일정에 자동 매핑하므로 좌표가 사라지면 매핑이 안 된다.
+ *
+ * 성공하면 여행 상세(days[].items[].images / 최상단 images)가 바뀌므로 상세를 무효화한다.
+ */
+export function useAddTravelImages() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      travelIdx,
+      photos,
+      scheduleIdx,
+    }: {
+      travelIdx: number;
+      photos: ReelsMediaAsset[];
+      scheduleIdx?: number | null;
+    }) => {
+      const files = await Promise.all(
+        photos.map((photo, index) => preparePhotoForUpload(photo, index)),
+      );
+      return addTravelImages(travelIdx, files, scheduleIdx);
+    },
+    onSuccess: (_data, vars) =>
+      queryClient.invalidateQueries({
+        queryKey: travelKeys.detail(vars.travelIdx),
+      }),
   });
 }

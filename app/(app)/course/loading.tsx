@@ -32,7 +32,9 @@ export default function LoadingScreen() {
   useEffect(() => {
     if (data || isError) return;
     const startedAt = Date.now();
-    const T = 8000; // 시상수(ms). ~15s 에서 80%, ~25s 에서 90% 근처.
+    // 시상수(ms). 최대 2분까지 걸릴 수 있어 곡선을 완만하게 잡는다
+    // (~35s 에서 75%, ~70s 에서 90% 근처). 너무 빠르면 95% 에서 오래 멈춰 보인다.
+    const T = 25000;
     const tick = setInterval(() => {
       const elapsed = Date.now() - startedAt;
       const next = Math.round(95 * (1 - Math.exp(-elapsed / T)));
@@ -104,6 +106,18 @@ export default function LoadingScreen() {
               style={{ fontSize: moderateScale(15), marginTop: verticalScale(8) }}
             >
               일정을 만들고 있어요
+            </Text>
+            {/* 응답이 오래 걸리는 API 라 미리 알려준다(멈춘 줄 알고 나가지 않게). */}
+            <Text
+              className="text-center text-gray-400"
+              style={{
+                fontSize: moderateScale(13),
+                lineHeight: moderateScale(19),
+                marginTop: verticalScale(10),
+              }}
+            >
+              최대 2분까지 걸릴 수 있어요.{"\n"}화면을 벗어나지 말고 잠시만
+              기다려 주세요.
             </Text>
           </>
         )}

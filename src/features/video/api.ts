@@ -83,6 +83,39 @@ export async function renderPhotosOrdered(
   return res.data.data;
 }
 
+/**
+ * 여행 일정으로 영상 렌더 시작. POST /api/videos/render/travel (urlencoded).
+ *
+ * 사진을 올리는 photos-ordered 와 달리 재료가 이미 서버에 있다 — 여행 일정(day_no,
+ * sequence) 순서로 이동 경로를 그리고, 일정에 붙여 둔 사진을 그 지점에서 보여준다.
+ * (직전 지점 기준 1km 미만인 연속 일정은 한 지점으로 묶이고, 기차 일정은 출발역 좌표가
+ *  경유 지점이 된다. 다운로드에 실패한 이미지는 건너뛴다.)
+ *
+ * 응답은 즉시 오고 status=running — reels_idx 로 getRenderStatus 폴링한다.
+ * title 을 비우면 여행 제목이 릴스 제목이 된다. 영상 앞뒤 인트로·아웃트로는 서버 고정.
+ * 400: 일정이 없거나 지점이 2개 미만 / 404: 없거나 본인 여행이 아님·BGM 없음 / 401.
+ */
+export async function renderTravelVideo(
+  travelIdx: number,
+  options: RenderOptions,
+): Promise<VideoRenderStatusResponse> {
+  const body = new URLSearchParams({
+    travel_idx: String(travelIdx),
+    theme: options.theme,
+  });
+  // 빈 값(무음)도 그대로 보낸다 — 서버가 빈 문자열을 무음으로 해석한다.
+  body.append("bgm", options.bgm ?? "");
+  body.append("title", options.title?.trim() ?? "");
+
+  const res = await api.post<CommonResponse<VideoRenderStatusResponse>>(
+    "/api/videos/render/travel",
+    body.toString(),
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
 /** 서버 상한(100MB). 넘으면 413 이 오는데 그 응답은 공통 봉투가 아니라 안내가 어렵다. */
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
@@ -153,6 +186,20 @@ export async function updateReelsTitle(
     `/api/videos/reels/${reelsIdx}/title`,
     { title },
   );
+}
+
+/**
+ * 릴스 삭제. DELETE /api/videos/reels/{reels_idx}
+ *
+ * 추천 피드·마이페이지 목록·공유 링크에서 즉시 사라지고 **복구할 수 없다**.
+ * 영상·썸네일 파일 정리가 실패해도 삭제 자체는 성공으로 응답하므로(서버 로그에만 남는다),
+ * 이미 알고 있던 파일 주소로는 계속 재생될 수 있다. 발급된 공유 링크(/r/{reels_idx})는 404.
+ * 렌더가 끝나지 않은 릴스도 지울 수 있다(멈춘 렌더 정리용). 달린 댓글·좋아요는 함께 지워지지
+ * 않지만 릴스가 노출되지 않아 어디에서도 보이지 않는다.
+ * 404: 릴스 없음(남의 릴스도 존재를 숨기려 403 이 아니라 404) / 401: 인증 필요.
+ */
+export async function deleteReels(reelsIdx: number): Promise<void> {
+  await api.delete<CommonResponse<null>>(`/api/videos/reels/${reelsIdx}`);
 }
 
 /**

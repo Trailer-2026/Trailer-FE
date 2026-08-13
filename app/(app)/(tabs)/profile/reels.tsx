@@ -1,10 +1,10 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -15,26 +15,39 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
+import EditPencilIcon from "@/src/components/icons/EditPencilIcon";
 import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
+import TrashIcon from "@/src/components/icons/TrashIcon";
 import { Text } from "@/src/components/Text";
 import { useMyReels } from "@/src/features/user/queries";
 import type { MyReelsItem } from "@/src/features/user/types";
+import { useDeleteReels } from "@/src/features/video/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
-const COLS = 3;
-const GAP = 2;
+/** Figma 시안 색 — 헤더 띠 / 본문 텍스트 / 보조 텍스트 / 썸네일 자리 */
+const HEADER_BG = "#EAEEF7";
+const TEXT_MAIN = "#353535";
+const TEXT_SUB = "#656565";
+const THUMB_BG = "#F5F5F7";
+
+/** 시안 기준 썸네일 122x81(가로형) */
+const THUMB_W = 122;
+const THUMB_H = 81;
+
+/** ⋯ 메뉴 카드 크기(시안 165 폭). 화면 밖으로 나가지 않게 오른쪽 여백을 둔다. */
+const MENU_W = 165;
 
 /**
- * 내 영상 — 인스타 프로필처럼 썸네일 3열 그리드.
+ * 내 영상 — Figma '내영상 / 업로드된 영상' 탭 시안대로 가로형 썸네일 리스트.
  *
- * 칸을 누르면 그 릴스부터 세로 스와이프 재생(reels-player), 우상단 ⋯ 은 바로 편집(studio).
- * 썸네일이 없는(옛 릴스·추출 실패) 항목은 어두운 자리표시자로 둔다 — 영상 첫 프레임을
- * 뽑으려면 별도 라이브러리가 필요해 그리드에서는 재생하지 않는다.
+ * 한 줄 = 썸네일(122x81) + 제목 + 보조정보 + 지역, 오른쪽 ⋯ 로 수정/삭제 메뉴.
+ * 시안의 '임시저장' 탭은 추후 업데이트 예정이라 지금은 만들지 않는다(탭 바 자체를 생략).
+ * 시안의 조회수·영상 길이·업로드 시각은 서버 응답(MyReelsItem)에 없는 값이라
+ * 서버가 주는 좋아요·댓글 수로 대체한다 — 필드가 생기면 그 자리에 넣으면 된다.
  */
-export default function MyReelsGridScreen() {
+export default function MyReelsListScreen() {
   const { width } = useWindowDimensions();
-  const cell = (width - GAP * (COLS - 1)) / COLS;
 
   const {
     data: reels = [],
@@ -47,31 +60,58 @@ export default function MyReelsGridScreen() {
     isFetchingNextPage,
   } = useMyReels();
 
-  // ⋯ 로 연 항목 (null 이면 닫힘)
-  const [menuFor, setMenuFor] = useState<MyReelsItem | null>(null);
+  // ⋯ 로 연 항목과 그 버튼의 화면 좌표(메뉴를 버튼 옆에 띄우기 위함).
+  const [menu, setMenu] = useState<{ item: MyReelsItem; y: number } | null>(
+    null,
+  );
 
   const openPlayer = (item: MyReelsItem) =>
     router.push(`/profile/reels-player?reels_idx=${item.reels_idx}`);
 
   const openStudio = (item: MyReelsItem) => {
-    setMenuFor(null);
+    setMenu(null);
     // title 도 함께 넘겨 편집 화면이 현재 제목을 그대로 보여주고 고칠 수 있게 한다.
     router.push(
       `/reels/studio?reels_idx=${item.reels_idx}&url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title ?? "")}`,
     );
   };
 
+  // 삭제 확인 창에 걸린 항목 (null 이면 닫힘)
+  const [confirmDelete, setConfirmDelete] = useState<MyReelsItem | null>(null);
+  const deleteReels = useDeleteReels();
+
+  const askDelete = (item: MyReelsItem) => {
+    setMenu(null);
+    setConfirmDelete(item);
+  };
+
+  // 되돌릴 수 없는 요청이라 응답을 받은 뒤에 창을 닫는다(연타·중복 호출 방지).
+  const runDelete = (item: MyReelsItem) => {
+    if (deleteReels.isPending) return;
+    deleteReels.mutate(item.reels_idx, {
+      onSuccess: () => setConfirmDelete(null),
+      onError: (err) => {
+        setConfirmDelete(null);
+        Alert.alert("삭제 실패", describeApiError(err));
+      },
+    });
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <StatusBar style="dark" />
 
-      {/* 헤더 */}
+      {/* 헤더 — 시안의 연한 파란 띠 + 아래 구분선 */}
       <View
         className="flex-row items-center"
         style={{
-          paddingHorizontal: scale(16),
-          paddingVertical: verticalScale(12),
-          gap: scale(12),
+          backgroundColor: HEADER_BG,
+          paddingHorizontal: scale(22),
+          paddingTop: verticalScale(18),
+          paddingBottom: verticalScale(18),
+          gap: scale(14),
+          borderBottomWidth: 1,
+          borderBottomColor: "#DDE3EF",
         }}
       >
         <Pressable
@@ -81,14 +121,14 @@ export default function MyReelsGridScreen() {
           accessibilityLabel="뒤로"
         >
           <BackIcon
-            color="#111827"
-            width={moderateScale(20)}
-            height={moderateScale(20)}
+            color={TEXT_MAIN}
+            width={moderateScale(18)}
+            height={moderateScale(18)}
           />
         </Pressable>
         <Text
-          className="font-semibold text-gray-900"
-          style={{ fontSize: moderateScale(16) }}
+          className="font-bold"
+          style={{ fontSize: moderateScale(16), color: TEXT_MAIN }}
         >
           내 영상
         </Text>
@@ -103,7 +143,7 @@ export default function MyReelsGridScreen() {
           className="flex-1 items-center justify-center"
           style={{ paddingHorizontal: scale(24), gap: verticalScale(10) }}
         >
-          <Text className="text-gray-700" style={{ fontSize: moderateScale(14) }}>
+          <Text style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}>
             내 영상을 불러오지 못했어요.
           </Text>
           <Text
@@ -158,9 +198,25 @@ export default function MyReelsGridScreen() {
         <FlatList
           data={reels}
           keyExtractor={(item) => String(item.reels_idx)}
-          numColumns={COLS}
-          columnWrapperStyle={{ gap: GAP }}
-          contentContainerStyle={{ gap: GAP, paddingBottom: verticalScale(24) }}
+          contentContainerStyle={{
+            paddingHorizontal: scale(20),
+            paddingBottom: verticalScale(24),
+            gap: verticalScale(14),
+          }}
+          ListHeaderComponent={
+            <Text
+              className="font-bold"
+              style={{
+                fontSize: moderateScale(14),
+                color: TEXT_MAIN,
+                marginTop: verticalScale(30),
+                marginBottom: verticalScale(14),
+                paddingHorizontal: scale(3),
+              }}
+            >
+              영상 {reels.length}
+            </Text>
+          }
           onEndReachedThreshold={0.6}
           onEndReached={() => {
             if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
@@ -174,193 +230,304 @@ export default function MyReelsGridScreen() {
           }
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <GridCell
+            <ReelsRow
               item={item}
-              size={cell}
               onPress={() => openPlayer(item)}
-              onMenu={() => setMenuFor(item)}
+              onMenu={(y) => setMenu({ item, y })}
             />
           )}
         />
       )}
 
       <ItemMenu
-        item={menuFor}
-        onClose={() => setMenuFor(null)}
+        state={menu}
+        screenWidth={width}
+        onClose={() => setMenu(null)}
         onEdit={openStudio}
+        onDelete={askDelete}
+      />
+
+      <DeleteConfirmDialog
+        item={confirmDelete}
+        deleting={deleteReels.isPending}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={runDelete}
       />
     </SafeAreaView>
   );
 }
 
-/** 그리드 한 칸 — 썸네일(세로 4:5 비율) + 우상단 ⋯ + 좌하단 제목/지역. */
-function GridCell({
+/** 목록 한 줄 — 가로 썸네일 + 제목/보조정보/지역 + 우측 ⋯. */
+function ReelsRow({
   item,
-  size,
   onPress,
   onMenu,
 }: {
   item: MyReelsItem;
-  size: number;
   onPress: () => void;
-  onMenu: () => void;
+  onMenu: (y: number) => void;
 }) {
-  // 세로(9:16) 영상이라 칸도 세로로 길게. 1.5 면 3열에서도 화면이 답답하지 않다.
-  const height = size * 1.5;
-
   return (
     <Pressable
       onPress={onPress}
-      className="active:opacity-80"
-      style={{ width: size, height }}
+      className="flex-row items-start active:opacity-80"
+      style={{ gap: scale(10) }}
     >
-      {item.thumbnail_url ? (
-        <Image
-          source={{ uri: item.thumbnail_url }}
-          style={{ width: "100%", height: "100%" }}
-          contentFit="cover"
-          transition={150}
-        />
-      ) : (
-        <View className="h-full w-full items-center justify-center bg-gray-200">
-          <Text className="text-gray-400" style={{ fontSize: moderateScale(14) }}>
-            ▶
-          </Text>
-        </View>
-      )}
-
-      {/* ⋯ — 누르면 편집 메뉴. 칸 탭(재생)과 겹치지 않게 눌리는 영역을 분리한다. */}
-      <Pressable
-        onPress={onMenu}
-        hitSlop={10}
-        className="absolute items-center justify-center"
+      {/* 썸네일 — 세로 영상이라 잘리지 않게 contain, 남는 자리는 시안의 회색 배경 */}
+      <View
         style={{
-          top: scale(4),
-          right: scale(4),
-          width: scale(24),
-          height: scale(24),
-          borderRadius: scale(12),
-          backgroundColor: "rgba(0,0,0,0.45)",
+          width: scale(THUMB_W),
+          height: verticalScale(THUMB_H),
+          borderRadius: scale(4),
+          backgroundColor: THUMB_BG,
+          overflow: "hidden",
         }}
+      >
+        {item.thumbnail_url ? (
+          <Image
+            source={{ uri: item.thumbnail_url }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="contain"
+            transition={150}
+          />
+        ) : (
+          <View className="h-full w-full items-center justify-center">
+            <Text
+              className="text-gray-400"
+              style={{ fontSize: moderateScale(14) }}
+            >
+              ▶
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* 본문 */}
+      <View className="flex-1" style={{ paddingTop: verticalScale(4) }}>
+        <Text
+          className="font-semibold"
+          numberOfLines={1}
+          style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
+        >
+          {item.title ?? "제목 없는 영상"}
+        </Text>
+        <Text
+          className="font-medium"
+          numberOfLines={1}
+          style={{
+            fontSize: moderateScale(12),
+            color: TEXT_SUB,
+            marginTop: verticalScale(4),
+          }}
+        >
+          좋아요 {item.like_count}회 ∙ 댓글 {item.comment_count}개
+        </Text>
+        {item.region ? (
+          <View
+            className="flex-row items-center"
+            style={{ gap: scale(4), marginTop: verticalScale(7) }}
+          >
+            <PlaceMarkerIcon
+              width={moderateScale(8)}
+              height={moderateScale(10)}
+              color={TEXT_SUB}
+              dotFill="#FFFFFF"
+            />
+            <Text
+              className="font-medium"
+              numberOfLines={1}
+              style={{ fontSize: moderateScale(12), color: TEXT_SUB }}
+            >
+              {item.region}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* ⋯ (세로 3점) — 줄 탭(재생)과 겹치지 않게 눌리는 영역을 분리한다. */}
+      <Pressable
+        // 메뉴를 누른 자리에 띄우려고 터치 지점(pageY)을 그대로 넘긴다.
+        // measureInWindow 는 콜백이 안 오면 메뉴가 영영 안 열려서 쓰지 않는다.
+        onPress={(e) => onMenu(e.nativeEvent.pageY)}
+        hitSlop={12}
+        className="items-center justify-center"
+        style={{ paddingTop: verticalScale(4), gap: verticalScale(3) }}
         accessibilityRole="button"
         accessibilityLabel={`${item.title ?? "영상"} 더보기`}
       >
-        <Text
-          className="font-bold text-white"
-          style={{ fontSize: moderateScale(13) }}
-        >
-          ⋯
-        </Text>
-      </Pressable>
-
-      {/* 지역 — 좌상단 핀 배지(API 규격) */}
-      {item.region ? (
-        <View
-          className="absolute flex-row items-center"
-          pointerEvents="none"
-          style={{
-            top: scale(4),
-            left: scale(4),
-            backgroundColor: "rgba(0,0,0,0.55)",
-            borderRadius: scale(10),
-            paddingHorizontal: scale(6),
-            paddingVertical: verticalScale(2),
-            gap: scale(2),
-          }}
-        >
-          <PlaceMarkerIcon
-            width={moderateScale(7)}
-            height={moderateScale(9)}
-            color="#FFFFFF"
-            dotFill="rgba(0,0,0,0.55)"
+        {[0, 1, 2].map((i) => (
+          <View
+            key={i}
+            style={{
+              width: moderateScale(3),
+              height: moderateScale(3),
+              borderRadius: moderateScale(2),
+              backgroundColor: TEXT_MAIN,
+            }}
           />
-          <Text
-            className="font-semibold text-white"
-            numberOfLines={1}
-            style={{ fontSize: moderateScale(9) }}
-          >
-            {item.region}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* 제목 — 하단 그라데이션 띠. 지역과 겹치지 않게 위치를 분리한다. */}
-      {item.title ? (
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.75)"]}
-          className="absolute inset-x-0 bottom-0"
-          pointerEvents="none"
-          style={{
-            paddingHorizontal: scale(6),
-            paddingTop: verticalScale(14),
-            paddingBottom: verticalScale(5),
-          }}
-        >
-          <Text
-            className="font-medium text-white"
-            numberOfLines={2}
-            style={{ fontSize: moderateScale(10), lineHeight: moderateScale(13) }}
-          >
-            {item.title}
-          </Text>
-        </LinearGradient>
-      ) : null}
+        ))}
+      </Pressable>
     </Pressable>
   );
 }
 
-/** ⋯ 메뉴 — 지금은 편집 하나뿐이라 시트 한 줄로 끝낸다. */
+/** ⋯ 메뉴 — 시안의 흰 카드(수정 / 삭제). 누른 ⋯ 옆에 뜬다. */
 function ItemMenu({
-  item,
+  state,
+  screenWidth,
   onClose,
   onEdit,
+  onDelete,
 }: {
-  item: MyReelsItem | null;
+  state: { item: MyReelsItem; y: number } | null;
+  screenWidth: number;
   onClose: () => void;
   onEdit: (item: MyReelsItem) => void;
+  onDelete: (item: MyReelsItem) => void;
 }) {
+  if (!state) return null;
+
   return (
-    <Modal
-      visible={item != null}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1" onPress={onClose}>
+        <View
+          style={{
+            position: "absolute",
+            // ⋯ 바로 아래에 붙이되 화면 오른쪽 여백(20)은 유지한다.
+            top: state.y + verticalScale(18),
+            left: screenWidth - scale(MENU_W) - scale(20),
+            width: scale(MENU_W),
+            backgroundColor: "#FFFFFF",
+            borderRadius: scale(4),
+            paddingVertical: verticalScale(6),
+            elevation: 6,
+            shadowColor: "#000",
+          }}
+        >
+          <MenuRow
+            icon={
+              <EditPencilIcon
+                width={moderateScale(18)}
+                height={moderateScale(18)}
+              />
+            }
+            label="수정하기"
+            onPress={() => onEdit(state.item)}
+          />
+          <MenuRow
+            icon={
+              <TrashIcon
+                width={moderateScale(18)}
+                height={moderateScale(20)}
+                color={TEXT_MAIN}
+              />
+            }
+            label="삭제하기"
+            onPress={() => onDelete(state.item)}
+          />
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+/**
+ * 삭제 확인 창 — Figma '내영상' 삭제 확인 시안(254x178 흰 카드 + 25% 딤).
+ * DELETE /api/videos/reels/{reels_idx} 는 되돌릴 수 없어 여기서 한 번 더 확인받는다.
+ */
+function DeleteConfirmDialog({
+  item,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  item: MyReelsItem | null;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: (item: MyReelsItem) => void;
+}) {
+  if (!item) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable
-        className="flex-1 justify-end"
-        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        onPress={onClose}
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+        // 삭제 요청 중에는 바깥을 눌러도 닫지 않는다 — 결과를 보고 닫는다.
+        onPress={deleting ? undefined : onCancel}
       >
+        {/* 카드 안을 눌러도 닫히지 않게 이벤트를 막는다. */}
         <Pressable
           onPress={() => {}}
           style={{
+            width: scale(254),
             backgroundColor: "#FFFFFF",
-            borderTopLeftRadius: scale(16),
-            borderTopRightRadius: scale(16),
-            paddingVertical: verticalScale(8),
+            borderRadius: scale(4),
+            paddingHorizontal: scale(21),
+            paddingTop: verticalScale(23),
+            paddingBottom: verticalScale(16),
+            elevation: 8,
+            shadowColor: "#000",
           }}
         >
-          <View
+          <Text
+            className="font-bold"
+            style={{ fontSize: moderateScale(18), color: "#1C1C1C" }}
+          >
+            영상을 삭제하시겠습니까?
+          </Text>
+          <Text
+            className="font-medium"
             style={{
-              paddingHorizontal: scale(20),
-              paddingTop: verticalScale(8),
-              paddingBottom: verticalScale(4),
+              fontSize: moderateScale(13),
+              lineHeight: moderateScale(20),
+              color: TEXT_MAIN,
+              marginTop: verticalScale(16),
             }}
           >
-            <Text
-              className="text-gray-400"
-              numberOfLines={1}
-              style={{ fontSize: moderateScale(11) }}
-            >
-              {item?.title ?? "제목 없는 영상"}
-            </Text>
-          </View>
+            영상을 삭제하면 영구적으로{"\n"}삭제되며 실행취소할 수 없습니다.
+          </Text>
 
-          <MenuRow
-            label="영상 편집"
-            onPress={() => item && onEdit(item)}
-          />
-          <MenuRow label="닫기" muted onPress={onClose} />
+          <View
+            className="flex-row justify-end"
+            style={{ gap: scale(32), marginTop: verticalScale(24) }}
+          >
+            <Pressable
+              onPress={onCancel}
+              disabled={deleting}
+              hitSlop={10}
+              className="active:opacity-60"
+              style={{ opacity: deleting ? 0.4 : 1 }}
+              accessibilityRole="button"
+              accessibilityLabel="취소"
+            >
+              <Text
+                className="font-bold"
+                style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
+              >
+                취소
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onConfirm(item)}
+              disabled={deleting}
+              hitSlop={10}
+              className="active:opacity-60"
+              accessibilityRole="button"
+              accessibilityLabel="삭제"
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color={TEXT_MAIN} />
+              ) : (
+                <Text
+                  className="font-bold"
+                  style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
+                >
+                  삭제
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -368,28 +535,35 @@ function ItemMenu({
 }
 
 function MenuRow({
+  icon,
   label,
-  muted = false,
   onPress,
 }: {
+  icon: React.ReactNode;
   label: string;
-  muted?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className="active:opacity-60"
+      className="flex-row items-center active:opacity-60"
       style={{
-        paddingHorizontal: scale(20),
-        paddingVertical: verticalScale(14),
+        paddingHorizontal: scale(18),
+        paddingVertical: verticalScale(9),
+        gap: scale(10),
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
+      <View
+        className="items-center justify-center"
+        style={{ width: moderateScale(24), height: moderateScale(24) }}
+      >
+        {icon}
+      </View>
       <Text
-        className={muted ? "text-gray-400" : "font-semibold text-gray-900"}
-        style={{ fontSize: moderateScale(14) }}
+        className="font-medium"
+        style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
       >
         {label}
       </Text>

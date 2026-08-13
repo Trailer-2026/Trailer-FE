@@ -158,7 +158,9 @@ export default function MyReelsPlayerScreen() {
   );
 
   // 지금 화면을 채우고 있는 카드 = 재생할 카드.
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // initialScrollIndex 로 중간 카드부터 열면 onViewableItemsChanged 가 바로 오지 않아
+  // 재생할 카드가 정해지지 않는다(= 검은 화면). 그래서 넘겨받은 릴스로 시작한다.
+  const [activeIdx, setActiveIdx] = useState<number | null>(startIdx);
   const [visiblePosition, setVisiblePosition] = useState(0);
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -207,6 +209,35 @@ export default function MyReelsPlayerScreen() {
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     setViewportHeight(e.nativeEvent.layout.height);
   }, []);
+
+  /**
+   * 목록에서 고른 릴스로 첫 위치를 맞춘다.
+   *
+   * FlatList 의 initialScrollIndex 는 안드로이드에서 pagingEnabled 와 함께 쓰면 콘텐츠
+   * 높이가 확정되는 순간 위치가 0 으로 되돌아가는 일이 있다. 그러면 화면에는 첫 카드가
+   * 보이는데 재생 대상은 고른 카드라 아무 영상도 안 나온다 — 그래서 높이를 안 뒤에
+   * 오프셋으로 직접 이동한다(카드 높이가 고정이라 계산이 정확하다).
+   */
+  const listRef = useRef<FlatList<MyReelsItem>>(null);
+  const startPosition = Math.max(
+    0,
+    reels.findIndex((r) => r.reels_idx === startIdx),
+  );
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (jumped.current) return;
+    if (viewportHeight <= 0 || reels.length === 0) return;
+    jumped.current = true;
+    if (startPosition === 0) return;
+    setVisiblePosition(startPosition);
+    // 첫 프레임에는 리스트가 아직 안 그려져 있어 다음 프레임에 옮긴다.
+    requestAnimationFrame(() =>
+      listRef.current?.scrollToOffset({
+        offset: viewportHeight * startPosition,
+        animated: false,
+      }),
+    );
+  }, [viewportHeight, reels.length, startPosition]);
 
   const renderItem = useCallback(
     ({ item }: { item: MyReelsItem }) => (
@@ -301,11 +332,11 @@ export default function MyReelsPlayerScreen() {
         </View>
       ) : viewportHeight > 0 ? (
         <FlatList
+          ref={listRef}
           data={reels}
           keyExtractor={(item) => String(item.reels_idx)}
           renderItem={renderItem}
           pagingEnabled
-          snapToInterval={viewportHeight}
           snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
@@ -315,12 +346,9 @@ export default function MyReelsPlayerScreen() {
             index,
           })}
           windowSize={3}
-          removeClippedSubviews
-          // 그리드에서 고른 릴스부터 시작(없으면 처음부터). getItemLayout 이 있어 바로 점프된다.
-          initialScrollIndex={Math.max(
-            0,
-            reels.findIndex((r) => r.reels_idx === startIdx),
-          )}
+          // removeClippedSubviews 는 쓰지 않는다 — 안드로이드에서 위치를 옮겨 들어가면
+          // 카드가 통째로 안 그려지는 문제가 있다(windowSize 로 충분하다).
+          // 시작 위치는 위 useEffect 가 scrollToOffset 으로 맞춘다.
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
         />

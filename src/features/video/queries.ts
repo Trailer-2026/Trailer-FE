@@ -6,10 +6,12 @@ import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { userKeys } from "@/src/features/user/keys";
 import {
   cutVideoSection,
+  deleteReels,
   getBgmTracks,
   getRenderStatus,
   insertImageClip,
   renderPhotosOrdered,
+  renderTravelVideo,
   updateReelsTitle,
   uploadReelsVideo,
 } from "./api";
@@ -74,6 +76,22 @@ export function useRenderPhotosOrdered() {
 }
 
 /**
+ * 여행 일정으로 영상 렌더 시작. 사진을 올리지 않아 요청이 가볍다(옵션만 보낸다).
+ * 성공하면 reels_idx 를 돌려주므로 호출부가 진행률 화면으로 넘긴다.
+ */
+export function useRenderTravelVideo() {
+  return useMutation({
+    mutationFn: ({
+      travelIdx,
+      options,
+    }: {
+      travelIdx: number;
+      options: RenderOptions;
+    }) => renderTravelVideo(travelIdx, options),
+  });
+}
+
+/**
  * 직접 만든 영상 업로드. 응답 시점에 이미 완성된 릴스라 폴링 없이 목록만 갱신한다.
  * (내 영상 목록 + 릴스 추천·홈 카드)
  */
@@ -104,6 +122,24 @@ export function useUpdateReelsTitle() {
       updateReelsTitle(vars.reelsIdx, vars.title),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
+    },
+  });
+}
+
+/**
+ * 릴스 삭제. 되돌릴 수 없어 호출부에서 확인을 받고 부른다.
+ *
+ * 지운 릴스는 내 목록·좋아요 목록·추천 피드 어디에서도 보이면 안 되므로
+ * 관련 캐시를 모두 무효화한다.
+ */
+export function useDeleteReels() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reelsIdx: number) => deleteReels(reelsIdx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      queryClient.invalidateQueries({ queryKey: userKeys.likedReels() });
       queryClient.invalidateQueries({ queryKey: reelsKeys.all });
     },
   });

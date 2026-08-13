@@ -1,5 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useQueryClient } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -7,6 +8,7 @@ import {
   Image,
   ImageBackground,
   Pressable,
+  RefreshControl,
   ScrollView,
   useWindowDimensions,
   View,
@@ -15,11 +17,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
 import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
+import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
 import ThemeSwapIcon from "@/src/components/icons/ThemeSwapIcon";
 import { Text } from "@/src/components/Text";
 import type { Theme } from "@/src/features/course/types";
+import { placeKeys } from "@/src/features/place/keys";
 import { useThemedPlaces } from "@/src/features/place/queries";
 import type { ThemePlaceCard } from "@/src/features/place/types";
+import { reelsKeys } from "@/src/features/reels/keys";
 import {
   HOME_PREVIEW_LIMIT,
   useReelsPreview,
@@ -29,6 +34,7 @@ import {
   formatTravelPeriod,
   travelStatusLabel,
 } from "@/src/features/travel/format";
+import { travelKeys } from "@/src/features/travel/keys";
 import { useCurrentTravel } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
 import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
@@ -77,11 +83,44 @@ const CARD_ELEVATION = {
 
 export default function HomeScreen() {
   const { data: currentTravel } = useCurrentTravel();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * 당겨서 새로고침 — 추천 릴스·테마별 여행지·현재 여행을 서버에서 다시 받는다.
+   * 테마별 여행지는 지금 보고 있는 테마(고정/랜덤) 키만 갱신하도록 type:"active" 로 좁힌다.
+   */
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.refetchQueries({
+          queryKey: reelsKeys.preview(HOME_PREVIEW_LIMIT),
+          exact: true,
+        }),
+        queryClient.refetchQueries({
+          queryKey: [...placeKeys.all, "themed"],
+          type: "active",
+        }),
+        queryClient.refetchQueries({ queryKey: travelKeys.current() }),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [queryClient]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#5E84F4"]}
+            tintColor="#5E84F4"
+          />
+        }
         contentContainerStyle={{
           // 현재 여행 카드는 absolute 로 떠 있어 콘텐츠를 밀어내지 못한다.
           // 카드가 있을 때만 그 높이(77)+아래 여백(27)만큼 더 비워 마지막 항목이 가리지 않게 한다.
@@ -423,6 +462,7 @@ function FeedCarousel() {
 }
 
 function FeedCard({ reels }: { reels: Reels }) {
+  const location = reels.location;
   return (
     <Pressable
       // 피드가 이 릴스를 맨 앞에 세운다 — 데이터는 이미 받아 둔 preview 캐시에서 꺼내
@@ -448,35 +488,59 @@ function FeedCard({ reels }: { reels: Reels }) {
         uri={reels.thumbnail_url}
         style={{ flex: 1, justifyContent: "flex-end" }}
       >
-        {/* 하단 캡션 (가독성용 어두운 오버레이) */}
-        <View
-          className="bg-black/40"
-          style={{
-            paddingHorizontal: scale(12),
-            paddingVertical: verticalScale(12),
-          }}
-        >
-          <Text
-            className="text-white font-semibold"
-            numberOfLines={2}
-            style={{ fontSize: moderateScale(15) }}
+        {/* 지역 — 좌상단 핀 배지 (내 영상 그리드와 같은 스타일) */}
+        {location ? (
+          <View
+            className="absolute flex-row items-center"
+            pointerEvents="none"
+            style={{
+              top: scale(8),
+              left: scale(8),
+              backgroundColor: "rgba(0,0,0,0.55)",
+              borderRadius: scale(11),
+              paddingHorizontal: scale(7),
+              paddingVertical: verticalScale(3),
+              gap: scale(3),
+            }}
           >
-            {reels.caption}
-          </Text>
-          {/* 지역 태그 — 옛 릴스는 null 이라 숨긴다 */}
-          {reels.location ? (
+            <PlaceMarkerIcon
+              width={moderateScale(8)}
+              height={moderateScale(10)}
+              color="#FFFFFF"
+              dotFill="rgba(0,0,0,0.55)"
+            />
             <Text
-              className="text-white/80"
+              className="font-semibold text-white"
               numberOfLines={1}
+              style={{ fontSize: moderateScale(10) }}
+            >
+              {location}
+            </Text>
+          </View>
+        ) : null}
+        {/* 하단 캡션 — 제목이 없는 릴스는 띠까지 통째로 빼서 빈 칸이 안 보이게 한다.
+            사진 위에 얹히므로 단색 대신 아래로 짙어지는 그라데이션을 쓴다. */}
+        {reels.caption ? (
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.75)"]}
+            style={{
+              paddingHorizontal: scale(11),
+              paddingTop: verticalScale(22),
+              paddingBottom: verticalScale(11),
+            }}
+          >
+            <Text
+              className="text-white font-semibold"
+              numberOfLines={2}
               style={{
                 fontSize: moderateScale(12),
-                marginTop: verticalScale(4),
+                lineHeight: moderateScale(16),
               }}
             >
-              {reels.location}
+              {reels.caption}
             </Text>
-          ) : null}
-        </View>
+          </LinearGradient>
+        ) : null}
       </ThemedRemoteImage>
     </Pressable>
   );

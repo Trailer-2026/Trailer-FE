@@ -1,4 +1,5 @@
 import type { ImagePickerAsset } from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import type { AssetInfo } from "expo-media-library";
 
 import type { ReelsMediaAsset } from "./types";
@@ -58,6 +59,42 @@ export function toReelsMediaAsset(asset: ImagePickerAsset): ReelsMediaAsset {
     latitude: parseExifCoord(exif, "GPSLatitude", "GPSLatitudeRef"),
     longitude: parseExifCoord(exif, "GPSLongitude", "GPSLongitudeRef"),
   };
+}
+
+/**
+ * 시스템 피커가 지운 촬영 위치·시각을 원본 asset 에서 되찾는다.
+ *
+ * 안드로이드 13+ Photo Picker 는 사진 사본을 넘기면서 EXIF GPS 를 지운다.
+ * 서버는 사진 GPS 로 일정을 매핑하므로 좌표가 사라지면 일정 연결이 끊긴다.
+ * assetId 로 MediaLibrary 원본을 다시 조회해 좌표를 채운다
+ * (ACCESS_MEDIA_LOCATION 권한은 app.config.ts 에서 켜져 있다).
+ *
+ * 권한 거부·조회 실패는 좌표 없이 그대로 진행한다 — 기기 현재 위치로
+ * 대체하지 않는다. 갤러리 사진은 지금 여기서 찍힌 사진이 아니다.
+ */
+export async function fillLocationFromLibrary(
+  asset: ImagePickerAsset,
+): Promise<ReelsMediaAsset> {
+  const media = toReelsMediaAsset(asset);
+  if (media.latitude != null || !asset.assetId) return media;
+
+  try {
+    const perm = await MediaLibrary.getPermissionsAsync();
+    if (!perm.granted && !(await MediaLibrary.requestPermissionsAsync()).granted) {
+      return media;
+    }
+    const info = await MediaLibrary.getAssetInfoAsync(asset.assetId);
+    if (info.location) {
+      media.latitude = info.location.latitude;
+      media.longitude = info.location.longitude;
+    }
+    if (!media.taken_at && info.creationTime) {
+      media.taken_at = new Date(info.creationTime).toISOString();
+    }
+  } catch {
+    // 원본 조회 실패 — 좌표 없이 사용
+  }
+  return media;
 }
 
 /**
