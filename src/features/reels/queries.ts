@@ -152,13 +152,26 @@ function toReels(item: ReelsRecommendItem): Reels {
 export const HOME_PREVIEW_LIMIT = 3;
 
 /**
+ * 직전에 홈 카드로 보여준 reels_idx. 다음 요청의 exclude 로 넘겨 같은 릴스가
+ * 다시 뽑히지 않게 한다(당겨서 새로고침 때마다 카드가 실제로 바뀌게).
+ * 쿼리 키에 넣지 않는 이유: 키가 매번 달라지면 캐시 항목이 계속 쌓인다.
+ * 서버는 뺄 게 없으면 exclude 를 무시하고 처음부터 다시 추천하므로 릴스가
+ * 적어도 빈 목록이 되지 않는다.
+ */
+let lastPreviewIdx: number[] = [];
+
+/**
  * 홈 '지금 사람들이 떠나는 여행' 카드용 — 추천에서 limit 개만 받는다.
  * 피드와 달리 무한 스크롤이 없어 useQuery 하나로 끝난다.
  */
 export function useReelsPreview(limit: number) {
   return useQuery({
     queryKey: reelsKeys.preview(limit),
-    queryFn: async () => (await getRecommendedReels([], limit)).map(toReels),
+    queryFn: async () => {
+      const items = await getRecommendedReels(lastPreviewIdx, limit);
+      lastPreviewIdx = items.map((item) => item.reels_idx);
+      return items.map(toReels);
+    },
     staleTime: 1000 * 60, // 1분 — 홈을 오갈 때마다 다시 받지 않게
   });
 }
