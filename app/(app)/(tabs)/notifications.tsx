@@ -18,6 +18,10 @@ import {
   useReadNotification,
 } from "@/src/features/notification/queries";
 import { openNotificationTarget } from "@/src/features/notification/routing";
+import MediaSourceSheet, {
+  type MediaSource,
+} from "@/src/features/reels/components/MediaSourceSheet";
+import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
   useCurrentTravel,
@@ -234,6 +238,21 @@ function SceneryPromoCard({
   collapsed: boolean;
   onToggle: () => void;
 }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const onPickPhoto = async (source: MediaSource) => {
+    setSheetOpen(false);
+    const photo = await pickScenicPhoto(source);
+    if (!photo) return; // 취소·권한 거부
+    // TODO: 사진 등록 API 나오면 여기서 업로드한다(좌표·촬영시각까지 함께 보낸다).
+    Alert.alert(
+      "사진을 골랐어요",
+      "등록 기능은 곧 연결될 예정이에요.\n" +
+        (photo.file_name ?? "사진 1장") +
+        (photo.latitude != null ? "\n촬영 위치 포함" : ""),
+    );
+  };
+
   return (
     <View
       className="overflow-hidden"
@@ -312,11 +331,14 @@ function SceneryPromoCard({
             </View>
             <View style={{ height: verticalScale(140) }} />
             <Pressable
-              className="items-center justify-center rounded-2xl"
+              onPress={() => setSheetOpen(true)}
+              className="items-center justify-center rounded-2xl active:opacity-80"
               style={{
                 height: verticalScale(56),
                 backgroundColor: ACCENT,
               }}
+              accessibilityRole="button"
+              accessibilityLabel="지금 촬영하러 가기"
             >
               <Text
                 className="text-white font-bold"
@@ -328,6 +350,13 @@ function SceneryPromoCard({
           </>
         ) : null}
       </View>
+
+      {/* 촬영하기 / 갤러리에서 선택 — 영상 만들기와 같은 시트를 그대로 쓴다. */}
+      <MediaSourceSheet
+        visible={sheetOpen}
+        onSelect={onPickPhoto}
+        onClose={() => setSheetOpen(false)}
+      />
     </View>
   );
 }
