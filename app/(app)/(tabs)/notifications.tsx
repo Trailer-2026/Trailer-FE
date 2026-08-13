@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import BellIcon from "@/src/components/icons/BellIcon";
 import { Text } from "@/src/components/Text";
 import {
@@ -22,8 +23,10 @@ import MediaSourceSheet, {
   type MediaSource,
 } from "@/src/features/reels/components/MediaSourceSheet";
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
+import { useScenicStore } from "@/src/features/scenic/store";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
+  useAddTravelImages,
   useCurrentTravel,
   usePastTravels,
 } from "@/src/features/travel/queries";
@@ -74,6 +77,8 @@ export default function NotificationsTab() {
   // TODO(backend): NotificationLogItem 에 cover_image_url 이 추가되면 이 룩업 제거.
   const { data: currentTravel } = useCurrentTravel();
   const { data: pastTravels } = usePastTravels();
+  // 풍경 알림은 탑승 중일 때 오는 것이라, 사진도 그 여행에 붙인다.
+  const ridingTravelIdx = useScenicStore((s) => s.session?.travelIdx ?? null);
   const coverByIdx = useMemo(() => {
     const m = new Map<number, string | null>();
     if (currentTravel) m.set(currentTravel.travel_idx, currentTravel.cover_image_url);
@@ -157,6 +162,8 @@ export default function NotificationsTab() {
           <SceneryPromoCard
             collapsed={collapsed}
             onToggle={() => setCollapsed((c) => !c)}
+            // 탑승 중이면 그 여행, 아니면 진행 중인 여행에 사진을 붙인다.
+            travelIdx={ridingTravelIdx ?? currentTravel?.travel_idx ?? null}
           />
         }
         ListEmptyComponent={
@@ -234,22 +241,32 @@ export default function NotificationsTab() {
 function SceneryPromoCard({
   collapsed,
   onToggle,
+  travelIdx,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  /** 사진을 붙일 여행. 탑승 세션이 없으면 진행 중인 여행으로 떨어진다. */
+  travelIdx: number | null;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const addImages = useAddTravelImages();
 
   const onPickPhoto = async (source: MediaSource) => {
     setSheetOpen(false);
     const photo = await pickScenicPhoto(source);
     if (!photo) return; // 취소·권한 거부
-    // TODO: 사진 등록 API 나오면 여기서 업로드한다(좌표·촬영시각까지 함께 보낸다).
-    Alert.alert(
-      "사진을 골랐어요",
-      "등록 기능은 곧 연결될 예정이에요.\n" +
-        (photo.file_name ?? "사진 1장") +
-        (photo.latitude != null ? "\n촬영 위치 포함" : ""),
+    if (travelIdx == null) {
+      Alert.alert("여행을 찾지 못했어요", "진행 중인 여행이 있을 때 사진을 붙일 수 있어요.");
+      return;
+    }
+    // schedule_idx 는 보내지 않는다 — 서버가 사진 EXIF 의 GPS 로 가까운 일정에 매핑한다.
+    addImages.mutate(
+      { travelIdx, photos: [photo] },
+      {
+        onSuccess: () =>
+          Alert.alert("사진을 붙였어요", "여행 영상을 만들 때 이 사진이 함께 쓰여요."),
+        onError: (err) => Alert.alert("사진 등록 실패", describeApiError(err)),
+      },
     );
   };
 
@@ -332,20 +349,26 @@ function SceneryPromoCard({
             <View style={{ height: verticalScale(140) }} />
             <Pressable
               onPress={() => setSheetOpen(true)}
+              disabled={addImages.isPending}
               className="items-center justify-center rounded-2xl active:opacity-80"
               style={{
                 height: verticalScale(56),
                 backgroundColor: ACCENT,
+                opacity: addImages.isPending ? 0.6 : 1,
               }}
               accessibilityRole="button"
               accessibilityLabel="지금 촬영하러 가기"
             >
-              <Text
-                className="text-white font-bold"
-                style={{ fontSize: moderateScale(16) }}
-              >
-                지금 촬영하러 가기
-              </Text>
+              {addImages.isPending ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text
+                  className="text-white font-bold"
+                  style={{ fontSize: moderateScale(16) }}
+                >
+                  지금 촬영하러 가기
+                </Text>
+              )}
             </Pressable>
           </>
         ) : null}

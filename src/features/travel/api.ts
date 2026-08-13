@@ -286,3 +286,41 @@ export async function deleteTravelCoverImage(
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
 }
+
+/**
+ * POST /api/travels/{travel_idx}/images — 여행 중 찍은 사진 붙이기 (multipart, 한 번에 최대 20장).
+ *
+ * 붙인 사진은 여행 영상(POST /api/videos/render/travel)의 재료가 된다 —
+ * 한 장도 없으면 지도 이동만 있는 영상이 된다.
+ *
+ * scheduleIdx 는 선택이고 보통 보내지 않는다:
+ * - 안 주면: 서버가 사진 EXIF 의 GPS 로 가장 가까운 일정에 자동 매핑한다.
+ * - 주면: 자동 매핑 없이 그 일정에 그대로 붙는다(사용자가 일정을 직접 고른 화면).
+ * - 좌표를 못 구하면 일정 없이(schedule_idx: null) 저장되고 영상에서는 마지막 지점 뒤에 몰려 나온다.
+ *
+ * 400: 이미지가 아니거나 빈 파일·10MB 초과·21장 이상 / 404: 없거나 남의 여행,
+ * schedule_idx 가 그 여행의 일정이 아님 / 401 / 502: 저장소 업로드 실패.
+ * 사진 여러 장 업로드는 전역 10s 로는 부족해 timeout 을 늘려 잡는다.
+ */
+export async function addTravelImages(
+  travelIdx: number,
+  files: { uri: string; name: string; type: string }[],
+  scheduleIdx?: number | null,
+): Promise<void> {
+  const form = new FormData();
+  files.forEach((file) => {
+    form.append("images", {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as unknown as Blob);
+  });
+  if (scheduleIdx != null) form.append("schedule_idx", String(scheduleIdx));
+
+  // Content-Type 은 지정하지 않는다 — RN 의 XHR 이 FormData 를 보고 boundary 를 붙인다.
+  await api.post<CommonResponse<unknown>>(
+    `/api/travels/${travelIdx}/images`,
+    form,
+    { timeout: 120000 },
+  );
+}

@@ -3,7 +3,11 @@ import { useEffect } from "react";
 
 import { notificationKeys } from "../notification/keys";
 
+import type { ReelsMediaAsset } from "@/src/features/reels/types";
+import { preparePhotoForUpload } from "@/src/features/video/photo-upload";
+
 import {
+  addTravelImages,
   createManualTravel,
   createSchedule,
   createTravel,
@@ -306,5 +310,35 @@ export function useDeleteTravelCover() {
   return useMutation({
     mutationFn: (travelIdx: number) => deleteTravelCoverImage(travelIdx),
     onSuccess: (data) => invalidateTravelThumbnails(queryClient, data.travel_idx),
+  });
+}
+
+/**
+ * 여행 사진 붙이기. 업로드 전 리사이즈·EXIF(GPS·촬영시각) 재주입까지 여기서 한다 —
+ * 서버가 EXIF GPS 로 일정에 자동 매핑하므로 좌표가 사라지면 매핑이 안 된다.
+ *
+ * 성공하면 여행 상세(days[].items[].images / 최상단 images)가 바뀌므로 상세를 무효화한다.
+ */
+export function useAddTravelImages() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      travelIdx,
+      photos,
+      scheduleIdx,
+    }: {
+      travelIdx: number;
+      photos: ReelsMediaAsset[];
+      scheduleIdx?: number | null;
+    }) => {
+      const files = await Promise.all(
+        photos.map((photo, index) => preparePhotoForUpload(photo, index)),
+      );
+      return addTravelImages(travelIdx, files, scheduleIdx);
+    },
+    onSuccess: (_data, vars) =>
+      queryClient.invalidateQueries({
+        queryKey: travelKeys.detail(vars.travelIdx),
+      }),
   });
 }
