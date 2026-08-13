@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -254,9 +254,6 @@ function ReelsRow({
   onPress: () => void;
   onMenu: (y: number) => void;
 }) {
-  // ⋯ 버튼의 화면상 위치를 재서 메뉴를 그 옆에 띄운다.
-  const dotsRef = useRef<View>(null);
-
   return (
     <Pressable
       onPress={onPress}
@@ -336,10 +333,9 @@ function ReelsRow({
 
       {/* ⋯ (세로 3점) — 줄 탭(재생)과 겹치지 않게 눌리는 영역을 분리한다. */}
       <Pressable
-        ref={dotsRef}
-        onPress={() =>
-          dotsRef.current?.measureInWindow((_x, y) => onMenu(y))
-        }
+        // 메뉴를 누른 자리에 띄우려고 터치 지점(pageY)을 그대로 넘긴다.
+        // measureInWindow 는 콜백이 안 오면 메뉴가 영영 안 열려서 쓰지 않는다.
+        onPress={(e) => onMenu(e.nativeEvent.pageY)}
         hitSlop={12}
         className="items-center justify-center"
         style={{ paddingTop: verticalScale(4), gap: verticalScale(3) }}

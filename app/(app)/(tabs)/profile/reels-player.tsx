@@ -158,7 +158,9 @@ export default function MyReelsPlayerScreen() {
   );
 
   // 지금 화면을 채우고 있는 카드 = 재생할 카드.
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // initialScrollIndex 로 중간 카드부터 열면 onViewableItemsChanged 가 바로 오지 않아
+  // 재생할 카드가 정해지지 않는다(= 검은 화면). 그래서 넘겨받은 릴스로 시작한다.
+  const [activeIdx, setActiveIdx] = useState<number | null>(startIdx);
   const [visiblePosition, setVisiblePosition] = useState(0);
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -315,8 +317,9 @@ export default function MyReelsPlayerScreen() {
             index,
           })}
           windowSize={3}
-          removeClippedSubviews
-          // 그리드에서 고른 릴스부터 시작(없으면 처음부터). getItemLayout 이 있어 바로 점프된다.
+          // removeClippedSubviews 는 쓰지 않는다 — 안드로이드에서 initialScrollIndex 로
+          // 점프해 들어가면 카드가 통째로 안 그려지는 문제가 있다(windowSize 로 충분).
+          // 목록에서 고른 릴스부터 시작(없으면 처음부터). getItemLayout 이 있어 바로 점프된다.
           initialScrollIndex={Math.max(
             0,
             reels.findIndex((r) => r.reels_idx === startIdx),
