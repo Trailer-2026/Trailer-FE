@@ -8,6 +8,10 @@ import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
 import RenderOptions from "@/src/features/reels/components/RenderOptions";
+import {
+  ThemeBackground,
+  ThemeParticles,
+} from "@/src/features/reels/components/ThemePreview";
 import { DEFAULT_RENDER_OPTIONS } from "@/src/features/video/options";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
 import { headerBarStyle } from "@/src/utils/header";
@@ -49,6 +53,9 @@ export default function TravelVideoScreen() {
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <StatusBar style="light" />
 
+      {/* 고른 테마의 하늘색 — 콘텐츠보다 먼저 그려 뒤에 깔린다(파티클은 맨 앞). */}
+      <ThemeBackground theme={options.theme} />
+
       {/* 헤더 */}
       <View
         className="flex-row items-center"
@@ -85,7 +92,8 @@ export default function TravelVideoScreen() {
         {/* 어떤 여행인지 + 무엇이 만들어지는지 */}
         <View
           style={{
-            backgroundColor: "#1C1C1C",
+            // 뒤에 깔린 테마 색이 비치도록 반투명 카드로 둔다.
+            backgroundColor: "rgba(0,0,0,0.45)",
             borderRadius: scale(14),
             padding: scale(16),
           }}
@@ -167,6 +175,9 @@ export default function TravelVideoScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {/* 눈·꽃잎 등 테마 파티클 — 화면 맨 앞에 떠서 터치는 통과시킨다. */}
+      <ThemeParticles theme={options.theme} />
     </SafeAreaView>
   );
 }
