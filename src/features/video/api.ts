@@ -156,6 +156,20 @@ export async function updateReelsTitle(
 }
 
 /**
+ * 릴스 삭제. DELETE /api/videos/reels/{reels_idx}
+ *
+ * 추천 피드·마이페이지 목록·공유 링크에서 즉시 사라지고 **복구할 수 없다**.
+ * 영상·썸네일 파일 정리가 실패해도 삭제 자체는 성공으로 응답하므로(서버 로그에만 남는다),
+ * 이미 알고 있던 파일 주소로는 계속 재생될 수 있다. 발급된 공유 링크(/r/{reels_idx})는 404.
+ * 렌더가 끝나지 않은 릴스도 지울 수 있다(멈춘 렌더 정리용). 달린 댓글·좋아요는 함께 지워지지
+ * 않지만 릴스가 노출되지 않아 어디에서도 보이지 않는다.
+ * 404: 릴스 없음(남의 릴스도 존재를 숨기려 403 이 아니라 404) / 401: 인증 필요.
+ */
+export async function deleteReels(reelsIdx: number): Promise<void> {
+  await api.delete<CommonResponse<null>>(`/api/videos/reels/${reelsIdx}`);
+}
+
+/**
  * 내 완성 영상 다운로드. GET /api/videos/reels/{reels_idx}/download
  *
  * mp4 첨부 파일로 내려오므로 axios(JSON) 대신 파일 다운로드 API 를 쓴다.

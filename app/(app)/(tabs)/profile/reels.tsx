@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -20,6 +21,7 @@ import TrashIcon from "@/src/components/icons/TrashIcon";
 import { Text } from "@/src/components/Text";
 import { useMyReels } from "@/src/features/user/queries";
 import type { MyReelsItem } from "@/src/features/user/types";
+import { useDeleteReels } from "@/src/features/video/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
@@ -76,14 +78,24 @@ export default function MyReelsListScreen() {
 
   // 삭제 확인 창에 걸린 항목 (null 이면 닫힘)
   const [confirmDelete, setConfirmDelete] = useState<MyReelsItem | null>(null);
+  const deleteReels = useDeleteReels();
 
   const askDelete = (item: MyReelsItem) => {
     setMenu(null);
     setConfirmDelete(item);
   };
 
-  // TODO: 삭제 API 나오면 여기서 호출 + 목록 캐시 무효화. 지금은 창만 닫는다.
-  const confirmDeleteReels = () => setConfirmDelete(null);
+  // 되돌릴 수 없는 요청이라 응답을 받은 뒤에 창을 닫는다(연타·중복 호출 방지).
+  const runDelete = (item: MyReelsItem) => {
+    if (deleteReels.isPending) return;
+    deleteReels.mutate(item.reels_idx, {
+      onSuccess: () => setConfirmDelete(null),
+      onError: (err) => {
+        setConfirmDelete(null);
+        Alert.alert("삭제 실패", describeApiError(err));
+      },
+    });
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -237,8 +249,9 @@ export default function MyReelsListScreen() {
 
       <DeleteConfirmDialog
         item={confirmDelete}
+        deleting={deleteReels.isPending}
         onCancel={() => setConfirmDelete(null)}
-        onConfirm={confirmDeleteReels}
+        onConfirm={runDelete}
       />
     </SafeAreaView>
   );
@@ -420,14 +433,16 @@ function ItemMenu({
 
 /**
  * 삭제 확인 창 — Figma '내영상' 삭제 확인 시안(254x178 흰 카드 + 25% 딤).
- * 실제 삭제 API 는 아직 없어 '삭제'를 눌러도 창만 닫힌다.
+ * DELETE /api/videos/reels/{reels_idx} 는 되돌릴 수 없어 여기서 한 번 더 확인받는다.
  */
 function DeleteConfirmDialog({
   item,
+  deleting,
   onCancel,
   onConfirm,
 }: {
   item: MyReelsItem | null;
+  deleting: boolean;
   onCancel: () => void;
   onConfirm: (item: MyReelsItem) => void;
 }) {
@@ -438,7 +453,8 @@ function DeleteConfirmDialog({
       <Pressable
         className="flex-1 items-center justify-center"
         style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
-        onPress={onCancel}
+        // 삭제 요청 중에는 바깥을 눌러도 닫지 않는다 — 결과를 보고 닫는다.
+        onPress={deleting ? undefined : onCancel}
       >
         {/* 카드 안을 눌러도 닫히지 않게 이벤트를 막는다. */}
         <Pressable
@@ -478,8 +494,10 @@ function DeleteConfirmDialog({
           >
             <Pressable
               onPress={onCancel}
+              disabled={deleting}
               hitSlop={10}
               className="active:opacity-60"
+              style={{ opacity: deleting ? 0.4 : 1 }}
               accessibilityRole="button"
               accessibilityLabel="취소"
             >
@@ -492,17 +510,22 @@ function DeleteConfirmDialog({
             </Pressable>
             <Pressable
               onPress={() => onConfirm(item)}
+              disabled={deleting}
               hitSlop={10}
               className="active:opacity-60"
               accessibilityRole="button"
               accessibilityLabel="삭제"
             >
-              <Text
-                className="font-bold"
-                style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
-              >
-                삭제
-              </Text>
+              {deleting ? (
+                <ActivityIndicator size="small" color={TEXT_MAIN} />
+              ) : (
+                <Text
+                  className="font-bold"
+                  style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
+                >
+                  삭제
+                </Text>
+              )}
             </Pressable>
           </View>
         </Pressable>

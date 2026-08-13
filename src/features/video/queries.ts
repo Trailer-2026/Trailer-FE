@@ -6,6 +6,7 @@ import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { userKeys } from "@/src/features/user/keys";
 import {
   cutVideoSection,
+  deleteReels,
   getBgmTracks,
   getRenderStatus,
   insertImageClip,
@@ -104,6 +105,24 @@ export function useUpdateReelsTitle() {
       updateReelsTitle(vars.reelsIdx, vars.title),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
+    },
+  });
+}
+
+/**
+ * 릴스 삭제. 되돌릴 수 없어 호출부에서 확인을 받고 부른다.
+ *
+ * 지운 릴스는 내 목록·좋아요 목록·추천 피드 어디에서도 보이면 안 되므로
+ * 관련 캐시를 모두 무효화한다.
+ */
+export function useDeleteReels() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reelsIdx: number) => deleteReels(reelsIdx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      queryClient.invalidateQueries({ queryKey: userKeys.likedReels() });
       queryClient.invalidateQueries({ queryKey: reelsKeys.all });
     },
   });
