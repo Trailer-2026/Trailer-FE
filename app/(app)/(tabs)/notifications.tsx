@@ -262,12 +262,19 @@ function SceneryPromoCard({
       Alert.alert("여행을 찾지 못했어요", "진행 중인 여행이 있을 때 사진을 붙일 수 있어요.");
       return;
     }
+    // 방금 고른 사진을 바로 보여준다(업로드가 끝날 때까지 기다리지 않는다).
+    // 실패하면 직전 사진으로 되돌린다.
+    const previous = added;
+    setAdded(photo);
+
     // schedule_idx 는 보내지 않는다 — 서버가 사진 EXIF 의 GPS 로 가까운 일정에 매핑한다.
     addImages.mutate(
       { travelIdx, photos: [photo] },
       {
-        onSuccess: () => setAdded(photo),
-        onError: (err) => Alert.alert("사진 등록 실패", describeApiError(err)),
+        onError: (err) => {
+          setAdded(previous);
+          Alert.alert("사진 등록 실패", describeApiError(err));
+        },
       },
     );
   };
@@ -353,6 +360,7 @@ function SceneryPromoCard({
               /* 방금 붙인 사진 — 썸네일 + 안내. 누르면 한 장 더 붙일 수 있다. */
               <Pressable
                 onPress={() => setSheetOpen(true)}
+                disabled={addImages.isPending}
                 className="flex-row items-center rounded-2xl bg-white active:opacity-80"
                 style={{
                   height: verticalScale(56),
@@ -362,21 +370,30 @@ function SceneryPromoCard({
                 accessibilityRole="button"
                 accessibilityLabel="사진 한 장 더 붙이기"
               >
-                <Image
-                  source={{ uri: added.uri }}
-                  style={{
-                    width: scale(38),
-                    height: scale(38),
-                    borderRadius: scale(8),
-                  }}
-                  contentFit="cover"
-                />
+                {/* 썸네일은 항상 방금 고른 사진. 올리는 중에는 살짝 흐리게 + 스피너. */}
+                <View>
+                  <Image
+                    source={{ uri: added.uri }}
+                    style={{
+                      width: scale(38),
+                      height: scale(38),
+                      borderRadius: scale(8),
+                      opacity: addImages.isPending ? 0.45 : 1,
+                    }}
+                    contentFit="cover"
+                  />
+                  {addImages.isPending ? (
+                    <View className="absolute inset-0 items-center justify-center">
+                      <ActivityIndicator size="small" color={ACCENT} />
+                    </View>
+                  ) : null}
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text
                     className="font-bold"
                     style={{ fontSize: moderateScale(14), color: "#353535" }}
                   >
-                    사진을 붙였어요
+                    {addImages.isPending ? "사진을 올리는 중" : "사진을 붙였어요"}
                   </Text>
                   <Text
                     className="text-gray-500"
@@ -389,12 +406,14 @@ function SceneryPromoCard({
                     여행 영상을 만들 때 함께 담겨요
                   </Text>
                 </View>
-                <Text
-                  className="font-semibold"
-                  style={{ fontSize: moderateScale(13), color: ACCENT }}
-                >
-                  한 장 더
-                </Text>
+                {addImages.isPending ? null : (
+                  <Text
+                    className="font-semibold"
+                    style={{ fontSize: moderateScale(13), color: ACCENT }}
+                  >
+                    한 장 더
+                  </Text>
+                )}
               </Pressable>
             ) : (
               <Pressable
