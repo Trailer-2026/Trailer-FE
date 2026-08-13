@@ -63,7 +63,7 @@ function setLikedInPast(
  * 들어간 것처럼 보인다. 서버는 건드리지 않고 화면만 바꾼다.
  * 확인이 끝나면 이 상수를 false 로 되돌릴 것. (__DEV__ 라 릴리스 빌드에는 영향 없음)
  */
-const MOCK_TRAVEL_COMPLETED = __DEV__ && true;
+const MOCK_TRAVEL_COMPLETED = __DEV__ && false;
 
 /** 목업 여행의 PK. 서버에 없는 값이라 실제 조회는 전부 목업으로 대체한다. */
 const MOCK_TRAVEL_IDX = -1;
