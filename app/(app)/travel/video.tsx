@@ -1,9 +1,16 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
@@ -12,7 +19,9 @@ import {
   ThemeBackground,
   ThemeParticles,
 } from "@/src/features/reels/components/ThemePreview";
+import { useActiveRenderStore } from "@/src/features/video/active-render-store";
 import { DEFAULT_RENDER_OPTIONS } from "@/src/features/video/options";
+import { useRenderTravelVideo } from "@/src/features/video/queries";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -26,8 +35,8 @@ const ACCENT = "#5E84F4";
  * 제목·BGM·테마만 고르면 끝이다 — 버튼 한 번으로 렌더가 시작된다.
  *
  * 옵션 UI 는 릴스 편집 화면과 같은 RenderOptions 를 그대로 쓴다(칩 + BGM 미리듣기).
- * TODO: POST /api/videos/render/travel 배선 — travel_idx + title/bgm/theme 를 보내고
- *       응답의 reels_idx 로 기존 진행률 화면(/reels/progress)에 넘긴다.
+ * 렌더는 POST /api/videos/render/travel — 응답의 reels_idx 로 기존 진행률 화면
+ * (/reels/progress)에 넘겨 폴링까지 같은 흐름을 탄다.
  */
 export default function TravelVideoScreen() {
   const { travelIdx, travelTitle } = useLocalSearchParams<{
@@ -41,11 +50,26 @@ export default function TravelVideoScreen() {
     title: "",
   });
 
+  const render = useRenderTravelVideo();
+  const startTracking = useActiveRenderStore((s) => s.start);
+
   const onCreate = () => {
-    // TODO: 렌더 API 연결 전까지는 고른 값만 확인한다.
-    Alert.alert(
-      "곧 연결돼요",
-      `여행 #${Number.isFinite(idx) ? idx : "?"}\n제목: ${options.title?.trim() || "(여행 제목 사용)"}\n테마: ${options.theme}\n음악: ${options.bgm || "무음"}`,
+    if (!Number.isFinite(idx)) {
+      Alert.alert("여행을 찾지 못했어요", "여행 목록에서 다시 들어와 주세요.");
+      return;
+    }
+    render.mutate(
+      { travelIdx: idx, options },
+      {
+        onSuccess: (status) => {
+          // 전역 추적 시작 → 진행률 화면을 떠나도 완료를 감지해 배너로 알린다.
+          startTracking(status.reels_idx);
+          // 렌더 옵션 화면은 스택에 남기지 않는다(완료 후 뒤로 = 여행 상세).
+          router.replace(`/reels/progress?reels_idx=${status.reels_idx}`);
+        },
+        // 400(일정 없음·지점 2개 미만)·404(BGM 없음) 등은 서버 메시지를 그대로 노출.
+        onError: (err) => Alert.alert("영상 만들기 실패", describeApiError(err)),
+      },
     );
   };
 
@@ -153,27 +177,46 @@ export default function TravelVideoScreen() {
       >
         <Pressable
           onPress={onCreate}
+          disabled={render.isPending}
           className="flex-row items-center justify-center active:opacity-80"
           style={{
-            height: verticalScale(52),
-            borderRadius: scale(26),
+            height: verticalScale(56),
+            borderRadius: scale(28),
             backgroundColor: ACCENT,
             gap: scale(8),
+            opacity: render.isPending ? 0.6 : 1,
           }}
           accessibilityRole="button"
-          accessibilityLabel="영상 만들기"
+          accessibilityLabel="원클릭으로 영상 만들기"
         >
-          <PlayIcon
-            color="#FFFFFF"
-            width={moderateScale(18)}
-            height={moderateScale(18)}
-          />
-          <Text
-            className="font-bold text-white"
-            style={{ fontSize: moderateScale(16) }}
-          >
-            영상 만들기
-          </Text>
+          {render.isPending ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <PlayIcon
+                color="#FFFFFF"
+                width={moderateScale(18)}
+                height={moderateScale(18)}
+              />
+              <View>
+                <Text
+                  className="font-bold text-white"
+                  style={{ fontSize: moderateScale(16) }}
+                >
+                  원클릭으로 영상 만들기
+                </Text>
+                <Text
+                  className="text-center text-white/70"
+                  style={{
+                    fontSize: moderateScale(11),
+                    marginTop: verticalScale(1),
+                  }}
+                >
+                  누르면 바로 만들기가 시작돼요
+                </Text>
+              </View>
+            </>
+          )}
         </Pressable>
       </View>
 

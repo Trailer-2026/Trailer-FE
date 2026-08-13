@@ -11,6 +11,7 @@ import {
   getRenderStatus,
   insertImageClip,
   renderPhotosOrdered,
+  renderTravelVideo,
   updateReelsTitle,
   uploadReelsVideo,
 } from "./api";
@@ -71,6 +72,22 @@ export function useRenderPhotosOrdered() {
       photos: ReelsMediaAsset[];
       options: RenderOptions;
     }) => renderPhotosOrdered(photos, options),
+  });
+}
+
+/**
+ * 여행 일정으로 영상 렌더 시작. 사진을 올리지 않아 요청이 가볍다(옵션만 보낸다).
+ * 성공하면 reels_idx 를 돌려주므로 호출부가 진행률 화면으로 넘긴다.
+ */
+export function useRenderTravelVideo() {
+  return useMutation({
+    mutationFn: ({
+      travelIdx,
+      options,
+    }: {
+      travelIdx: number;
+      options: RenderOptions;
+    }) => renderTravelVideo(travelIdx, options),
   });
 }
 

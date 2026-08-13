@@ -83,6 +83,39 @@ export async function renderPhotosOrdered(
   return res.data.data;
 }
 
+/**
+ * 여행 일정으로 영상 렌더 시작. POST /api/videos/render/travel (urlencoded).
+ *
+ * 사진을 올리는 photos-ordered 와 달리 재료가 이미 서버에 있다 — 여행 일정(day_no,
+ * sequence) 순서로 이동 경로를 그리고, 일정에 붙여 둔 사진을 그 지점에서 보여준다.
+ * (직전 지점 기준 1km 미만인 연속 일정은 한 지점으로 묶이고, 기차 일정은 출발역 좌표가
+ *  경유 지점이 된다. 다운로드에 실패한 이미지는 건너뛴다.)
+ *
+ * 응답은 즉시 오고 status=running — reels_idx 로 getRenderStatus 폴링한다.
+ * title 을 비우면 여행 제목이 릴스 제목이 된다. 영상 앞뒤 인트로·아웃트로는 서버 고정.
+ * 400: 일정이 없거나 지점이 2개 미만 / 404: 없거나 본인 여행이 아님·BGM 없음 / 401.
+ */
+export async function renderTravelVideo(
+  travelIdx: number,
+  options: RenderOptions,
+): Promise<VideoRenderStatusResponse> {
+  const body = new URLSearchParams({
+    travel_idx: String(travelIdx),
+    theme: options.theme,
+  });
+  // 빈 값(무음)도 그대로 보낸다 — 서버가 빈 문자열을 무음으로 해석한다.
+  body.append("bgm", options.bgm ?? "");
+  body.append("title", options.title?.trim() ?? "");
+
+  const res = await api.post<CommonResponse<VideoRenderStatusResponse>>(
+    "/api/videos/render/travel",
+    body.toString(),
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
 /** 서버 상한(100MB). 넘으면 413 이 오는데 그 응답은 공통 봉투가 아니라 안내가 어렵다. */
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
