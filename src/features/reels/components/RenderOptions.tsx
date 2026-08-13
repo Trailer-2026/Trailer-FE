@@ -140,11 +140,13 @@ function PreviewButton({
       disabled={disabled}
       className="flex-row items-center active:opacity-70"
       style={{
-        paddingHorizontal: scale(10),
+        paddingHorizontal: scale(12),
         paddingVertical: verticalScale(6),
         borderRadius: scale(14),
-        borderWidth: 1,
-        borderColor: disabled ? "#3A3A3A" : ACCENT,
+        // 테두리만 있으면 어두운 배경에서 잘 안 보인다 → 칩과 같은 꽉 찬 배경.
+        // 재생 중일 때만 강조색으로 바뀌어 상태가 바로 보인다.
+        backgroundColor: playing ? ACCENT : "#2A2A2A",
+        opacity: disabled ? 0.5 : 1,
         gap: scale(5),
       }}
       accessibilityRole="button"
@@ -174,7 +176,10 @@ function PreviewButton({
           }}
         />
       )}
-      <Text style={{ fontSize: moderateScale(12), color }}>
+      <Text
+        className="font-semibold"
+        style={{ fontSize: moderateScale(12), color }}
+      >
         {playing ? "정지" : "미리듣기"}
       </Text>
     </Pressable>
