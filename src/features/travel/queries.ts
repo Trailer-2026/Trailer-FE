@@ -26,6 +26,8 @@ import {
 } from "./api";
 import { travelKeys } from "./keys";
 import type {
+  HomeTravelCard,
+  PastTravelCard,
   PastTravelListResponse,
   ScheduleCreateRequest,
   ScheduleUpdateRequest,
@@ -53,12 +55,24 @@ function setLikedInPast(
  * - 홈 진입 시 자동 실행.
  * - 저장 직후 mutation 이 invalidate 하므로 자동 갱신됨.
  */
+/**
+ * ⚠️ 개발용 임시 스위치 — '여행 완료' 상태 화면을 서버 데이터 없이 확인하기 위한 목업.
+ *
+ * 켜면 진행중 여행이 없는 것처럼(=홈 하단 카드 사라짐), 그 여행이 '다녀온 여행'에
+ * 들어간 것처럼 보인다. 서버는 건드리지 않고 화면만 바꾼다.
+ * 확인이 끝나면 이 상수를 false 로 되돌릴 것. (__DEV__ 라 릴리스 빌드에는 영향 없음)
+ */
+const MOCK_TRAVEL_COMPLETED = __DEV__ && true;
+
 export function useCurrentTravel() {
-  return useQuery({
+  const query = useQuery({
     queryKey: travelKeys.current(),
     queryFn: getCurrentTravel,
     staleTime: 1000 * 60, // 1분
   });
+  // 여행이 끝나면 서버가 data=null 을 주므로, 목업도 null 로 맞춘다.
+  if (MOCK_TRAVEL_COMPLETED) return { ...query, data: null };
+  return query;
 }
 
 /**
@@ -66,11 +80,49 @@ export function useCurrentTravel() {
  * 없으면 travels=[] 로 온다.
  */
 export function usePastTravels() {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: travelKeys.past(),
     queryFn: getPastTravels,
     staleTime: 1000 * 60, // 1분
   });
+
+  // 목업: 진행중이던 여행을 '완료'로 바꿔 지난 여행 맨 앞에 끼워 넣는다.
+  // travel_idx 는 실제 값을 쓰므로 카드를 눌러 상세까지 그대로 열어 볼 수 있다.
+  if (MOCK_TRAVEL_COMPLETED) {
+    const current = queryClient.getQueryData<HomeTravelCard | null>(
+      travelKeys.current(),
+    );
+    const real = query.data?.travels ?? [];
+    // 진행중 여행이 없으면(서버에 아무것도 없을 때) 가짜 카드라도 하나 보여준다.
+    // 이 카드는 travel_idx 가 없는 값이라 눌러서 상세로 들어가면 조회에 실패한다.
+    const base: HomeTravelCard = current ?? {
+      travel_idx: -1,
+      title: "부산 여행",
+      start_date: "2026-08-01",
+      end_date: "2026-08-03",
+      status: "COMPLETED",
+      cover_image_url: null,
+    };
+    const mocked: PastTravelCard[] = [
+      {
+        travel_idx: base.travel_idx,
+        title: base.title,
+        start_date: base.start_date,
+        end_date: base.end_date,
+        status: "COMPLETED",
+        cover_image_url: base.cover_image_url,
+        liked: false,
+      },
+      ...real.filter((t) => t.travel_idx !== base.travel_idx),
+    ];
+    return {
+      ...query,
+      data: { travels: mocked, total: mocked.length },
+    };
+  }
+
+  return query;
 }
 
 /**
