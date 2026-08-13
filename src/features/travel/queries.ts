@@ -26,10 +26,11 @@ import {
 } from "./api";
 import { travelKeys } from "./keys";
 import type {
-  HomeTravelCard,
   PastTravelCard,
   PastTravelListResponse,
   ScheduleCreateRequest,
+  TravelDetail,
+  TravelScheduleItem,
   ScheduleUpdateRequest,
   TravelCoverFile,
   TravelManualCreateRequest,
@@ -64,6 +65,90 @@ function setLikedInPast(
  */
 const MOCK_TRAVEL_COMPLETED = __DEV__ && true;
 
+/** 목업 여행의 PK. 서버에 없는 값이라 실제 조회는 전부 목업으로 대체한다. */
+const MOCK_TRAVEL_IDX = -1;
+
+/** 목업 '다녀온 여행' 1건 — 목록·상세가 같은 값을 쓴다. */
+const MOCK_PAST_TRAVEL: PastTravelCard = {
+  travel_idx: MOCK_TRAVEL_IDX,
+  title: "부산 여행",
+  start_date: "2026-08-01",
+  end_date: "2026-08-03",
+  status: "COMPLETED",
+  cover_image_url: null,
+  liked: false,
+};
+
+/** 목업 여행 상세 — 완료 화면(일정표 + '내 여행 영상 만들기')을 그리는 데 필요한 최소 데이터. */
+function mockTravelDetail(): TravelDetail {
+  const item = (
+    schedule_idx: number,
+    sequence: number,
+    kind: string,
+    title: string,
+    start_time: string,
+    extra: Partial<TravelScheduleItem> = {},
+  ): TravelScheduleItem => ({
+    schedule_idx,
+    sequence,
+    kind,
+    title,
+    train_no: null,
+    train_grade: null,
+    dep_station: null,
+    arr_station: null,
+    car_no: null,
+    seat_no: null,
+    start_time,
+    end_time: null,
+    latitude: null,
+    longitude: null,
+    image_url: null,
+    memo: null,
+    ...extra,
+  });
+
+  return {
+    travel_idx: MOCK_TRAVEL_IDX,
+    title: MOCK_PAST_TRAVEL.title,
+    start_date: MOCK_PAST_TRAVEL.start_date,
+    end_date: MOCK_PAST_TRAVEL.end_date,
+    region: "부산",
+    status: "COMPLETED",
+    days: [
+      {
+        day_no: 1,
+        date: MOCK_PAST_TRAVEL.start_date,
+        items: [
+          item(-101, 1, "train", "KTX 101 서울→부산", "09:00:00", {
+            train_no: "101",
+            train_grade: "KTX",
+            dep_station: "서울",
+            arr_station: "부산",
+            car_no: "3",
+            seat_no: "12A",
+            end_time: "11:40:00",
+          }),
+          item(-102, 2, "visit", "감천문화마을", "13:00:00", {
+            latitude: 35.0975,
+            longitude: 129.0107,
+          }),
+        ],
+      },
+      {
+        day_no: 2,
+        date: "2026-08-02",
+        items: [
+          item(-103, 1, "visit", "해운대 해수욕장", "10:00:00", {
+            latitude: 35.1587,
+            longitude: 129.1604,
+          }),
+        ],
+      },
+    ],
+  };
+}
+
 export function useCurrentTravel() {
   const query = useQuery({
     queryKey: travelKeys.current(),
@@ -80,44 +165,22 @@ export function useCurrentTravel() {
  * 없으면 travels=[] 로 온다.
  */
 export function usePastTravels() {
-  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: travelKeys.past(),
     queryFn: getPastTravels,
     staleTime: 1000 * 60, // 1분
   });
 
-  // 목업: 진행중이던 여행을 '완료'로 바꿔 지난 여행 맨 앞에 끼워 넣는다.
-  // travel_idx 는 실제 값을 쓰므로 카드를 눌러 상세까지 그대로 열어 볼 수 있다.
+  // 목업: '다녀온 여행' 맨 앞에 완료된 여행 1건을 끼워 넣는다.
+  // 상세도 useTravelDetail 이 같은 목업을 돌려주므로 카드를 눌러 완료 화면까지 볼 수 있다.
   if (MOCK_TRAVEL_COMPLETED) {
-    const current = queryClient.getQueryData<HomeTravelCard | null>(
-      travelKeys.current(),
-    );
     const real = query.data?.travels ?? [];
-    // 진행중 여행이 없으면(서버에 아무것도 없을 때) 가짜 카드라도 하나 보여준다.
-    // 이 카드는 travel_idx 가 없는 값이라 눌러서 상세로 들어가면 조회에 실패한다.
-    const base: HomeTravelCard = current ?? {
-      travel_idx: -1,
-      title: "부산 여행",
-      start_date: "2026-08-01",
-      end_date: "2026-08-03",
-      status: "COMPLETED",
-      cover_image_url: null,
-    };
-    const mocked: PastTravelCard[] = [
-      {
-        travel_idx: base.travel_idx,
-        title: base.title,
-        start_date: base.start_date,
-        end_date: base.end_date,
-        status: "COMPLETED",
-        cover_image_url: base.cover_image_url,
-        liked: false,
-      },
-      ...real.filter((t) => t.travel_idx !== base.travel_idx),
-    ];
+    const mocked = [MOCK_PAST_TRAVEL, ...real];
     return {
       ...query,
+      // 서버 조회가 실패해도(여행을 지웠거나 로그인 전) 목업은 그대로 보이게 한다.
+      isLoading: false,
+      isError: false,
       data: { travels: mocked, total: mocked.length },
     };
   }
@@ -172,12 +235,24 @@ export function useToggleTravelLike() {
  * - 404/401 은 호출부(TravelDetailView)에서 isAxiosError status 로 분기.
  */
 export function useTravelDetail(travelIdx?: number) {
-  return useQuery({
+  const mocked = MOCK_TRAVEL_COMPLETED && travelIdx === MOCK_TRAVEL_IDX;
+  const query = useQuery({
     queryKey: travelKeys.detail(travelIdx ?? -1),
     queryFn: () => getTravelDetail(travelIdx!),
-    enabled: travelIdx != null,
+    // 목업 여행은 서버에 없다 — 요청을 보내지 않고 아래에서 목업으로 응답한다.
+    enabled: travelIdx != null && !mocked,
     staleTime: 1000 * 60, // 1분
   });
+  if (mocked) {
+    return {
+      ...query,
+      isLoading: false,
+      isError: false,
+      error: null,
+      data: mockTravelDetail(),
+    };
+  }
+  return query;
 }
 
 /**
