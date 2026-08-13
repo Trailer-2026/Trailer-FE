@@ -113,8 +113,9 @@ export default function TravelVideoScreen() {
               marginTop: verticalScale(6),
             }}
           >
-            일정 순서대로 이동 경로를 그리고, 여행 중 붙인 사진을 그 지점에서
-            보여줘요. 앞뒤에는 TRAILER 인트로·아웃트로가 붙어요.
+            여행에 등록해 둔 사진과 여행 중 찍어서 올린 사진을 모아, 버튼 한
+            번으로 영상을 만들어 드려요. 일정 순서대로 이동 경로를 그리고 사진은
+            찍은 자리에서 보여줘요. 앞뒤에는 TRAILER 인트로·아웃트로가 붙어요.
           </Text>
         </View>
 
