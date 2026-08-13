@@ -2,6 +2,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { isAxiosError } from "axios";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -159,9 +160,16 @@ export default function TravelDetailView({
           travel={data}
           coverUri={cover}
           onBack={onBack}
-          // 다녀온 여행에서는 같은 자리가 '내 여행 영상 만들기'가 된다.
-          // 진입 방법이 별도라 아직 배선하지 않음 → onAction 미전달로 '준비 중' 표시.
-          onAction={completed ? undefined : () => setTicketOpen(true)}
+          // 다녀온 여행에서는 같은 자리가 '내 여행 영상 만들기' — 옵션 화면으로 보낸다.
+          onAction={
+            completed
+              ? () =>
+                  router.push({
+                    pathname: "/travel/video",
+                    params: { travelIdx, travelTitle: data.title },
+                  })
+              : () => setTicketOpen(true)
+          }
           actionKind={completed ? "video" : "ticket"}
         />
 

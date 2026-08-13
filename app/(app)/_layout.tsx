@@ -11,6 +11,7 @@ export default function AppLayout() {
         <Stack.Screen name="reels" />
         <Stack.Screen name="travel/[travelIdx]" />
         <Stack.Screen name="travel/manual" />
+        <Stack.Screen name="travel/video" />
         <Stack.Screen name="place/[contentId]" />
       </Stack>
       {/* 진행 중 렌더를 앱 어느 화면에서든 추적 → 완료 시 상단 배너 */}
