@@ -518,22 +518,29 @@ function FeedCard({ reels }: { reels: Reels }) {
             </Text>
           </View>
         ) : null}
-        {/* 하단 캡션 (가독성용 어두운 오버레이) */}
-        <View
-          className="bg-black/40"
-          style={{
-            paddingHorizontal: scale(12),
-            paddingVertical: verticalScale(12),
-          }}
-        >
-          <Text
-            className="text-white font-semibold"
-            numberOfLines={2}
-            style={{ fontSize: moderateScale(15) }}
+        {/* 하단 캡션 — 제목이 없는 릴스는 띠까지 통째로 빼서 빈 칸이 안 보이게 한다.
+            사진 위에 얹히므로 단색 대신 아래로 짙어지는 그라데이션을 쓴다. */}
+        {reels.caption ? (
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.75)"]}
+            style={{
+              paddingHorizontal: scale(11),
+              paddingTop: verticalScale(22),
+              paddingBottom: verticalScale(11),
+            }}
           >
-            {reels.caption}
-          </Text>
-        </View>
+            <Text
+              className="text-white font-semibold"
+              numberOfLines={2}
+              style={{
+                fontSize: moderateScale(12),
+                lineHeight: moderateScale(16),
+              }}
+            >
+              {reels.caption}
+            </Text>
+          </LinearGradient>
+        ) : null}
       </ThemedRemoteImage>
     </Pressable>
   );
