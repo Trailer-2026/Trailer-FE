@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
 import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
+import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
 import ThemeSwapIcon from "@/src/components/icons/ThemeSwapIcon";
 import { Text } from "@/src/components/Text";
 import type { Theme } from "@/src/features/course/types";
@@ -448,6 +449,36 @@ function FeedCard({ reels }: { reels: Reels }) {
         uri={reels.thumbnail_url}
         style={{ flex: 1, justifyContent: "flex-end" }}
       >
+        {/* 지역 — 좌상단 핀 배지 (내 영상 그리드와 같은 스타일) */}
+        {reels.location ? (
+          <View
+            className="absolute flex-row items-center"
+            pointerEvents="none"
+            style={{
+              top: scale(8),
+              left: scale(8),
+              backgroundColor: "rgba(0,0,0,0.55)",
+              borderRadius: scale(11),
+              paddingHorizontal: scale(7),
+              paddingVertical: verticalScale(3),
+              gap: scale(3),
+            }}
+          >
+            <PlaceMarkerIcon
+              width={moderateScale(8)}
+              height={moderateScale(10)}
+              color="#FFFFFF"
+              dotFill="rgba(0,0,0,0.55)"
+            />
+            <Text
+              className="font-semibold text-white"
+              numberOfLines={1}
+              style={{ fontSize: moderateScale(10) }}
+            >
+              {reels.location}
+            </Text>
+          </View>
+        ) : null}
         {/* 하단 캡션 (가독성용 어두운 오버레이) */}
         <View
           className="bg-black/40"
@@ -463,19 +494,6 @@ function FeedCard({ reels }: { reels: Reels }) {
           >
             {reels.caption}
           </Text>
-          {/* 지역 태그 — 옛 릴스는 null 이라 숨긴다 */}
-          {reels.location ? (
-            <Text
-              className="text-white/80"
-              numberOfLines={1}
-              style={{
-                fontSize: moderateScale(12),
-                marginTop: verticalScale(4),
-              }}
-            >
-              {reels.location}
-            </Text>
-          ) : null}
         </View>
       </ThemedRemoteImage>
     </Pressable>
