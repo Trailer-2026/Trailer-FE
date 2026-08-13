@@ -7,9 +7,9 @@ import type { RecommendCriteria, RecommendResponse } from "./types";
  * AI 추천 응답이 오래 걸리는 편이라 클라이언트 전역 timeout(10s) 대신
  * 이 요청만 넉넉히 잡는다.
  *
- * 참고: 서버 앞단 nginx 가 60초에 끊고 504(HTML)를 돌려주는 것을 확인했다
- * (측정값 60.9초). 그래서 이 값을 늘려도 지금은 60초쯤에 504 로 끝난다 —
- * 서버 proxy_read_timeout 이 올라가면 그만큼 앱도 기다릴 수 있게 여유를 둔 값이다.
+ * 서버 앞단 nginx 의 proxy_read_timeout 도 2분으로 맞춘다 — 로딩 화면의
+ * "최대 2분" 안내와 같은 값이라, 이보다 짧으면 안내보다 먼저 504(HTML)로 끊긴다.
+ * (nginx 가 60초였을 때 실제로 60.9초에 504 로 끝나는 것을 확인했다.)
  */
 const RECOMMEND_TIMEOUT_MS = 120_000;
 

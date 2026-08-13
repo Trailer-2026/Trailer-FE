@@ -2,7 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Alert } from "react-native";
 
 import { captureFromCamera } from "@/src/features/reels/capture";
-import { toReelsMediaAsset } from "@/src/features/reels/media";
+import { fillLocationFromLibrary } from "@/src/features/reels/media";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import type { MediaSource } from "@/src/features/reels/components/MediaSourceSheet";
 
@@ -34,5 +34,27 @@ export async function pickScenicPhoto(
     exif: true,
   });
   if (result.canceled || result.assets.length === 0) return null;
-  return toReelsMediaAsset(result.assets[0]);
+
+  // 시스템 피커가 지운 GPS 를 원본 asset 에서 되찾는다(서버가 좌표로 일정에 매핑).
+  const photo = await fillLocationFromLibrary(result.assets[0]);
+  if (photo.latitude == null && !(await confirmNoLocation())) return null;
+  return photo;
+}
+
+/**
+ * 좌표가 없는 사진은 일정에 자동 연결되지 않는다 — 그대로 올릴지 먼저 묻는다.
+ * (스크린샷·다운로드 사진처럼 원본에도 위치가 없는 경우)
+ */
+function confirmNoLocation(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      "위치 정보가 없는 사진이에요",
+      "이 사진은 여행 일정에 자동으로 연결되지 않고 여행에만 등록돼요. 계속할까요?",
+      [
+        { text: "취소", style: "cancel", onPress: () => resolve(false) },
+        { text: "계속", onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
 }

@@ -153,6 +153,8 @@ export function useCurrentTravel() {
   const query = useQuery({
     queryKey: travelKeys.current(),
     queryFn: getCurrentTravel,
+    // 목업 모드에선 응답을 어차피 버리므로 요청 자체를 보내지 않는다(로그인 전 401 소음 방지).
+    enabled: !MOCK_TRAVEL_COMPLETED,
     staleTime: 1000 * 60, // 1분
   });
   // 여행이 끝나면 서버가 data=null 을 주므로, 목업도 null 로 맞춘다.
@@ -168,17 +170,18 @@ export function usePastTravels() {
   const query = useQuery({
     queryKey: travelKeys.past(),
     queryFn: getPastTravels,
+    // 목업 모드에선 서버를 보지 않는다 — 목록을 목업으로 통째 대체하므로 요청이 무의미하다.
+    enabled: !MOCK_TRAVEL_COMPLETED,
     staleTime: 1000 * 60, // 1분
   });
 
-  // 목업: '다녀온 여행' 맨 앞에 완료된 여행 1건을 끼워 넣는다.
+  // 목업: '다녀온 여행' 을 완료된 여행 1건으로 대체한다.
   // 상세도 useTravelDetail 이 같은 목업을 돌려주므로 카드를 눌러 완료 화면까지 볼 수 있다.
   if (MOCK_TRAVEL_COMPLETED) {
-    const real = query.data?.travels ?? [];
-    const mocked = [MOCK_PAST_TRAVEL, ...real];
+    const mocked = [MOCK_PAST_TRAVEL];
     return {
       ...query,
-      // 서버 조회가 실패해도(여행을 지웠거나 로그인 전) 목업은 그대로 보이게 한다.
+      // 서버 조회를 껐으므로(로그인 전이어도) 목업은 항상 보인다.
       isLoading: false,
       isError: false,
       data: { travels: mocked, total: mocked.length },
