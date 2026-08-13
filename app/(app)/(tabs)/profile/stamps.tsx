@@ -19,19 +19,23 @@ import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
-/** 헤더 + 달성 현황 띠를 잇는 상단 영역 색 */
+/** 헤더 + 달성 현황 띠를 잇는 상단 영역 색 (Figma 시안) */
 const TOP_BG = "#EAEEF7";
-const CARD_BG = "#E8EFFC";
-/** 달성한 스탬프 테두리 */
-const CARD_BORDER = "#8CA9FF";
+const TEXT_MAIN = "#353535";
+/** 달성한 스탬프 칸 */
+const CARD_BG = "#E4ECFF";
 /** 미달성 스탬프 — 그림은 감추고 자물쇠만 보여준다 */
 const LOCKED_BG = "#F1F4FB";
-const LOCKED_BORDER = "#C5C9D3";
+const COUNT_COLOR = "#6A6A6A";
 
 const LOCK = require("../../../../assets/images/style/Lock.png");
 
-const PAD = scale(20);
-const GAP = scale(12);
+/**
+ * Figma 시안(360 기준) 치수 — 좌우 여백 21, 칸 사이 8, 칸 101x101(정사각).
+ * 칸 크기는 화면 폭에서 계산하므로 폭이 다른 기기에서도 3열 정사각이 유지된다.
+ */
+const PAD = scale(21);
+const GAP = scale(8);
 const COLS = 3;
 
 /**
@@ -72,51 +76,40 @@ export default function StampsScreen() {
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
         <Text
-          className="text-gray-900"
-style={{
-            fontSize: moderateScale(17),
+          className="font-bold"
+          style={{
+            fontSize: moderateScale(16),
             marginLeft: scale(8),
-            fontWeight: 650 as never,
+            color: TEXT_MAIN,
           }}
         >
           스탬프
         </Text>
       </View>
 
-      {/* 달성 현황 띠 */}
+      {/* 달성 현황 띠 — 시안은 제목 아래 여백을 넉넉히 두고 개수를 옆에 크게 붙인다. */}
       <View
-        className="flex-row items-baseline"
+        className="flex-row items-center"
         style={{
           backgroundColor: TOP_BG,
           paddingHorizontal: PAD,
-          paddingVertical: verticalScale(26),
-          gap: scale(10),
+          paddingTop: verticalScale(34),
+          paddingBottom: verticalScale(20),
+          gap: scale(12),
         }}
       >
         <Text
-          className="text-gray-900"
-          // Bold(700)와 SemiBold(600) 사이 굵기(Pretendard-650). RN 타입엔 650 문자열이
-          // 없어 숫자로 준다 — Text 래퍼가 가장 가까운 정적 폰트로 매핑한다.
-          style={{ fontSize: moderateScale(15), fontWeight: 650 as never }}
+          className="font-semibold"
+          style={{ fontSize: moderateScale(14), color: TEXT_MAIN }}
         >
           스탬프 달성 현황
         </Text>
         {data ? (
           <Text
-            style={{
-              fontSize: moderateScale(24),
-              color: ACCENT,
-              fontWeight: 650 as never,
-            }}
+            className="font-medium"
+            style={{ fontSize: moderateScale(22), color: COUNT_COLOR }}
           >
-            {data.achieved_count}
-            {/* '개'만 검은색 + 한 단계 작게 */}
-            <Text
-              className="text-gray-900"
-              style={{ fontSize: moderateScale(19), fontWeight: 650 as never }}
-            >
-              개
-            </Text>
+            {data.achieved_count}개
           </Text>
         ) : null}
       </View>
@@ -155,13 +148,13 @@ style={{
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: PAD,
-            paddingTop: verticalScale(24),
+            paddingTop: verticalScale(30),
             paddingBottom: verticalScale(32),
           }}
         >
           <View
             className="flex-row flex-wrap"
-            style={{ gap: GAP, rowGap: verticalScale(20) }}
+            style={{ gap: GAP, rowGap: verticalScale(18) }}
           >
             {data.stamps.map((stamp) => (
               <StampCell key={stamp.type} stamp={stamp} size={cardSize} />
@@ -184,17 +177,15 @@ function StampCell({ stamp, size }: { stamp: Stamp; size: number }) {
 
   return (
     <View style={{ width: size }}>
+      {/* 칸은 시안대로 정사각 + r10, 테두리 없이 배경색으로만 달성 여부를 구분한다. */}
       <View
         className="items-center justify-center"
         style={{
           width: size,
           height: size,
-          borderRadius: scale(12),
+          borderRadius: scale(10),
           overflow: "hidden",
-          // 미달성은 자물쇠만, 달성은 스탬프 그림. 테두리 색으로도 구분한다.
           backgroundColor: locked ? LOCKED_BG : CARD_BG,
-          borderWidth: 1,
-          borderColor: locked ? LOCKED_BORDER : CARD_BORDER,
         }}
       >
         {locked ? (
@@ -202,16 +193,16 @@ function StampCell({ stamp, size }: { stamp: Stamp; size: number }) {
             <Image
               source={LOCK}
               contentFit="contain"
-              style={{ width: size * 0.34, height: size * 0.34 }}
+              style={{ width: size * 0.39, height: size * 0.39 }}
             />
             {showProgress ? (
               <Text
                 className="font-bold"
                 style={{
-                  fontSize: moderateScale(11),
+                  fontSize: moderateScale(10),
                   // 밝은 배경으로 바뀌어 흰색은 안 보인다 → 자물쇠와 같은 회색 계열.
                   color: "#9BA3B4",
-                  marginTop: verticalScale(6),
+                  marginTop: verticalScale(4),
                 }}
               >
                 {stamp.progress}/{stamp.goal}
@@ -219,26 +210,28 @@ function StampCell({ stamp, size }: { stamp: Stamp; size: number }) {
             ) : null}
           </>
         ) : failed ? (
-          <Feather name="award" size={size * 0.34} color="#B7C4E4" />
+          <Feather name="award" size={size * 0.4} color="#B7C4E4" />
         ) : (
           <Image
             source={{ uri: stamp.image_url }}
             contentFit="contain"
             onError={() => setFailed(true)}
-            style={{ width: size * 0.66, height: size * 0.66 }}
+            style={{ width: size * 0.8, height: size * 0.8 }}
           />
         )}
       </View>
 
-      {/* 이름 — 2줄 자리를 고정해 아래 줄 카드들이 어긋나지 않게 한다. */}
+      {/* 이름 — 2줄 자리를 고정해 아래 줄 카드들이 어긋나지 않게 한다.
+          라벨은 칸 너비에 맞춰 커지므로 폰트도 moderateScale 로 함께 움직인다. */}
       <Text
-        className={locked ? "text-gray-400 text-center" : "text-gray-800 text-center"}
+        className="text-center font-medium"
         numberOfLines={2}
         style={{
-          marginTop: verticalScale(10),
-          fontSize: moderateScale(12),
-          lineHeight: moderateScale(17),
-          height: moderateScale(34),
+          marginTop: scale(9),
+          fontSize: moderateScale(11),
+          lineHeight: moderateScale(14),
+          height: moderateScale(28),
+          color: locked ? "#9AA0AC" : TEXT_MAIN,
         }}
       >
         {stamp.title}
