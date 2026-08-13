@@ -22,6 +22,7 @@ import { openNotificationTarget } from "@/src/features/notification/routing";
 import MediaSourceSheet, {
   type MediaSource,
 } from "@/src/features/reels/components/MediaSourceSheet";
+import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import { useScenicStore } from "@/src/features/scenic/store";
 import type { NotificationLogItem } from "@/src/features/notification/types";
@@ -249,6 +250,8 @@ function SceneryPromoCard({
   travelIdx: number | null;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  // 방금 붙인 사진 — 성공을 시스템 알림창 대신 카드 안에서 보여준다.
+  const [added, setAdded] = useState<ReelsMediaAsset | null>(null);
   const addImages = useAddTravelImages();
 
   const onPickPhoto = async (source: MediaSource) => {
@@ -263,8 +266,7 @@ function SceneryPromoCard({
     addImages.mutate(
       { travelIdx, photos: [photo] },
       {
-        onSuccess: () =>
-          Alert.alert("사진을 붙였어요", "여행 영상을 만들 때 이 사진이 함께 쓰여요."),
+        onSuccess: () => setAdded(photo),
         onError: (err) => Alert.alert("사진 등록 실패", describeApiError(err)),
       },
     );
@@ -347,29 +349,78 @@ function SceneryPromoCard({
               </View>
             </View>
             <View style={{ height: verticalScale(140) }} />
-            <Pressable
-              onPress={() => setSheetOpen(true)}
-              disabled={addImages.isPending}
-              className="items-center justify-center rounded-2xl active:opacity-80"
-              style={{
-                height: verticalScale(56),
-                backgroundColor: ACCENT,
-                opacity: addImages.isPending ? 0.6 : 1,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="지금 촬영하러 가기"
-            >
-              {addImages.isPending ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
+            {added ? (
+              /* 방금 붙인 사진 — 썸네일 + 안내. 누르면 한 장 더 붙일 수 있다. */
+              <Pressable
+                onPress={() => setSheetOpen(true)}
+                className="flex-row items-center rounded-2xl bg-white active:opacity-80"
+                style={{
+                  height: verticalScale(56),
+                  paddingHorizontal: scale(12),
+                  gap: scale(12),
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="사진 한 장 더 붙이기"
+              >
+                <Image
+                  source={{ uri: added.uri }}
+                  style={{
+                    width: scale(38),
+                    height: scale(38),
+                    borderRadius: scale(8),
+                  }}
+                  contentFit="cover"
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    className="font-bold"
+                    style={{ fontSize: moderateScale(14), color: "#353535" }}
+                  >
+                    사진을 붙였어요
+                  </Text>
+                  <Text
+                    className="text-gray-500"
+                    numberOfLines={1}
+                    style={{
+                      fontSize: moderateScale(12),
+                      marginTop: verticalScale(2),
+                    }}
+                  >
+                    여행 영상을 만들 때 함께 담겨요
+                  </Text>
+                </View>
                 <Text
-                  className="text-white font-bold"
-                  style={{ fontSize: moderateScale(16) }}
+                  className="font-semibold"
+                  style={{ fontSize: moderateScale(13), color: ACCENT }}
                 >
-                  지금 촬영하러 가기
+                  한 장 더
                 </Text>
-              )}
-            </Pressable>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => setSheetOpen(true)}
+                disabled={addImages.isPending}
+                className="items-center justify-center rounded-2xl active:opacity-80"
+                style={{
+                  height: verticalScale(56),
+                  backgroundColor: ACCENT,
+                  opacity: addImages.isPending ? 0.6 : 1,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="지금 촬영하러 가기"
+              >
+                {addImages.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text
+                    className="text-white font-bold"
+                    style={{ fontSize: moderateScale(16) }}
+                  >
+                    지금 촬영하러 가기
+                  </Text>
+                )}
+              </Pressable>
+            )}
           </>
         ) : null}
       </View>
