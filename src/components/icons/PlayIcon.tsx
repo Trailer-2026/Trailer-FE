@@ -19,7 +19,9 @@ const PlayIcon = ({
   holeColor = "#0D0D0D",
   ...props
 }: Props) => (
-  <Svg width={22} height={22} fill="none" {...props}>
+  // viewBox 가 없으면 width/height 를 키워도 22px 원본이 좌상단에 그대로 남는다
+  // (호출부에서 크게 쓰면 아이콘만 작게 보인다).
+  <Svg width={22} height={22} viewBox="0 0 22 22" fill="none" {...props}>
     <Path
       fill={filled ? color : "none"}
       stroke={color}

@@ -1,11 +1,15 @@
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
-import { captureFromCamera, promptMediaSource } from "@/src/features/reels/capture";
+import { captureFromCamera } from "@/src/features/reels/capture";
+import MediaSourceSheet, {
+  type MediaSource,
+} from "@/src/features/reels/components/MediaSourceSheet";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -18,16 +22,17 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
  */
 export default function ReelsCreateScreen() {
   const setAssets = useReelsCreateStore((s) => s.setAssets);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const onPickMedia = async () => {
-    const source = await promptMediaSource();
+  const onPickMedia = async (source: MediaSource) => {
+    setSheetOpen(false);
     if (source === "camera") {
       const media = await captureFromCamera();
       if (media && media.length > 0) {
         setAssets(media);
         router.push("/reels/edit");
       }
-    } else if (source === "gallery") {
+    } else {
       router.push("/reels/gallery?mode=new");
     }
   };
@@ -85,7 +90,7 @@ export default function ReelsCreateScreen() {
         }}
       >
         <Pressable
-          onPress={onPickMedia}
+          onPress={() => setSheetOpen(true)}
           hitSlop={12}
           className="flex-row items-center active:opacity-60"
           style={{ gap: scale(4) }}
@@ -100,6 +105,12 @@ export default function ReelsCreateScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <MediaSourceSheet
+        visible={sheetOpen}
+        onSelect={onPickMedia}
+        onClose={() => setSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

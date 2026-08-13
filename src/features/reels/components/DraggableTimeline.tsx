@@ -148,6 +148,27 @@ function DraggableThumb({
             borderColor: "#FFFFFF",
           }}
         />
+
+        {/* 영상에 나오는 순서 — 보낸 순서가 곧 영상 순서라 번호로 못박아 보여준다. */}
+        <View
+          className="absolute items-center justify-center"
+          pointerEvents="none"
+          style={{
+            top: scale(4),
+            left: scale(4),
+            width: scale(18),
+            height: scale(18),
+            borderRadius: scale(9),
+            backgroundColor: "rgba(0,0,0,0.6)",
+          }}
+        >
+          <Text
+            className="font-bold text-white"
+            style={{ fontSize: moderateScale(10) }}
+          >
+            {index + 1}
+          </Text>
+        </View>
         <View pointerEvents="none">
           <Text
             className="text-gray-400"

@@ -1,8 +1,11 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Pressable, View } from "react-native";
+import { VideoView, type VideoPlayer } from "expo-video";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import CommentIcon from "@/src/components/icons/CommentIcon";
+import DownloadIcon from "@/src/components/icons/DownloadIcon";
 import HeartIcon from "@/src/components/icons/HeartIcon";
 import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
 import ShareIcon from "@/src/components/icons/ShareIcon";
@@ -15,7 +18,20 @@ type Props = {
   reels: Reels;
   /** 한 카드가 차지할 높이(= 뷰포트 높이). 페이징 단위와 반드시 같아야 한다. */
   height: number;
+  /** 지금 화면에 보이는 카드인지 — 이 카드만 플레이어를 붙인다. */
+  active: boolean;
+  /** 피드 전체가 공유하는 플레이어 1개. 카드마다 만들면 ExoPlayer 버퍼가 쌓여 OOM 난다. */
+  player: VideoPlayer;
   onToggleLike: (reelsIdx: number) => void;
+  onOpenComments: (reelsIdx: number) => void;
+  /** 내 영상이면 다운로드, 남의 영상이면 링크 공유 — 분기는 호출부(feed)가 한다. */
+  onShare: (reels: Reels) => void;
+  /** ⋯ — 신고·차단 메뉴. 없으면 ⋯ 버튼을 그리지 않는다(내 영상 재생 화면). */
+  onOpenMore?: (reels: Reels) => void;
+  /** 내 영상 — 버튼을 공유 대신 다운로드 아이콘으로 바꾼다. */
+  mine?: boolean;
+  /** 다운로드·링크 조회 진행 중 — 버튼을 스피너로 바꾸고 중복 탭을 막는다. */
+  sharing?: boolean;
 };
 
 /**
@@ -35,13 +51,73 @@ function formatCount(n: number) {
   return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}천`;
 }
 
-export default function ReelsCard({ reels, height, onToggleLike }: Props) {
+export default function ReelsCard({
+  reels,
+  height,
+  active,
+  player,
+  onToggleLike,
+  onOpenComments,
+  onShare,
+  onOpenMore,
+  mine = false,
+  sharing = false,
+}: Props) {
+  const ActionIcon = mine ? DownloadIcon : ShareIcon;
+
+  // 화면을 탭하면 재생/일시정지. 카드가 바뀌면(호출부가 플레이어를 다시 재생시킨다)
+  // 표시를 원래대로 돌려 놓는다.
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    setPaused(false);
+  }, [active, reels.reels_idx]);
+
+  const togglePlay = () => {
+    if (!active || !reels.video_url) return;
+    if (player.playing) {
+      player.pause();
+      setPaused(true);
+    } else {
+      player.play();
+      setPaused(false);
+    }
+  };
+
   return (
     <View className="w-full bg-black" style={{ height }}>
-      {/* 영상 제작 로직이 아직 없어 정지 이미지(썸네일)로 대체 렌더한다.
-          TODO(영상): video_url 이 생기면 expo-video 플레이어로 교체하고,
-          현재 보이는 카드만 재생하도록 viewability 로 제어. */}
-      {reels.thumbnail_url ? (
+      {reels.video_url && active ? (
+        <Pressable onPress={togglePlay} style={{ width: "100%", height: "100%" }}>
+          <VideoView
+            player={player}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            nativeControls={false}
+          />
+          {/* 일시정지 표시 — 탭으로 멈춘 상태임을 알린다 */}
+          {paused ? (
+            <View
+              className="absolute inset-0 items-center justify-center"
+              pointerEvents="none"
+            >
+              <View
+                className="items-center justify-center rounded-full"
+                style={{
+                  width: moderateScale(64),
+                  height: moderateScale(64),
+                  backgroundColor: "rgba(0,0,0,0.45)",
+                }}
+              >
+                <Text
+                  className="text-white"
+                  style={{ fontSize: moderateScale(24) }}
+                >
+                  ▶
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : reels.thumbnail_url ? (
         <Image
           source={{ uri: reels.thumbnail_url }}
           style={{ width: "100%", height: "100%" }}
@@ -96,8 +172,7 @@ export default function ReelsCard({ reels, height, onToggleLike }: Props) {
           className="items-center active:opacity-60"
           style={{ gap: verticalScale(4) }}
           hitSlop={moderateScale(8)}
-          // TODO(댓글): 댓글 화면(바텀시트) 열기 — 이번 범위 밖.
-          onPress={() => {}}
+          onPress={() => onOpenComments(reels.reels_idx)}
           accessibilityRole="button"
           accessibilityLabel="댓글 보기"
         >
@@ -117,17 +192,45 @@ export default function ReelsCard({ reels, height, onToggleLike }: Props) {
         <Pressable
           className="items-center active:opacity-60"
           hitSlop={moderateScale(8)}
-          // TODO(공유): 시스템 공유 시트 연결 — 이번 범위 밖.
-          onPress={() => {}}
+          disabled={sharing}
+          onPress={() => onShare(reels)}
           accessibilityRole="button"
-          accessibilityLabel="공유"
+          accessibilityLabel={mine ? "갤러리에 저장" : "공유"}
         >
-          <ShareIcon
-            width={moderateScale(ICON.share.w)}
-            height={moderateScale(ICON.share.h)}
-            color="#FFFFFF"
-          />
+          {sharing ? (
+            <ActivityIndicator
+              color="#FFFFFF"
+              style={{
+                width: moderateScale(ICON.share.w),
+                height: moderateScale(ICON.share.h),
+              }}
+            />
+          ) : (
+            <ActionIcon
+              width={moderateScale(ICON.share.w)}
+              height={moderateScale(ICON.share.h)}
+              color="#FFFFFF"
+            />
+          )}
         </Pressable>
+
+        {/* ⋯ — 신고·차단. 공유 바로 아래. */}
+        {onOpenMore ? (
+        <Pressable
+          className="items-center active:opacity-60"
+          hitSlop={moderateScale(8)}
+          onPress={() => onOpenMore(reels)}
+          accessibilityRole="button"
+          accessibilityLabel="더보기"
+        >
+          <Text
+            className="font-bold text-white"
+            style={{ fontSize: moderateScale(22), lineHeight: moderateScale(22) }}
+          >
+            ⋯
+          </Text>
+        </Pressable>
+        ) : null}
       </View>
 
       {/* 하단 정보: 작성자 · 캡션 · 위치 */}

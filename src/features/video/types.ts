@@ -28,10 +28,36 @@ export type RenderOptions = {
   theme: VideoTheme;
   /** BGM 파일명(BgmTrackResponse.file) 또는 "" (무음). */
   bgm: string;
+  /** 릴스 제목(100자 이내). 빈 값이면 제목 없는 릴스로 만들어진다. */
+  title?: string;
   // 출발지(선택) — 위도/경도는 함께 지정. 생략 시 첫 사진 위치에서 시작.
   start_name?: string;
   start_latitude?: number;
   start_longitude?: number;
+};
+
+/**
+ * POST /api/videos/edit/cut · /edit/insert 의 data.
+ * 릴스 PK 는 그대로고 영상만 교체된다(이전 영상은 서버가 지움 — 복구 불가).
+ */
+export type VideoEditResponse = {
+  reels_idx: number;
+  /** 편집된 새 영상의 공개 URL — 릴스의 url 이 이 값으로 갱신됨 */
+  video_url: string;
+  duration_seconds: number;
+  elapsed_seconds: number;
+};
+
+/**
+ * POST /api/videos/reels/upload 의 data.
+ * 렌더를 거치지 않아 응답 시점에 이미 완성된 릴스다(진행률 폴링 없음).
+ * 지역 태그(region)는 좌표를 알 수 없어 항상 null — 홈 카드에서 지역 핀이 숨겨진다.
+ */
+export type ReelsUploadResponse = {
+  reels_idx: number;
+  url: string | null;
+  /** 서버가 대표 프레임을 뽑아 저장한다. 실패하면 null. */
+  thumbnail_url: string | null;
 };
 
 /** GET /api/videos/render/{reels_idx} 및 렌더 시작 응답의 data. */

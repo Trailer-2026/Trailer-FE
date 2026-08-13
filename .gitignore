@@ -50,3 +50,9 @@ GoogleService-Info.plist
 
 # Claude Code (settings.json 은 팀 공유라 추적, *.local.json 은 개인 설정이라 제외)
 .claude/settings.local.json
+
+# IDE (개인 설정)
+.idea/
+
+# Figma 개인 토큰 (디자인 스펙 조회용 — 앱 번들과 무관)
+.figma-token

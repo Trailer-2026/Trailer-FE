@@ -1,16 +1,24 @@
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
-import { captureFromCamera, promptMediaSource } from "@/src/features/reels/capture";
+import { captureFromCamera } from "@/src/features/reels/capture";
 import DraggableTimeline from "@/src/features/reels/components/DraggableTimeline";
+import MediaSourceSheet, {
+  type MediaSource,
+} from "@/src/features/reels/components/MediaSourceSheet";
+import GradedPhoto from "@/src/features/reels/components/GradedPhoto";
 import RenderOptions from "@/src/features/reels/components/RenderOptions";
+import {
+  ThemeBackground,
+  ThemeParticles,
+} from "@/src/features/reels/components/ThemePreview";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import {
   SECONDS_PER_PHOTO,
@@ -19,9 +27,8 @@ import {
   totalDurationSeconds,
 } from "@/src/features/reels/media";
 import { useActiveRenderStore } from "@/src/features/video/active-render-store";
-import { describeRenderError } from "@/src/features/video/errors";
 import { DEFAULT_RENDER_OPTIONS } from "@/src/features/video/options";
-import { useRenderPhotosOnly } from "@/src/features/video/queries";
+import { useRenderPhotosOrdered } from "@/src/features/video/queries";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -47,6 +54,7 @@ export default function ReelsEditScreen() {
 
   // 위쪽 큰 미리보기에 띄울 항목. 목록이 줄어들 수 있어 인덱스가 아니라 uri 로 잡는다.
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const selected =
     assets.find((a) => a.uri === selectedUri) ?? assets[0] ?? null;
 
@@ -57,18 +65,18 @@ export default function ReelsEditScreen() {
   const patchOptions = (patch: Partial<RenderOptionsValue>) =>
     setOptions((prev) => ({ ...prev, ...patch }));
 
-  const render = useRenderPhotosOnly();
+  const render = useRenderPhotosOrdered();
   const startTracking = useActiveRenderStore((s) => s.start);
 
   // photos-only 렌더 대상은 사진만. 영상이 섞여 있어도 사진만 추려 보낸다.
   const photos = assets.filter((a) => a.kind === "image");
 
-  const onAddMore = async () => {
-    const source = await promptMediaSource();
+  const onAddMore = async (source: MediaSource) => {
+    setSheetOpen(false);
     if (source === "camera") {
       const media = await captureFromCamera();
       if (media && media.length > 0) addAssets(media);
-    } else if (source === "gallery") {
+    } else {
       router.push("/reels/gallery?mode=add");
     }
   };
@@ -83,7 +91,7 @@ export default function ReelsEditScreen() {
       );
       return;
     }
-    // 순서는 백엔드가 EXIF 촬영시각으로 정렬하므로 드래그 순서를 강제하지 않는다.
+    // photos-ordered 는 보낸 순서를 그대로 쓴다 — 타임라인에 보이는 순서가 곧 영상 순서.
     render.mutate(
       { photos, options },
       {
@@ -93,7 +101,7 @@ export default function ReelsEditScreen() {
           router.push(`/reels/progress?reels_idx=${status.reels_idx}`);
         },
         // 400(GPS 부족·같은 장소·알 수 없는 옵션 등)은 서버 메시지를 그대로 노출.
-        onError: (err) => Alert.alert("영상 만들기 실패", describeRenderError(err)),
+        onError: (err) => Alert.alert("영상 만들기 실패", describeApiError(err)),
       },
     );
   };
@@ -104,6 +112,9 @@ export default function ReelsEditScreen() {
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <StatusBar style="light" />
+
+      {/* 테마 하늘색 — 콘텐츠보다 먼저 그려 뒤에 깔린다(파티클은 맨 앞, 화면 끝에서). */}
+      <ThemeBackground theme={options.theme} />
 
       {/* 헤더: 뒤로 / 생성하기 */}
       <View
@@ -149,10 +160,12 @@ export default function ReelsEditScreen() {
       {/* 큰 미리보기 */}
       <View className="flex-1 items-center justify-center">
         {selected ? (
-          <Image
-            source={{ uri: selected.uri }}
-            contentFit="contain"
-            style={{ width: scale(248), height: verticalScale(370) }}
+          // 렌더러가 지도에 굽는 것과 같은 색보정을 사진에 걸어 결과 색감을 보여준다.
+          <GradedPhoto
+            uri={selected.uri}
+            theme={options.theme}
+            width={scale(248)}
+            height={verticalScale(370)}
           />
         ) : (
           <Text
@@ -204,7 +217,7 @@ export default function ReelsEditScreen() {
         }}
       >
         <Pressable
-          onPress={onAddMore}
+          onPress={() => setSheetOpen(true)}
           className="items-center justify-center active:opacity-70"
           style={{
             width: scale(THUMB_H),
@@ -234,6 +247,15 @@ export default function ReelsEditScreen() {
           labelFor={(index) => formatTimelineLabel(index * SECONDS_PER_PHOTO)}
         />
       </View>
+
+      {/* 파티클은 사진 위로 떨어져야 영상과 같아 보인다 — 맨 마지막에 그린다. */}
+      <ThemeParticles theme={options.theme} />
+
+      <MediaSourceSheet
+        visible={sheetOpen}
+        onSelect={onAddMore}
+        onClose={() => setSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

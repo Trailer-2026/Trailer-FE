@@ -1,6 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
-import { getMyProfile, updateNickname, updateProfileImage } from "./api";
+import { reelsKeys } from "@/src/features/reels/keys";
+
+import {
+  blockUser,
+  getLikedReels,
+  getMyProfile,
+  getMyReels,
+  updateNickname,
+  updateProfileImage,
+} from "./api";
 import { userKeys } from "./keys";
 import type { ProfileImageFile } from "./types";
 
@@ -10,6 +24,48 @@ export function useMyProfile() {
     queryKey: userKeys.profile(),
     queryFn: getMyProfile,
     staleTime: 1000 * 60, // 1분
+  });
+}
+
+/**
+ * 내가 올린 릴스(최신순) 무한 스크롤. next_cursor 가 null 이면 마지막 페이지.
+ * 영상을 만들고 돌아오면 목록이 바뀌므로 캐시는 짧게 잡는다.
+ */
+export function useMyReels(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: userKeys.myReels(),
+    queryFn: ({ pageParam }) => getMyReels(pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    enabled,
+    staleTime: 1000 * 30,
+    select: (data) => data.pages.flatMap((page) => page.items),
+  });
+}
+
+/** 내가 좋아요한 릴스(누른 순) 무한 스크롤. 내 릴스 목록과 페이징 방식이 같다. */
+export function useLikedReels(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: userKeys.likedReels(),
+    queryFn: ({ pageParam }) => getLikedReels(pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    enabled,
+    staleTime: 1000 * 30,
+    select: (data) => data.pages.flatMap((page) => page.items),
+  });
+}
+
+/**
+ * 사용자 차단. 성공하면 릴스 캐시 전체(추천 목록 + 댓글)를 무효화한다.
+ * 서버가 차단 상대의 릴스·댓글을 걸러서 주므로, 다시 받아오면 화면에서 사라진다.
+ */
+export function useBlockUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userIdx: number) => blockUser(userIdx),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all }),
   });
 }
 

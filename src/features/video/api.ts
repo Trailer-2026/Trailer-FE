@@ -1,11 +1,16 @@
+import { File, Paths } from "expo-file-system";
+
 import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
+import { getAccessToken } from "@/src/features/auth/storage";
 
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { preparePhotoForUpload } from "./photo-upload";
 import type {
   BgmTrackResponse,
+  ReelsUploadResponse,
   RenderOptions,
+  VideoEditResponse,
   VideoRenderStatusResponse,
 } from "./types";
 
@@ -21,11 +26,15 @@ export async function getBgmTracks(): Promise<BgmTrackResponse[]> {
 }
 
 /**
- * 사진→영상 렌더 시작. POST /api/videos/render/photos-only (multipart/form-data).
+ * 사진→영상 렌더 시작. POST /api/videos/render/photos-ordered (multipart/form-data).
+ *
+ * photos-only 와 달리 **촬영 시각을 무시하고 보낸 순서 그대로** 지점을 이동한다 —
+ * 화면 하단 타임라인의 드래그 순서가 곧 영상 순서다. GPS 좌표는 여전히 필요하고,
+ * GPS 없는 사진은 서버가 알아서 뺀다.
  *
  * - photos: 업로드 전 각 사진을 리사이즈·압축한다(preparePhotoForUpload) — 원본을 그대로
  *   올리면 본문이 커져 413 이 난다. 리사이즈로 사라진 EXIF GPS·촬영시각은 앱이 가진
- *   좌표로 재주입한다. 백엔드가 EXIF 로 GPS·촬영시각을 읽어 이동 경로를 만든다.
+ *   좌표로 재주입한다. 백엔드가 EXIF 로 GPS 를 읽어 이동 경로를 만든다.
  * - 텍스트 옵션: theme, bgm(빈 값이면 무음 → 미전송), 출발지(선택, 위·경도 함께).
  *   엔진은 항상 modal, 인트로/아웃트로는 항상 붙어 전송 필드가 없다.
  * - Content-Type 은 지정하지 않는다 — RN 의 XHR 이 FormData 를 감지해 boundary 자동 부착.
@@ -35,13 +44,14 @@ export async function getBgmTracks(): Promise<BgmTrackResponse[]> {
  * 400: 사진 2장 미만 / GPS 있는 사진 2장 미만 / 모두 같은 장소 / 알 수 없는 테마 /
  *      출발지 좌표 오류 → 서버 message 를 그대로 사용자에게 노출. 401 / 404(BGM 없음).
  */
-export async function renderPhotosOnly(
+export async function renderPhotosOrdered(
   photos: ReelsMediaAsset[],
   options: RenderOptions,
 ): Promise<VideoRenderStatusResponse> {
   const form = new FormData();
 
-  // 각 사진 리사이즈·압축 + EXIF 재주입(병렬).
+  // 각 사진 리사이즈·압축 + EXIF 재주입(병렬). Promise.all 은 입력 순서를 보존하므로
+  // 아래 append 순서 = 사용자가 정렬한 순서 = 영상 순서다.
   const files = await Promise.all(
     photos.map((photo, index) => preparePhotoForUpload(photo, index)),
   );
@@ -56,6 +66,7 @@ export async function renderPhotosOnly(
   form.append("theme", options.theme);
   // 빈 값(무음)은 아예 보내지 않는다(잘못된 곡명이면 404 이므로).
   if (options.bgm) form.append("bgm", options.bgm);
+  if (options.title?.trim()) form.append("title", options.title.trim());
   // 출발지는 위·경도 둘 다 있을 때만.
   if (options.start_latitude != null && options.start_longitude != null) {
     form.append("start_name", options.start_name ?? "출발");
@@ -64,12 +75,182 @@ export async function renderPhotosOnly(
   }
 
   const res = await api.post<CommonResponse<VideoRenderStatusResponse>>(
-    "/api/videos/render/photos-only",
+    "/api/videos/render/photos-ordered",
     form,
     { timeout: 60000 },
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
+}
+
+/** 서버 상한(100MB). 넘으면 413 이 오는데 그 응답은 공통 봉투가 아니라 안내가 어렵다. */
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+/** 업로드 전 파일 크기(바이트). 읽을 수 없으면 null — 그때는 서버 판정에 맡긴다. */
+export function videoFileSize(uri: string): number | null {
+  try {
+    return new File(uri).size ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 직접 만든 영상을 릴스로 업로드. POST /api/videos/reels/upload (multipart/form-data).
+ *
+ * 렌더를 거치지 않아 응답 시점에 이미 완성된 릴스다 — 진행률 폴링 없이 바로
+ * 추천 피드·마이페이지에 뜬다. title 을 비우면 제목 없는 릴스가 된다.
+ * 400: 영상 파일이 아니거나 손상·빈 파일·100MB 초과 / 401 / 502: 저장소 업로드 실패.
+ * 100MB 는 보내기 전에 걸러 낸다(413 은 nginx 가 끊어 공통 봉투가 아니다).
+ */
+export async function uploadReelsVideo(
+  video: { uri: string; name: string; type: string },
+  title?: string,
+  onProgress?: (percent: number) => void,
+): Promise<ReelsUploadResponse> {
+  const size = videoFileSize(video.uri);
+  if (size != null && size > MAX_UPLOAD_BYTES) {
+    throw new Error("100MB 이하 영상만 업로드할 수 있어요.");
+  }
+
+  const form = new FormData();
+  form.append("video", {
+    uri: video.uri,
+    name: video.name,
+    type: video.type,
+  } as unknown as Blob);
+  if (title?.trim()) form.append("title", title.trim());
+
+  const res = await api.post<CommonResponse<ReelsUploadResponse>>(
+    "/api/videos/reels/upload",
+    form,
+    {
+      // 최대 100MB 업로드 — 모바일 회선에서 전역 10s 로는 못 끝낸다.
+      timeout: 300000,
+      // 폰 업링크로 수십 MB 는 수 분이 걸린다 — 진행률이 없으면 멈춘 것처럼 보인다.
+      onUploadProgress: (e) => {
+        if (!onProgress || !e.total) return;
+        onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+      },
+    },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * 릴스 제목 수정. PATCH /api/videos/reels/{reels_idx}/title
+ *
+ * 영상은 그대로 두고 제목만 교체하므로 릴스 PK·url·썸네일은 바뀌지 않는다 —
+ * 목록 캐시만 갱신하면 새 제목이 바로 보인다. null/빈 문자열이면 제목 없는 릴스가 된다.
+ * 404: 없거나 남의 릴스 / 400: 아직 렌더가 끝나지 않음 / 422: 100자 초과 / 401.
+ */
+export async function updateReelsTitle(
+  reelsIdx: number,
+  title: string | null,
+): Promise<void> {
+  await api.patch<CommonResponse<unknown>>(
+    `/api/videos/reels/${reelsIdx}/title`,
+    { title },
+  );
+}
+
+/**
+ * 내 완성 영상 다운로드. GET /api/videos/reels/{reels_idx}/download
+ *
+ * mp4 첨부 파일로 내려오므로 axios(JSON) 대신 파일 다운로드 API 를 쓴다.
+ * 인터셉터를 안 타므로 Authorization 헤더를 직접 붙인다.
+ * 남의 릴스는 존재 여부를 숨기려 403 이 아니라 404 로 온다(→ 호출부에서 안내).
+ * 400: 아직 렌더 중 / 502: 저장소 접근 실패 / 401: 인증 필요.
+ *
+ * 캐시에 받아둔 뒤 호출부가 갤러리에 저장한다. 같은 릴스를 다시 받으면 덮어쓴다(idempotent).
+ */
+export async function downloadMyReelsVideo(reelsIdx: number): Promise<string> {
+  const token = await getAccessToken();
+  const file = await File.downloadFileAsync(
+    `${process.env.EXPO_PUBLIC_API_URL}/api/videos/reels/${reelsIdx}/download`,
+    new File(Paths.cache, `reels_${reelsIdx}.mp4`),
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      idempotent: true,
+    },
+  );
+  return file.uri;
+}
+
+/**
+ * 완성된 릴스 영상에서 [start, end) 구간 삭제. POST /api/videos/edit/cut (urlencoded).
+ *
+ * 서버가 새 영상을 버킷에 올리고 릴스의 url 을 교체한 뒤 **편집 전 영상은 지운다** —
+ * 되돌릴 수 없다. 400: 렌더 미완료·구간 오류·영상 전체 삭제 시도 / 404: 남의 릴스·없음 /
+ * 502: ffmpeg 실패. ffmpeg 재인코딩이라 응답이 느려 timeout 을 늘려 잡는다.
+ */
+export async function cutVideoSection(
+  reelsIdx: number,
+  startSeconds: number,
+  endSeconds: number,
+): Promise<VideoEditResponse> {
+  const body = new URLSearchParams({
+    reels_idx: String(reelsIdx),
+    start_seconds: String(startSeconds),
+    end_seconds: String(endSeconds),
+  });
+  const res = await api.post<CommonResponse<VideoEditResponse>>(
+    "/api/videos/edit/cut",
+    body.toString(),
+    {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 120000,
+    },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * 완성된 릴스 영상 at_seconds 시점에 사진 끼워넣기. POST /api/videos/edit/insert (multipart).
+ *
+ * 사진이 머무는 시간은 서버 고정(렌더의 사진 1장 시간과 동일). cut 과 마찬가지로
+ * 편집 전 영상은 지워진다 — 되돌릴 수 없다.
+ */
+export async function insertImageClip(
+  reelsIdx: number,
+  atSeconds: number,
+  photo: ReelsMediaAsset,
+): Promise<VideoEditResponse> {
+  const form = new FormData();
+  form.append("reels_idx", String(reelsIdx));
+  form.append("at_seconds", String(atSeconds));
+  // 렌더 업로드와 같은 리사이즈·압축 경로 — 원본을 그대로 올리면 413 이 난다.
+  const file = await preparePhotoForUpload(photo, 0);
+  form.append("image", {
+    uri: file.uri,
+    name: file.name,
+    type: file.type,
+  } as unknown as Blob);
+
+  const res = await api.post<CommonResponse<VideoEditResponse>>(
+    "/api/videos/edit/insert",
+    form,
+    { timeout: 120000 },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * 릴스 공유 링크. GET /api/videos/reels/{reels_idx}/share
+ *
+ * 영상이 재생되는 공유 페이지(/r/{reels_idx}) 주소 — 버킷 영상 주소와 달리 카톡·SNS 에서
+ * 링크 미리보기가 뜬다. 남의 릴스도 조회 가능하고 로그인도 필요 없다.
+ * 404: 없거나 삭제됐거나 아직 렌더 중.
+ */
+export async function getReelsShareUrl(reelsIdx: number): Promise<string> {
+  const res = await api.get<CommonResponse<{ share_url: string }>>(
+    `/api/videos/reels/${reelsIdx}/share`,
+  );
+  if (!res.data.data?.share_url) throw new Error(res.data.message);
+  return res.data.data.share_url;
 }
 
 /**

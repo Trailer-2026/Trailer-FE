@@ -12,6 +12,12 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="me" />
       <Stack.Screen name="nickname" />
       <Stack.Screen name="notifications" />
+      {/* 내가 만든 릴스 — 썸네일 그리드(밝은 화면) → 고른 영상부터 세로 스와이프 재생(검정) */}
+      <Stack.Screen name="reels" />
+      <Stack.Screen
+        name="reels-player"
+        options={{ contentStyle: { backgroundColor: "#000000" } }}
+      />
       <Stack.Screen name="social" />
       <Stack.Screen name="travels" />
       <Stack.Screen name="version" />

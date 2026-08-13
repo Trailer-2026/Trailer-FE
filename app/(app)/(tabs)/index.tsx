@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +20,11 @@ import { Text } from "@/src/components/Text";
 import type { Theme } from "@/src/features/course/types";
 import { useThemedPlaces } from "@/src/features/place/queries";
 import type { ThemePlaceCard } from "@/src/features/place/types";
+import {
+  HOME_PREVIEW_LIMIT,
+  useReelsPreview,
+} from "@/src/features/reels/queries";
+import type { Reels } from "@/src/features/reels/types";
 import {
   formatTravelPeriod,
   travelStatusLabel,
@@ -54,19 +59,15 @@ const HERO_SLIDES = [
   },
 ] as const;
 
+/** 끝에서 한 번 더 넘기면 1번으로 돌아가도록 첫 장을 뒤에 복제해 둔다(순환). */
+const HERO_LOOP = [...HERO_SLIDES, HERO_SLIDES[0]];
+
 const HERO_HEIGHT = verticalScale(198);
 
 const TOOLTIP_COLOR = "#5E84F4"; // 상단 + 아래 말풍선
 const TOOLTIP_W = scale(100);
 // 말풍선 문구 — 홈에 들어올 때마다 번갈아 노출.
 const TOOLTIP_MESSAGES = ["AI 일정 만들기", "여행영상 만들기"] as const;
-
-// 실시간 여행 피드(추천) 카드 — 임의 배경 이미지 + 캡션
-const FEED_CARDS = [
-  { id: "1", caption: "경주에서 해볼만한 것" },
-  { id: "2", caption: "부산에서 20대가 노는 곳" },
-  { id: "3", caption: "여수 밤바다 즐기기" },
-];
 
 // 안드로이드 카드 입체감용 공통 스타일 (NativeWind shadow-* 가 흐릿하게 보이는 문제 보완)
 const CARD_ELEVATION = {
@@ -173,6 +174,7 @@ function Header() {
 function PromoHero() {
   const { width } = useWindowDimensions();
   const [slide, setSlide] = useState(0);
+  const heroRef = useRef<ScrollView>(null);
   const [msgIdx, setMsgIdx] = useState(0);
   // 홈을 떠날 때 다음 문구로 넘겨, 다시 들어오면 번갈아 보이게 한다(초기 진입 깜빡임 없음).
   useFocusEffect(
@@ -192,17 +194,26 @@ function PromoHero() {
         style={{ height: HERO_HEIGHT, ...CARD_ELEVATION }}
       >
         <ScrollView
+          ref={heroRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           // 화면 폭을 슬라이드 한 장으로 삼는다(배너가 좌우 여백 없이 꽉 참).
-          onMomentumScrollEnd={(e) =>
-            setSlide(Math.round(e.nativeEvent.contentOffset.x / width))
-          }
+          onMomentumScrollEnd={(e) => {
+            const i = Math.round(e.nativeEvent.contentOffset.x / width);
+            // 마지막 뒤의 복제 슬라이드(= 1번 사진)에 닿았으면 애니메이션 없이 실제 1번으로
+            // 되돌린다 — 사용자에겐 3장이 끊김 없이 순환하는 것으로 보인다.
+            if (i === HERO_SLIDES.length) {
+              heroRef.current?.scrollTo({ x: 0, animated: false });
+              setSlide(0);
+            } else {
+              setSlide(i);
+            }
+          }}
         >
-          {HERO_SLIDES.map((s) => (
+          {HERO_LOOP.map((s, si) => (
             <ImageBackground
-              key={s.tag}
+              key={`${s.tag}-${si}`}
               source={s.image}
               resizeMode="cover"
               style={{ width, height: HERO_HEIGHT }}
@@ -379,7 +390,22 @@ function SectionHeader() {
   );
 }
 
+/** 추천 릴스 3개(GET /api/videos/reels/recommend?limit=3). 탭하면 그 릴스부터 피드에서 본다. */
 function FeedCarousel() {
+  const { data: reels = [], isLoading } = useReelsPreview(HOME_PREVIEW_LIMIT);
+
+  if (isLoading) {
+    return (
+      <View
+        className="items-center justify-center"
+        style={{ height: verticalScale(250) }}
+      >
+        <ActivityIndicator color="#9CA3AF" />
+      </View>
+    );
+  }
+  if (reels.length === 0) return null;
+
   return (
     <ScrollView
       horizontal
@@ -389,42 +415,39 @@ function FeedCarousel() {
         gap: scale(12),
       }}
     >
-      {FEED_CARDS.map((card) => (
-        <FeedCard key={card.id} {...card} />
+      {reels.map((r) => (
+        <FeedCard key={r.reels_idx} reels={r} />
       ))}
     </ScrollView>
   );
 }
 
-function FeedCard({ caption }: { caption: string }) {
+function FeedCard({ reels }: { reels: Reels }) {
   return (
-    <View
-      className="overflow-hidden"
+    <Pressable
+      // 피드가 이 릴스를 맨 앞에 세운다 — 데이터는 이미 받아 둔 preview 캐시에서 꺼내
+      // 쓰므로 추가 요청이 없다.
+      onPress={() =>
+        router.navigate({
+          pathname: "/feed",
+          params: { reelsIdx: String(reels.reels_idx) },
+        })
+      }
+      className="overflow-hidden active:opacity-80"
       style={{
         width: scale(168),
         height: verticalScale(250),
         borderRadius: scale(16),
         ...CARD_ELEVATION,
       }}
+      accessibilityRole="button"
+      accessibilityLabel={reels.caption || "추천 여행영상"}
     >
-      {/* TODO: 임의 배경(Main.png 임시) — 추후 카드별 실제 이미지로 교체 */}
-      <ImageBackground
-        source={ICONS.main}
-        resizeMode="cover"
+      {/* 썸네일. 렌더 전 옛 릴스는 thumbnail_url 이 null → Main1 로 폴백 */}
+      <ThemedRemoteImage
+        uri={reels.thumbnail_url}
         style={{ flex: 1, justifyContent: "flex-end" }}
       >
-        {/* 우상단 더보기 */}
-        <View
-          className="absolute"
-          style={{ top: verticalScale(10), right: scale(10) }}
-        >
-          <MaterialCommunityIcons
-            name="dots-vertical"
-            size={moderateScale(20)}
-            color="#FFFFFF"
-          />
-        </View>
-
         {/* 하단 캡션 (가독성용 어두운 오버레이) */}
         <View
           className="bg-black/40"
@@ -435,13 +458,27 @@ function FeedCard({ caption }: { caption: string }) {
         >
           <Text
             className="text-white font-semibold"
+            numberOfLines={2}
             style={{ fontSize: moderateScale(15) }}
           >
-            {caption}
+            {reels.caption}
           </Text>
+          {/* 지역 태그 — 옛 릴스는 null 이라 숨긴다 */}
+          {reels.location ? (
+            <Text
+              className="text-white/80"
+              numberOfLines={1}
+              style={{
+                fontSize: moderateScale(12),
+                marginTop: verticalScale(4),
+              }}
+            >
+              {reels.location}
+            </Text>
+          ) : null}
         </View>
-      </ImageBackground>
-    </View>
+      </ThemedRemoteImage>
+    </Pressable>
   );
 }
 
