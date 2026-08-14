@@ -1,38 +1,35 @@
 import Feather from "@expo/vector-icons/Feather";
+import { router } from "expo-router";
 import { useMemo } from "react";
-import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 
 import { Text } from "@/src/components/Text";
 import type { TravelDetail } from "@/src/features/travel/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-import {
-  formatBasedAt,
-  formatClockLabel,
-  formatDistance,
-  sideLabel,
-} from "../format";
-import { ensureForegroundLocationPermission } from "../location";
-import { useMinuteTick, useScenicPolling } from "../queries";
+import { formatClockLabel } from "../format";
+import { ensureForegroundLocationPermission, resetMockLocation } from "../location";
+import { useMinuteTick } from "../queries";
 import {
   collectTrainSegments,
   findBoardingSuggestion,
   type TrainSegment,
 } from "../segments";
 import { useIsRiding, useScenicStore } from "../store";
-import type { ScenicSpotItem } from "../types";
 
 const ACCENT = "#5E84F4";
-const MINT = "#34C6A8";
 const CARD_BG = "#F4F4F6";
 const BORDER = "#E5E7EB";
 
 /**
- * 예정된 여행 상세의 "실시간 창밖 풍경" 섹션.
+ * 예정된 여행 상세의 "기차 탑승" 섹션 — 탑승 상태를 켜고 끄는 곳.
  *
- * - 탑승 중(이 여행의 세션이 있음) → 실시간 패널(구간·기준시각·관광지 top3)
+ * - 탑승 중(이 여행의 세션이 있음) → 현재 구간 + '탑승 종료'
  * - 아니면 → 열차 구간별 '탑승 시작' + 출발 시각 ±30분 제안 배너
  * - 열차 구간이 아예 없으면 아무것도 렌더하지 않는다.
+ *
+ * **실시간 풍경 결과는 여기서 보여주지 않는다.** 관광지 목록·기준 시각·새로고침은
+ * 알림 탭의 풍경알림 카드 한 곳에서만 그린다(폴링 구독도 그쪽에만 있다).
  */
 export default function LiveScenerySection({
   detail,
@@ -77,6 +74,7 @@ function IdlePanel({
       );
       return;
     }
+    resetMockLocation(); // 목업 위치 모드에서만 의미 있음 — 매번 같은 지점에서 출발
     startRiding({
       travelIdx,
       scheduleIdx: seg.scheduleIdx,
@@ -84,6 +82,9 @@ function IdlePanel({
       toStation: seg.toStation,
       label: seg.label,
     });
+    // 탑승 이후의 주 화면은 알림 탭의 풍경알림 카드다 → 바로 그리로 보낸다.
+    // push 가 아니라 navigate — 상세 화면을 스택에 쌓아두지 않고 탭으로 돌아간다.
+    router.navigate("/notifications");
   };
 
   return (
@@ -185,14 +186,15 @@ function IdlePanel({
 }
 
 /* ------------------------------------------------------------------ */
-/* 탑승 중 — 실시간 풍경                                                 */
+/* 탑승 중 — 상태 + 탑승 종료                                            */
+/*                                                                     */
+/* ⚠️ 여기서는 실시간 결과(관광지 top3·기준 시각·새로고침)를 그리지 않는다.  */
+/*    풍경 알림을 보여주는 곳은 알림 탭의 풍경알림 카드 한 곳뿐이다.        */
+/*    폴링도 걸지 않는다 — 이 화면이 구독하면 호출이 그만큼 늘어난다.       */
 /* ------------------------------------------------------------------ */
 function RidingPanel() {
   const session = useScenicStore((s) => s.session);
-  const result = useScenicStore((s) => s.lastResponse);
-  const hasNewSpots = useScenicStore((s) => s.hasNewSpots);
   const stopRiding = useScenicStore((s) => s.stopRiding);
-  const { loading, error, refresh } = useScenicPolling();
 
   if (!session) return null;
 
@@ -204,12 +206,20 @@ function RidingPanel() {
 
   return (
     <Section>
-      {/* 현재 구간 + 기준 시각 */}
-      <View className="flex-row items-center" style={{ gap: scale(8) }}>
+      <View
+        className="flex-row items-center"
+        style={{
+          backgroundColor: CARD_BG,
+          borderRadius: scale(10),
+          paddingHorizontal: scale(14),
+          paddingVertical: verticalScale(12),
+          gap: scale(10),
+        }}
+      >
         <View style={{ flex: 1 }}>
           <Text
             className="font-bold text-gray-900"
-            style={{ fontSize: moderateScale(15) }}
+            style={{ fontSize: moderateScale(14) }}
             numberOfLines={1}
           >
             {session.fromStation} → {session.toStation}
@@ -218,37 +228,20 @@ function RidingPanel() {
             className="text-gray-500"
             style={{ fontSize: moderateScale(12), marginTop: verticalScale(2) }}
           >
-            {result?.based_at
-              ? `${formatBasedAt(result.based_at)} 기준`
-              : "위치를 확인하는 중이에요"}
+            {session.label} · 탑승 중
           </Text>
         </View>
-
-        <Pressable
-          onPress={refresh}
-          disabled={loading}
-          hitSlop={10}
-          className="active:opacity-60"
-          style={{ padding: scale(6) }}
-          accessibilityRole="button"
-          accessibilityLabel="새로고침"
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={ACCENT} />
-          ) : (
-            <Feather name="refresh-cw" size={moderateScale(16)} color={ACCENT} />
-          )}
-        </Pressable>
 
         <Pressable
           onPress={confirmStop}
           className="active:opacity-70"
           style={{
-            paddingHorizontal: scale(12),
-            paddingVertical: verticalScale(7),
+            paddingHorizontal: scale(14),
+            paddingVertical: verticalScale(8),
             borderRadius: 999,
             borderWidth: 1,
             borderColor: BORDER,
+            backgroundColor: "#FFFFFF",
           }}
           accessibilityRole="button"
           accessibilityLabel="탑승 종료"
@@ -262,124 +255,17 @@ function RidingPanel() {
         </Pressable>
       </View>
 
-      {error ? (
-        <Text
-          style={{
-            fontSize: moderateScale(12),
-            color: "#EF4444",
-            marginTop: verticalScale(10),
-          }}
-        >
-          {error}
-        </Text>
-      ) : null}
-
-      {/* 관광지 top3 */}
-      {result && result.items.length > 0 ? (
-        <View style={{ marginTop: verticalScale(12), gap: verticalScale(8) }}>
-          {result.items.map((item) => (
-            <SpotCard
-              key={`${item.name}-${item.distance_m}`}
-              item={item}
-              // 같은 곳만 반복될 땐 강조하지 않는다(매 폴링마다 NEW 가 뜨지 않게).
-              highlight={hasNewSpots}
-            />
-          ))}
-        </View>
-      ) : (
-        <Text
-          className="text-gray-400"
-          style={{ fontSize: moderateScale(13), marginTop: verticalScale(14) }}
-        >
-          {result ? "지금은 보이는 관광지가 없어요" : "주변을 살펴보는 중이에요…"}
-        </Text>
-      )}
-    </Section>
-  );
-}
-
-/** side(좌/우)를 가장 크게 보여주는 관광지 카드. */
-function SpotCard({
-  item,
-  highlight,
-}: {
-  item: ScenicSpotItem;
-  highlight: boolean;
-}) {
-  const left = item.side === "left";
-  return (
-    <View
-      className="flex-row items-center"
-      style={{
-        backgroundColor: CARD_BG,
-        borderRadius: scale(10),
-        paddingHorizontal: scale(14),
-        paddingVertical: verticalScale(12),
-        gap: scale(12),
-      }}
-    >
-      {/* 창밖 방향 — 화살표 + 라벨을 한 덩어리로 크게 */}
-      <View
-        className="items-center justify-center"
+      <Text
+        className="text-gray-400"
         style={{
-          width: scale(58),
-          paddingVertical: verticalScale(6),
-          borderRadius: scale(8),
-          backgroundColor: "#FFFFFF",
+          fontSize: moderateScale(12),
+          marginTop: verticalScale(8),
+          lineHeight: moderateScale(18),
         }}
       >
-        <Feather
-          name={left ? "arrow-left" : "arrow-right"}
-          size={moderateScale(18)}
-          color={MINT}
-        />
-        <Text
-          className="font-bold"
-          style={{
-            fontSize: moderateScale(11),
-            color: MINT,
-            marginTop: verticalScale(2),
-          }}
-        >
-          {sideLabel(item.side)}
-        </Text>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View className="flex-row items-center" style={{ gap: scale(6) }}>
-          <Text
-            className="font-bold text-gray-900"
-            style={{ fontSize: moderateScale(15) }}
-            numberOfLines={1}
-          >
-            {item.name}
-          </Text>
-          {highlight ? (
-            <View
-              style={{
-                paddingHorizontal: scale(6),
-                paddingVertical: verticalScale(2),
-                borderRadius: scale(4),
-                backgroundColor: "#EEF2FF",
-              }}
-            >
-              <Text
-                className="font-bold"
-                style={{ fontSize: moderateScale(10), color: ACCENT }}
-              >
-                NEW
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        <Text
-          className="text-gray-500"
-          style={{ fontSize: moderateScale(12), marginTop: verticalScale(3) }}
-        >
-          {item.category} · {formatDistance(item.distance_m)}
-        </Text>
-      </View>
-    </View>
+        창밖으로 보이는 관광지는 알림 탭에서 알려드려요.
+      </Text>
+    </Section>
   );
 }
 
@@ -398,7 +284,7 @@ function Section({ children }: { children: React.ReactNode }) {
         className="font-bold text-gray-900"
         style={{ fontSize: moderateScale(16), marginBottom: verticalScale(10) }}
       >
-        실시간 창밖 풍경
+        기차 탑승
       </Text>
       {children}
     </View>

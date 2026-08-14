@@ -34,6 +34,14 @@ type ScenicState = {
   lastItemNames: string[];
   /** 마지막 갱신에서 새로 등장한 관광지가 있었는지(반복이면 false → 강조 안 함) */
   hasNewSpots: boolean;
+  /**
+   * 조회 진행 중 여부. 여행 상세와 알림 탭이 **동시에 떠 있을 수 있어서**
+   * 훅 로컬 state 로 두면 폴링을 실제로 돌리는 쪽에서만 스피너가 돈다.
+   * 두 화면이 같은 상태를 보도록 스토어에 둔다(error 도 같은 이유).
+   */
+  loading: boolean;
+  /** 마지막 조회 실패 메시지. 성공하면 null 로 지운다. */
+  error: string | null;
 };
 
 type ScenicActions = {
@@ -44,6 +52,8 @@ type ScenicActions = {
   /** 실제 API 호출에 성공했을 때의 좌표·시각 기록 */
   markCalled: (position: LatLng, at: number) => void;
   setResult: (res: ScenicNearbyResponse) => void;
+  /** 조회 진행 상태 갱신. 넘긴 필드만 바꾼다. */
+  setStatus: (next: { loading?: boolean; error?: string | null }) => void;
 };
 
 const initialState: ScenicState = {
@@ -53,6 +63,8 @@ const initialState: ScenicState = {
   lastResponse: null,
   lastItemNames: [],
   hasNewSpots: false,
+  loading: false,
+  error: null,
 };
 
 /**
@@ -75,6 +87,8 @@ export const useScenicStore = create<ScenicState & ScenicActions>((set, get) => 
   stopRiding: () => set(initialState),
 
   markCalled: (position, at) => set({ lastPosition: position, lastCalledAt: at }),
+
+  setStatus: (next) => set(next),
 
   setResult: (res) => {
     const prevNames = get().lastItemNames;

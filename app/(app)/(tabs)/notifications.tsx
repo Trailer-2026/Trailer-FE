@@ -1,17 +1,19 @@
+import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
   RefreshControl,
+  StyleSheet,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
-import BellIcon from "@/src/components/icons/BellIcon";
+import BellFilledIcon from "@/src/components/icons/BellFilledIcon";
 import { Text } from "@/src/components/Text";
 import {
   useNotifications,
@@ -23,14 +25,28 @@ import MediaSourceSheet, {
   type MediaSource,
 } from "@/src/features/reels/components/MediaSourceSheet";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
+import { normalizeStationName } from "@/src/features/scenic/api";
+import {
+  SCENERY_BACKGROUNDS,
+  sceneryTimeSlot,
+  type SceneryBackground,
+} from "@/src/features/scenic/background";
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
-import { useScenicStore } from "@/src/features/scenic/store";
+import SpotCard from "@/src/features/scenic/components/SpotCard";
+import { formatBasedAt, formatClockLabel } from "@/src/features/scenic/format";
+import {
+  ensureForegroundLocationPermission,
+  hasForegroundLocationPermission,
+} from "@/src/features/scenic/location";
+import { useMinuteTick, useScenicPolling } from "@/src/features/scenic/queries";
+import { useScenicStore, type ScenicSession } from "@/src/features/scenic/store";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
   useAddTravelImages,
   useCurrentTravel,
   usePastTravels,
 } from "@/src/features/travel/queries";
+import { useMyProfile } from "@/src/features/user/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
@@ -235,9 +251,12 @@ export default function NotificationsTab() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 상단 풍경알림 프로모 카드                                             */
-/* 실시간 풍경 알림(GET /api/scenic-spots/nearby) 은 이번 범위 밖 —      */
-/* 이 카드는 자리 유지용 정적 UI(TODO: 실 데이터 연결).                   */
+/* 상단 풍경알림 카드 — 이 기능의 주 화면                                 */
+/*                                                                     */
+/* 두 가지 상태를 그린다.                                                */
+/*  - 탑승 전: 안내 문구 + 현재 시각 + '실제 위치 켜기'(위치 권한 요청)    */
+/*  - 탑승 중: 지나는 역 + 조회 기준 시각 + 관광지 top3 + 촬영 버튼        */
+/* 탑승 시작은 여행 상세에서 누르고, 그때 이 탭으로 넘어온다.              */
 /* ------------------------------------------------------------------ */
 function SceneryPromoCard({
   collapsed,
@@ -253,6 +272,36 @@ function SceneryPromoCard({
   // 방금 붙인 사진 — 성공을 시스템 알림창 대신 카드 안에서 보여준다.
   const [added, setAdded] = useState<ReelsMediaAsset | null>(null);
   const addImages = useAddTravelImages();
+
+  const profile = useMyProfile().data;
+  const nickname = profile?.nickname ?? "여행자";
+  const profileImage = profile?.profile_image ?? null;
+
+  const session = useScenicStore((s) => s.session);
+  const result = useScenicStore((s) => s.lastResponse);
+  // 탑승 전 안내에 띄울 현재 시각. 배경 시간대도 이 값으로 정해져 1분마다 저절로 넘어간다.
+  const now = useMinuteTick();
+  const bg = SCENERY_BACKGROUNDS[sceneryTimeSlot(now)];
+
+  // 폴링은 카드 최상단에서 건다 — 접기(collapsed)로 내용이 사라져도 조회가 멈추면 안 된다.
+  // 세션이 없으면 훅 내부에서 아무것도 하지 않는다.
+  useScenicPolling();
+
+  /**
+   * 위치 권한 보유 여부. null 은 아직 확인 전.
+   * 권한을 받기 전에는 CTA 가 '기차에 탑승하셨나요?' 안내 버튼이고,
+   * 받고 나면 촬영 버튼으로 넘어간다(탑승 중에는 항상 촬영 버튼).
+   */
+  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    hasForegroundLocationPermission().then((ok) => {
+      if (alive) setLocationGranted(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const onPickPhoto = async (source: MediaSource) => {
     setSheetOpen(false);
@@ -288,29 +337,36 @@ function SceneryPromoCard({
         // 아래 알림 목록과 붙지 않게 여백 확보.
         marginBottom: verticalScale(16),
         borderRadius: scale(16),
-        backgroundColor: "#F2DEE8",
+        // 일러스트가 뜨기 전 잠깐 보이는 색.
+        backgroundColor: bg.fallback,
       }}
     >
+      {/* 시간대별 배경 일러스트 + 글씨가 묻히지 않게 덮는 반투명 막 */}
+      <Image
+        source={bg.image}
+        // className 대신 명시적 스타일 — 배경이 안 깔려도 티가 안 나는 자리라 확실한 쪽으로.
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={200}
+      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: bg.scrim }]} />
+
       <View style={{ padding: scale(16) }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center" style={{ gap: scale(6) }}>
-            <BellIcon
-              color={ACCENT}
+            <BellFilledIcon
               width={moderateScale(18)}
               height={moderateScale(20)}
             />
             <Text
               className="font-bold"
-              style={{ fontSize: moderateScale(15), color: ACCENT }}
+              style={{ fontSize: moderateScale(15), color: bg.head }}
             >
               풍경알림
             </Text>
           </View>
           <Pressable onPress={onToggle} hitSlop={8}>
-            <Text
-              className="text-gray-500"
-              style={{ fontSize: moderateScale(13) }}
-            >
+            <Text style={{ fontSize: moderateScale(13), color: bg.head }}>
               {collapsed ? "펼치기" : "접기"}
             </Text>
           </Pressable>
@@ -318,45 +374,77 @@ function SceneryPromoCard({
 
         {!collapsed ? (
           <>
+            {/* 인사 + 상태 문구 — 탑승 전/중에 따라 두 번째 줄만 달라진다. */}
             <View
               className="flex-row"
               style={{ marginTop: verticalScale(14) }}
             >
               <View
-                className="bg-white rounded-full"
+                className="bg-white rounded-full overflow-hidden"
                 style={{ width: scale(48), height: scale(48) }}
-              />
+              >
+                {profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={{ width: "100%", height: "100%" }}
+                    contentFit="cover"
+                  />
+                ) : null}
+              </View>
               <View style={{ flex: 1, marginLeft: scale(12) }}>
-                <Text
-                  className="text-gray-900"
-                  style={{ fontSize: moderateScale(16) }}
-                >
-                  김이박 님,
+                <Text style={{ fontSize: moderateScale(16), color: bg.text }}>
+                  {nickname} 님,
                 </Text>
                 <Text
-                  className="text-gray-900"
                   style={{
                     fontSize: moderateScale(16),
                     marginTop: verticalScale(2),
                     lineHeight: moderateScale(23),
+                    color: bg.text,
                   }}
                 >
-                  지금 <Text className="font-bold">대전역</Text> 스팟을 지나고
-                  있어요
+                  {session ? (
+                    <>
+                      지금{" "}
+                      <Text className="font-bold">
+                        {normalizeStationName(session.toStation)}
+                      </Text>
+                      을 지나가고 있어요
+                    </>
+                  ) : (
+                    <>
+                      기차 창밖으로 보이는{" "}
+                      <Text className="font-bold">풍경</Text>을 실시간으로
+                      알려드려요
+                    </>
+                  )}
                 </Text>
                 <Text
-                  className="text-gray-400"
                   style={{
                     fontSize: moderateScale(12),
                     marginTop: verticalScale(4),
+                    color: bg.subText,
                   }}
                 >
-                  오전 9:00 기준
+                  {/* 탑승 중이면 서버 조회 시각, 아니면 지금 시각(1분마다 갱신) */}
+                  {session
+                    ? result?.based_at
+                      ? `${formatBasedAt(result.based_at)} 기준`
+                      : "위치를 확인하는 중이에요"
+                    : `${formatClockLabel(now)} 기준`}
                 </Text>
               </View>
             </View>
-            <View style={{ height: verticalScale(140) }} />
-            {added ? (
+
+            {session ? (
+              <RidingDetail session={session} theme={bg} />
+            ) : (
+              <View style={{ height: verticalScale(12) }} />
+            )}
+
+            {!session && locationGranted !== true ? (
+              <LocationPrimerButton onResult={setLocationGranted} />
+            ) : added ? (
               /* 방금 붙인 사진 — 썸네일 + 안내. 누르면 한 장 더 붙일 수 있다. */
               <Pressable
                 onPress={() => setSheetOpen(true)}
@@ -451,6 +539,193 @@ function SceneryPromoCard({
         onClose={() => setSheetOpen(false)}
       />
     </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 탑승 중 상세 — 구간 · 관광지 top3 · 새로고침 / 탑승 종료               */
+/* 여행 상세의 실시간 섹션과 같은 값을 보여준다(스토어를 공유하므로 항상    */
+/* 같은 내용이다). 폴링은 부모가 이미 걸어두었다.                          */
+/* ------------------------------------------------------------------ */
+function RidingDetail({
+  session,
+  theme,
+}: {
+  session: ScenicSession;
+  /** 배경 시간대에 맞춘 글자색 — 밤 배경에서는 밝은 글씨로 뒤집힌다. */
+  theme: SceneryBackground;
+}) {
+  const result = useScenicStore((s) => s.lastResponse);
+  const hasNewSpots = useScenicStore((s) => s.hasNewSpots);
+  const stopRiding = useScenicStore((s) => s.stopRiding);
+  const loading = useScenicStore((s) => s.loading);
+  const error = useScenicStore((s) => s.error);
+  // 새로고침만 쓴다 — 구독(폴링 유지)은 부모의 useScenicPolling 이 이미 하고 있다.
+  const { refresh } = useScenicPolling();
+
+  const confirmStop = () =>
+    Alert.alert("탑승을 종료할까요?", "실시간 풍경 알림이 멈춰요.", [
+      { text: "취소", style: "cancel" },
+      { text: "종료", style: "destructive", onPress: stopRiding },
+    ]);
+
+  return (
+    <View style={{ marginTop: verticalScale(14) }}>
+      {/* 현재 구간 + 조작 버튼 */}
+      <View className="flex-row items-center" style={{ gap: scale(8) }}>
+        <Text
+          className="flex-1 font-bold"
+          style={{ fontSize: moderateScale(14), color: theme.text }}
+          numberOfLines={1}
+        >
+          {session.fromStation} → {session.toStation}
+        </Text>
+
+        <Pressable
+          onPress={refresh}
+          disabled={loading}
+          hitSlop={10}
+          className="active:opacity-60"
+          style={{ padding: scale(6) }}
+          accessibilityRole="button"
+          accessibilityLabel="새로고침"
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={ACCENT} />
+          ) : (
+            <Feather name="refresh-cw" size={moderateScale(16)} color={ACCENT} />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={confirmStop}
+          className="active:opacity-70 rounded-full bg-white"
+          style={{
+            paddingHorizontal: scale(12),
+            paddingVertical: verticalScale(7),
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="탑승 종료"
+        >
+          <Text
+            className="font-semibold text-gray-600"
+            style={{ fontSize: moderateScale(12) }}
+          >
+            탑승 종료
+          </Text>
+        </Pressable>
+      </View>
+
+      {error ? (
+        <Text
+          style={{
+            fontSize: moderateScale(12),
+            color: "#D92D20",
+            marginTop: verticalScale(10),
+          }}
+        >
+          {error}
+        </Text>
+      ) : null}
+
+      {/* 관광지 top3 */}
+      {result && result.items.length > 0 ? (
+        <View style={{ marginTop: verticalScale(12), gap: verticalScale(8) }}>
+          {result.items.map((item, index) => (
+            <SpotCard
+              key={`${item.name}-${item.distance_m}`}
+              item={item}
+              // 서버가 거리순으로 준다 → 첫 장이 가장 가까운 곳(내비게이션의 '다음 안내').
+              primary={index === 0}
+              // 같은 곳만 반복될 땐 강조하지 않는다(매 폴링마다 NEW 가 뜨지 않게).
+              highlight={hasNewSpots}
+              // 그림 배경 위라 흰 카드 + 회색 뱃지로 뒤집는다.
+              backgroundColor="#FFFFFF"
+              badgeColor="#F4F4F6"
+            />
+          ))}
+        </View>
+      ) : (
+        <Text
+          style={{
+            fontSize: moderateScale(13),
+            marginTop: verticalScale(12),
+            marginBottom: verticalScale(2),
+            color: theme.subText,
+          }}
+        >
+          {result ? "지금은 보이는 관광지가 없어요" : "주변을 살펴보는 중이에요…"}
+        </Text>
+      )}
+
+      <View style={{ height: verticalScale(12) }} />
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 탑승 전 CTA — 위치 권한 받아두기                                      */
+/*                                                                     */
+/* 시스템 권한창을 바로 띄우지 않고 왜 필요한지 먼저 설명한다. 한 번 거부  */
+/* 되면 안드로이드가 다시 묻지 않아 설정으로 보내야 하므로, 맥락을 모르는  */
+/* 상태에서 권한창을 맞닥뜨리게 하지 않는 편이 허용률에 유리하다.          */
+/* ------------------------------------------------------------------ */
+function LocationPrimerButton({
+  onResult,
+}: {
+  /** 권한 요청 결과 — 부모가 CTA 를 촬영 버튼으로 넘기는 데 쓴다. */
+  onResult: (granted: boolean) => void;
+}) {
+  const [asking, setAsking] = useState(false);
+
+  const request = async () => {
+    setAsking(true);
+    const ok = await ensureForegroundLocationPermission();
+    setAsking(false);
+    onResult(ok);
+    if (!ok) {
+      Alert.alert(
+        "위치 권한이 필요해요",
+        "창밖 풍경을 알려드리려면 위치 권한을 허용해 주세요. 설정 > 앱 > 권한에서 바꿀 수 있어요.",
+      );
+    }
+  };
+
+  const onPress = () => {
+    Alert.alert(
+      "기차에 탑승하셨나요?",
+      "현재 위치를 기반으로 실시간 풍경 스팟을 알려드리고, 최적의 여행 경험을 제공하기 위해 위치 정보에 접근합니다.",
+      [
+        { text: "나중에", style: "cancel" },
+        { text: "확인", onPress: () => void request() },
+      ],
+    );
+  };
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={asking}
+      className="items-center justify-center rounded-2xl active:opacity-80"
+      style={{
+        height: verticalScale(56),
+        backgroundColor: ACCENT,
+        opacity: asking ? 0.6 : 1,
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="기차에 탑승하셨나요?"
+    >
+      {asking ? (
+        <ActivityIndicator color="#FFFFFF" />
+      ) : (
+        <Text
+          className="text-white font-bold"
+          style={{ fontSize: moderateScale(16) }}
+        >
+          기차에 탑승하셨나요?
+        </Text>
+      )}
+    </Pressable>
   );
 }
 
