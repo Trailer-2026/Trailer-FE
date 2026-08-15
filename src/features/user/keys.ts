@@ -8,4 +8,5 @@ export const userKeys = {
   profile: () => [...userKeys.all, "profile"] as const,
   myReels: () => [...userKeys.all, "reels"] as const,
   likedReels: () => [...userKeys.all, "reels", "liked"] as const,
+  blocks: () => [...userKeys.all, "blocks"] as const,
 };

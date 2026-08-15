@@ -324,3 +324,18 @@ export async function addTravelImages(
     { timeout: 120000 },
   );
 }
+
+/**
+ * 여행에 붙인 사진 1장 삭제. DELETE /api/travels/{travel_idx}/images/{image_idx}
+ *
+ * **저장소 객체까지 지워 복구할 수 없다.** image_idx 는 여행 상세의 images 에 담겨 온다.
+ * 404: 사진이 없거나 본인 여행의 사진이 아님 / 401: 인증 필요.
+ */
+export async function deleteTravelImage(
+  travelIdx: number,
+  imageIdx: number,
+): Promise<void> {
+  await api.delete<CommonResponse<null>>(
+    `/api/travels/${travelIdx}/images/${imageIdx}`,
+  );
+}

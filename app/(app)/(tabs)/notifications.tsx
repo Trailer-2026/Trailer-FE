@@ -1,6 +1,8 @@
+import { useIsFocused } from "@react-navigation/native";
 import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +15,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
-import BellFilledIcon from "@/src/components/icons/BellFilledIcon";
 import { Text } from "@/src/components/Text";
 import {
   useNotifications,
@@ -24,27 +25,27 @@ import { openNotificationTarget } from "@/src/features/notification/routing";
 import MediaSourceSheet, {
   type MediaSource,
 } from "@/src/features/reels/components/MediaSourceSheet";
-import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { normalizeStationName } from "@/src/features/scenic/api";
 import {
   SCENERY_BACKGROUNDS,
+  SCENERY_CARD_HEIGHT,
+  SCENERY_SCRIM,
   sceneryTimeSlot,
-  type SceneryBackground,
 } from "@/src/features/scenic/background";
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
-import SpotCard from "@/src/features/scenic/components/SpotCard";
 import { formatBasedAt, formatClockLabel } from "@/src/features/scenic/format";
-import {
-  ensureForegroundLocationPermission,
-  hasForegroundLocationPermission,
-} from "@/src/features/scenic/location";
 import { useMinuteTick, useScenicPolling } from "@/src/features/scenic/queries";
-import { useScenicStore, type ScenicSession } from "@/src/features/scenic/store";
+import {
+  findCurrentScheduleItem,
+  findNearestScheduleItem,
+} from "@/src/features/scenic/segments";
+import { useScenicStore } from "@/src/features/scenic/store";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
   useAddTravelImages,
   useCurrentTravel,
   usePastTravels,
+  useTravelDetail,
 } from "@/src/features/travel/queries";
 import { useMyProfile } from "@/src/features/user/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -94,8 +95,6 @@ export default function NotificationsTab() {
   // TODO(backend): NotificationLogItem 에 cover_image_url 이 추가되면 이 룩업 제거.
   const { data: currentTravel } = useCurrentTravel();
   const { data: pastTravels } = usePastTravels();
-  // 풍경 알림은 탑승 중일 때 오는 것이라, 사진도 그 여행에 붙인다.
-  const ridingTravelIdx = useScenicStore((s) => s.session?.travelIdx ?? null);
   const coverByIdx = useMemo(() => {
     const m = new Map<number, string | null>();
     if (currentTravel) m.set(currentTravel.travel_idx, currentTravel.cover_image_url);
@@ -118,19 +117,35 @@ export default function NotificationsTab() {
     [readOne],
   );
 
-  const onReadAll = useCallback(() => {
-    if (unreadCount === 0) return;
+  /**
+   * 알림 탭에 들어오면 자동으로 전체 읽음 처리한다('모두 읽음' 버튼 대체).
+   *
+   * 화면이 포커스된 뒤에 목록이 도착하는 경우(첫 진입·콜드 스타트)도 있어서
+   * 포커스 여부와 unreadCount 를 함께 본다 — 둘 중 뭐가 먼저 와도 한 번은 실행된다.
+   *
+   * 실패하면 다시 시도하지 않는다 — 낙관 업데이트가 롤백되며 unreadCount 가 되살아나
+   * 그대로 두면 같은 요청을 무한 반복하게 된다. 탭을 나갔다 오면 다시 시도한다.
+   */
+  const isFocused = useIsFocused();
+  const readAllFailed = useRef(false);
+  useEffect(() => {
+    if (!isFocused) {
+      readAllFailed.current = false;
+      return;
+    }
+    if (unreadCount === 0 || readAll.isPending || readAllFailed.current) return;
     readAll.mutate(undefined, {
-      onError: () =>
-        Alert.alert("알림", "전체 읽음 처리에 실패했어요. 다시 시도해 주세요."),
+      onError: () => {
+        readAllFailed.current = true;
+      },
     });
-  }, [unreadCount, readAll]);
+  }, [isFocused, unreadCount, readAll]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* 헤더 */}
+      {/* 헤더 — 읽음 처리는 진입 시 자동이라 버튼이 없다. */}
       <View
-        className="flex-row items-center justify-between"
+        className="flex-row items-center"
         style={{
           paddingHorizontal: scale(20),
           // 앱 전체 상단바와 같은 높이로 맞추기 위한 여백.
@@ -144,21 +159,6 @@ export default function NotificationsTab() {
         >
           알림
         </Text>
-        <Pressable
-          onPress={onReadAll}
-          disabled={unreadCount === 0 || readAll.isPending}
-          hitSlop={8}
-          className="active:opacity-60"
-        >
-          <Text
-            style={{
-              fontSize: moderateScale(13),
-              color: unreadCount === 0 ? "#C4C4C4" : ACCENT,
-            }}
-          >
-            모두 읽음
-          </Text>
-        </Pressable>
       </View>
 
       <FlatList
@@ -179,8 +179,6 @@ export default function NotificationsTab() {
           <SceneryPromoCard
             collapsed={collapsed}
             onToggle={() => setCollapsed((c) => !c)}
-            // 탑승 중이면 그 여행, 아니면 진행 중인 여행에 사진을 붙인다.
-            travelIdx={ridingTravelIdx ?? currentTravel?.travel_idx ?? null}
           />
         }
         ListEmptyComponent={
@@ -251,27 +249,30 @@ export default function NotificationsTab() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 상단 풍경알림 카드 — 이 기능의 주 화면                                 */
+/* 상단 풍경알림 카드                                                     */
 /*                                                                     */
-/* 두 가지 상태를 그린다.                                                */
-/*  - 탑승 전: 안내 문구 + 현재 시각 + '실제 위치 켜기'(위치 권한 요청)    */
-/*  - 탑승 중: 지나는 역 + 조회 기준 시각 + 관광지 top3 + 촬영 버튼        */
-/* 탑승 시작은 여행 상세에서 누르고, 그때 이 탭으로 넘어온다.              */
+/* 시안(`알림` / `알림_` 프레임, 360x800)의 수치를 그대로 옮겼다.          */
+/*   카드 높이 352(접으면 161) · 라벨 y+9 · 프로필 y+41 45x45 ·           */
+/*   기준시각 y+87 · 촬영 버튼 y+279 318x48 r10                          */
+/* 관광지 목록·구간·새로고침·탑승 종료 같은 조작은 이 카드에 두지 않는다.   */
 /* ------------------------------------------------------------------ */
 function SceneryPromoCard({
   collapsed,
   onToggle,
-  travelIdx,
 }: {
   collapsed: boolean;
   onToggle: () => void;
-  /** 사진을 붙일 여행. 탑승 세션이 없으면 진행 중인 여행으로 떨어진다. */
-  travelIdx: number | null;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  // 방금 붙인 사진 — 성공을 시스템 알림창 대신 카드 안에서 보여준다.
-  const [added, setAdded] = useState<ReelsMediaAsset | null>(null);
+  // 방금 붙였다는 표시 — 버튼을 바꾸지 않고 위에 5초만 띄운다(시안은 버튼이 항상 촬영).
+  const [justAdded, setJustAdded] = useState(false);
   const addImages = useAddTravelImages();
+
+  useEffect(() => {
+    if (!justAdded) return;
+    const timer = setTimeout(() => setJustAdded(false), 5000);
+    return () => clearTimeout(timer);
+  }, [justAdded]);
 
   const profile = useMyProfile().data;
   const nickname = profile?.nickname ?? "여행자";
@@ -279,51 +280,69 @@ function SceneryPromoCard({
 
   const session = useScenicStore((s) => s.session);
   const result = useScenicStore((s) => s.lastResponse);
-  // 탑승 전 안내에 띄울 현재 시각. 배경 시간대도 이 값으로 정해져 1분마다 저절로 넘어간다.
+  // 배경 시간대를 정하는 현재 시각 — 1분마다 갱신돼 시간대가 저절로 넘어간다.
   const now = useMinuteTick();
   const bg = SCENERY_BACKGROUNDS[sceneryTimeSlot(now)];
 
-  // 폴링은 카드 최상단에서 건다 — 접기(collapsed)로 내용이 사라져도 조회가 멈추면 안 된다.
-  // 세션이 없으면 훅 내부에서 아무것도 하지 않는다.
-  useScenicPolling();
+  // 열차를 타고 있지 않을 때 "지금 ○○ 일정 중" 을 띄우기 위한 진행 중 일정.
+  // 여행중(ONGOING)이 아니면 조회하지 않는다.
+  const { data: currentTravel } = useCurrentTravel();
+  const { data: detail } = useTravelDetail(
+    currentTravel?.status === "ONGOING" ? currentTravel.travel_idx : undefined,
+  );
+  const currentSchedule = useMemo(
+    () => (detail && !session ? findCurrentScheduleItem(detail, now) : null),
+    [detail, session, now],
+  );
+  const currentScheduleTitle = currentSchedule?.title?.trim() || null;
 
   /**
-   * 위치 권한 보유 여부. null 은 아직 확인 전.
-   * 권한을 받기 전에는 CTA 가 '기차에 탑승하셨나요?' 안내 버튼이고,
-   * 받고 나면 촬영 버튼으로 넘어간다(탑승 중에는 항상 촬영 버튼).
+   * 좌표 없는 사진을 붙일 일정.
+   *
+   * 서버는 사진 GPS 로만 일정을 찾기 때문에, 메타데이터에 좌표가 없으면
+   * schedule_idx 가 null 로 남는다(= 어느 일정에도 안 붙음). 그래서 앱이
+   * 탑승 중 구간 → 진행 중 일정 → 시각이 가장 가까운 일정 순으로 골라 채워 보낸다.
    */
-  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
-  useEffect(() => {
-    let alive = true;
-    hasForegroundLocationPermission().then((ok) => {
-      if (alive) setLocationGranted(ok);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const fallbackScheduleIdx =
+    session?.scheduleIdx ??
+    currentSchedule?.schedule_idx ??
+    (detail ? (findNearestScheduleItem(detail, now)?.schedule_idx ?? null) : null);
+
+  // 카드가 결과 목록을 그리지 않아도 폴링은 여기서 계속 건다 — 이 호출이 곧 풍경
+  // 알림 푸시 발송이라, 멈추면 기능 자체가 죽는다. 세션이 없으면 훅이 알아서 쉰다.
+  useScenicPolling();
+
+  const scrim = collapsed ? SCENERY_SCRIM.collapsed : SCENERY_SCRIM.expanded;
+  // 탑승 중이면 그 여행, 아니면 진행 중인 여행에 사진을 붙인다.
+  const photoTravelIdx = session?.travelIdx ?? currentTravel?.travel_idx ?? null;
 
   const onPickPhoto = async (source: MediaSource) => {
     setSheetOpen(false);
-    const photo = await pickScenicPhoto(source);
+    // 붙일 일정을 정할 수 있으면 좌표가 없어도 받는다.
+    const photo = await pickScenicPhoto(source, {
+      requireLocation: fallbackScheduleIdx == null,
+    });
     if (!photo) return; // 취소·권한 거부
-    if (travelIdx == null) {
-      Alert.alert("여행을 찾지 못했어요", "진행 중인 여행이 있을 때 사진을 붙일 수 있어요.");
+    if (photoTravelIdx == null) {
+      Alert.alert(
+        "여행을 찾지 못했어요",
+        "진행 중인 여행이 있을 때 사진을 붙일 수 있어요.",
+      );
       return;
     }
-    // 방금 고른 사진을 바로 보여준다(업로드가 끝날 때까지 기다리지 않는다).
-    // 실패하면 직전 사진으로 되돌린다.
-    const previous = added;
-    setAdded(photo);
 
-    // schedule_idx 는 보내지 않는다 — 서버가 사진 EXIF 의 GPS 로 가까운 일정에 매핑한다.
+    // 좌표가 있으면 서버가 GPS 로 정확히 매핑한다. 없을 때만 앱이 고른 일정을 붙인다
+    // (안 보내면 schedule_idx 가 null 로 남아 어느 일정에도 안 붙는다).
+    const hasLocation = photo.latitude != null && photo.longitude != null;
     addImages.mutate(
-      { travelIdx, photos: [photo] },
       {
-        onError: (err) => {
-          setAdded(previous);
-          Alert.alert("사진 등록 실패", describeApiError(err));
-        },
+        travelIdx: photoTravelIdx,
+        photos: [photo],
+        scheduleIdx: hasLocation ? null : fallbackScheduleIdx,
+      },
+      {
+        onSuccess: () => setJustAdded(true),
+        onError: (err) => Alert.alert("사진 등록 실패", describeApiError(err)),
       },
     );
   };
@@ -332,205 +351,206 @@ function SceneryPromoCard({
     <View
       className="overflow-hidden"
       style={{
-        marginHorizontal: scale(20),
-        marginTop: verticalScale(8),
-        // 아래 알림 목록과 붙지 않게 여백 확보.
+        // 시안대로 화면 폭을 꽉 채운다(좌우 여백·라운드 없음).
         marginBottom: verticalScale(16),
-        borderRadius: scale(16),
+        height: verticalScale(
+          collapsed
+            ? SCENERY_CARD_HEIGHT.collapsed
+            : SCENERY_CARD_HEIGHT.expanded,
+        ),
         // 일러스트가 뜨기 전 잠깐 보이는 색.
         backgroundColor: bg.fallback,
       }}
     >
-      {/* 시간대별 배경 일러스트 + 글씨가 묻히지 않게 덮는 반투명 막 */}
+      {/* 시간대별 배경 일러스트 — 접었을 때 위쪽이 남도록 top 기준으로 자른다. */}
       <Image
         source={bg.image}
-        // className 대신 명시적 스타일 — 배경이 안 깔려도 티가 안 나는 자리라 확실한 쪽으로.
         style={StyleSheet.absoluteFill}
         contentFit="cover"
+        contentPosition="top"
         transition={200}
       />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: bg.scrim }]} />
+      {/* 글씨가 묻히지 않게 위쪽만 덮는 흰 그라디언트(시안 값). */}
+      <LinearGradient
+        colors={[...scrim.colors]}
+        locations={[...scrim.locations]}
+        style={StyleSheet.absoluteFill}
+      />
 
-      <View style={{ padding: scale(16) }}>
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center" style={{ gap: scale(6) }}>
-            <BellFilledIcon
-              width={moderateScale(18)}
-              height={moderateScale(20)}
+      {/* 접기 — 카드 위 9. 시안의 '풍경알림' 라벨·종 아이콘은 빼둔 상태. */}
+      <View
+        className="flex-row items-center justify-end"
+        style={{
+          marginTop: verticalScale(9),
+          paddingHorizontal: scale(20),
+          height: verticalScale(20),
+        }}
+      >
+        <Pressable
+          onPress={onToggle}
+          hitSlop={8}
+          className="flex-row items-center"
+          style={{ gap: scale(4) }}
+        >
+          <Text
+            style={{
+              fontSize: moderateScale(12),
+              fontWeight: "600",
+              color: bg.text,
+            }}
+          >
+            {collapsed ? "펼치기" : "접기"}
+          </Text>
+          <Feather
+            name={collapsed ? "chevron-up" : "chevron-down"}
+            size={moderateScale(12)}
+            color={bg.text}
+          />
+        </Pressable>
+      </View>
+
+      {/* 프로필 + 인사 — 카드 위 41 */}
+      <View
+        className="flex-row"
+        style={{ marginTop: verticalScale(12), paddingHorizontal: scale(17) }}
+      >
+        {/* 프로필 사진이 없는 계정(profile_image=null)이면 빈 흰 원만 남아
+            깨진 것처럼 보여서, 내 정보 화면과 같은 사람 아이콘으로 채운다. */}
+        <View
+          className="bg-white rounded-full overflow-hidden items-center justify-center"
+          style={{ width: scale(45), height: scale(45) }}
+        >
+          {profileImage ? (
+            <Image
+              source={{ uri: profileImage }}
+              style={{ width: "100%", height: "100%" }}
+              contentFit="cover"
             />
+          ) : (
+            <Feather name="user" size={scale(22)} color="#B7C0DA" />
+          )}
+        </View>
+        <View style={{ flex: 1, marginLeft: scale(7) }}>
+          <Text
+            style={{
+              fontSize: moderateScale(18),
+              lineHeight: moderateScale(21),
+              color: bg.text,
+            }}
+          >
+            {nickname} 님,
+          </Text>
+          <Text
+            style={{
+              fontSize: moderateScale(18),
+              lineHeight: moderateScale(21),
+              color: bg.text,
+            }}
+          >
+            {session ? (
+              /* 일정표의 도착역(arr_station)이라 탑승 내내 바뀌지 않는다.
+                 "지나가고 있어요" 로 쓰면 사실과 달라서 '향하고 있어요' 로 둔다.
+                 normalizeStationName 이 항상 '역'으로 끝내주므로 조사는 '으로' 고정. */
+              <>
+                지금{" "}
+                <Text style={{ fontWeight: "700" }}>
+                  {normalizeStationName(session.toStation)}
+                </Text>
+                으로 향하고 있어요
+              </>
+            ) : currentScheduleTitle ? (
+              <>
+                지금{" "}
+                <Text style={{ fontWeight: "700" }}>{currentScheduleTitle}</Text>{" "}
+                일정 중이에요
+              </>
+            ) : (
+              <>
+                기차 창밖으로 보이는{" "}
+                <Text style={{ fontWeight: "700" }}>풍경</Text>을 실시간으로
+                알려드려요
+              </>
+            )}
+          </Text>
+          {/* 탑승 중이면 서버 조회 시각, 아니면 지금 시각(1분마다 갱신).
+              탑승 직후 아직 조회 전이면 이 줄을 아예 그리지 않는다. */}
+          {!session || result?.based_at ? (
             <Text
-              className="font-bold"
-              style={{ fontSize: moderateScale(15), color: bg.head }}
+              style={{
+                fontSize: moderateScale(12),
+                lineHeight: moderateScale(14),
+                marginTop: verticalScale(4),
+                color: bg.subText,
+              }}
             >
-              풍경알림
+              {session && result?.based_at
+                ? `${formatBasedAt(result.based_at)} 기준`
+                : `${formatClockLabel(now)} 기준`}
             </Text>
-          </View>
-          <Pressable onPress={onToggle} hitSlop={8}>
-            <Text style={{ fontSize: moderateScale(13), color: bg.head }}>
-              {collapsed ? "펼치기" : "접기"}
-            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {/* 촬영 버튼 — 카드 아래에서 25 띄운 자리(시안 y+279, 높이 48).
+          접었을 때는 자리가 없어 그리지 않는다. */}
+      {!collapsed ? (
+        <View
+          style={{
+            position: "absolute",
+            left: scale(20),
+            right: scale(20),
+            bottom: verticalScale(25),
+            gap: verticalScale(8),
+          }}
+        >
+          {/* 방금 붙였다는 알림 — 버튼 위에 5초만 떴다 사라진다. */}
+          {justAdded ? (
+            <View
+              className="flex-row items-center bg-white"
+              style={{
+                alignSelf: "flex-start",
+                borderRadius: 999,
+                paddingHorizontal: scale(12),
+                paddingVertical: verticalScale(6),
+                gap: scale(6),
+              }}
+            >
+              <Feather name="check" size={moderateScale(12)} color={ACCENT} />
+              <Text
+                className="font-semibold"
+                style={{ fontSize: moderateScale(12), color: "#353535" }}
+              >
+                사진을 붙였어요
+              </Text>
+            </View>
+          ) : null}
+
+          <Pressable
+            onPress={() => setSheetOpen(true)}
+            disabled={addImages.isPending}
+            className="items-center justify-center active:opacity-80"
+            style={{
+              height: verticalScale(48),
+              borderRadius: scale(10),
+              backgroundColor: ACCENT,
+              opacity: addImages.isPending ? 0.6 : 1,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="지금 촬영하러 가기"
+          >
+            {addImages.isPending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text
+                className="text-white"
+                style={{ fontSize: moderateScale(16), fontWeight: "600" }}
+              >
+                지금 촬영하러 가기
+              </Text>
+            )}
           </Pressable>
         </View>
-
-        {!collapsed ? (
-          <>
-            {/* 인사 + 상태 문구 — 탑승 전/중에 따라 두 번째 줄만 달라진다. */}
-            <View
-              className="flex-row"
-              style={{ marginTop: verticalScale(14) }}
-            >
-              <View
-                className="bg-white rounded-full overflow-hidden"
-                style={{ width: scale(48), height: scale(48) }}
-              >
-                {profileImage ? (
-                  <Image
-                    source={{ uri: profileImage }}
-                    style={{ width: "100%", height: "100%" }}
-                    contentFit="cover"
-                  />
-                ) : null}
-              </View>
-              <View style={{ flex: 1, marginLeft: scale(12) }}>
-                <Text style={{ fontSize: moderateScale(16), color: bg.text }}>
-                  {nickname} 님,
-                </Text>
-                <Text
-                  style={{
-                    fontSize: moderateScale(16),
-                    marginTop: verticalScale(2),
-                    lineHeight: moderateScale(23),
-                    color: bg.text,
-                  }}
-                >
-                  {session ? (
-                    <>
-                      지금{" "}
-                      <Text className="font-bold">
-                        {normalizeStationName(session.toStation)}
-                      </Text>
-                      을 지나가고 있어요
-                    </>
-                  ) : (
-                    <>
-                      기차 창밖으로 보이는{" "}
-                      <Text className="font-bold">풍경</Text>을 실시간으로
-                      알려드려요
-                    </>
-                  )}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: moderateScale(12),
-                    marginTop: verticalScale(4),
-                    color: bg.subText,
-                  }}
-                >
-                  {/* 탑승 중이면 서버 조회 시각, 아니면 지금 시각(1분마다 갱신) */}
-                  {session
-                    ? result?.based_at
-                      ? `${formatBasedAt(result.based_at)} 기준`
-                      : "위치를 확인하는 중이에요"
-                    : `${formatClockLabel(now)} 기준`}
-                </Text>
-              </View>
-            </View>
-
-            {session ? (
-              <RidingDetail session={session} theme={bg} />
-            ) : (
-              <View style={{ height: verticalScale(12) }} />
-            )}
-
-            {!session && locationGranted !== true ? (
-              <LocationPrimerButton onResult={setLocationGranted} />
-            ) : added ? (
-              /* 방금 붙인 사진 — 썸네일 + 안내. 누르면 한 장 더 붙일 수 있다. */
-              <Pressable
-                onPress={() => setSheetOpen(true)}
-                disabled={addImages.isPending}
-                className="flex-row items-center rounded-2xl bg-white active:opacity-80"
-                style={{
-                  height: verticalScale(56),
-                  paddingHorizontal: scale(12),
-                  gap: scale(12),
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="사진 한 장 더 붙이기"
-              >
-                {/* 썸네일은 항상 방금 고른 사진. 올리는 중에는 살짝 흐리게 + 스피너. */}
-                <View>
-                  <Image
-                    source={{ uri: added.uri }}
-                    style={{
-                      width: scale(38),
-                      height: scale(38),
-                      borderRadius: scale(8),
-                      opacity: addImages.isPending ? 0.45 : 1,
-                    }}
-                    contentFit="cover"
-                  />
-                  {addImages.isPending ? (
-                    <View className="absolute inset-0 items-center justify-center">
-                      <ActivityIndicator size="small" color={ACCENT} />
-                    </View>
-                  ) : null}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    className="font-bold"
-                    style={{ fontSize: moderateScale(14), color: "#353535" }}
-                  >
-                    {addImages.isPending ? "사진을 올리는 중" : "사진을 붙였어요"}
-                  </Text>
-                  <Text
-                    className="text-gray-500"
-                    numberOfLines={1}
-                    style={{
-                      fontSize: moderateScale(12),
-                      marginTop: verticalScale(2),
-                    }}
-                  >
-                    여행 영상을 만들 때 함께 담겨요
-                  </Text>
-                </View>
-                {addImages.isPending ? null : (
-                  <Text
-                    className="font-semibold"
-                    style={{ fontSize: moderateScale(13), color: ACCENT }}
-                  >
-                    한 장 더
-                  </Text>
-                )}
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => setSheetOpen(true)}
-                disabled={addImages.isPending}
-                className="items-center justify-center rounded-2xl active:opacity-80"
-                style={{
-                  height: verticalScale(56),
-                  backgroundColor: ACCENT,
-                  opacity: addImages.isPending ? 0.6 : 1,
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="지금 촬영하러 가기"
-              >
-                {addImages.isPending ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text
-                    className="text-white font-bold"
-                    style={{ fontSize: moderateScale(16) }}
-                  >
-                    지금 촬영하러 가기
-                  </Text>
-                )}
-              </Pressable>
-            )}
-          </>
-        ) : null}
-      </View>
+      ) : null}
 
       {/* 촬영하기 / 갤러리에서 선택 — 영상 만들기와 같은 시트를 그대로 쓴다. */}
       <MediaSourceSheet
@@ -539,193 +559,6 @@ function SceneryPromoCard({
         onClose={() => setSheetOpen(false)}
       />
     </View>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* 탑승 중 상세 — 구간 · 관광지 top3 · 새로고침 / 탑승 종료               */
-/* 여행 상세의 실시간 섹션과 같은 값을 보여준다(스토어를 공유하므로 항상    */
-/* 같은 내용이다). 폴링은 부모가 이미 걸어두었다.                          */
-/* ------------------------------------------------------------------ */
-function RidingDetail({
-  session,
-  theme,
-}: {
-  session: ScenicSession;
-  /** 배경 시간대에 맞춘 글자색 — 밤 배경에서는 밝은 글씨로 뒤집힌다. */
-  theme: SceneryBackground;
-}) {
-  const result = useScenicStore((s) => s.lastResponse);
-  const hasNewSpots = useScenicStore((s) => s.hasNewSpots);
-  const stopRiding = useScenicStore((s) => s.stopRiding);
-  const loading = useScenicStore((s) => s.loading);
-  const error = useScenicStore((s) => s.error);
-  // 새로고침만 쓴다 — 구독(폴링 유지)은 부모의 useScenicPolling 이 이미 하고 있다.
-  const { refresh } = useScenicPolling();
-
-  const confirmStop = () =>
-    Alert.alert("탑승을 종료할까요?", "실시간 풍경 알림이 멈춰요.", [
-      { text: "취소", style: "cancel" },
-      { text: "종료", style: "destructive", onPress: stopRiding },
-    ]);
-
-  return (
-    <View style={{ marginTop: verticalScale(14) }}>
-      {/* 현재 구간 + 조작 버튼 */}
-      <View className="flex-row items-center" style={{ gap: scale(8) }}>
-        <Text
-          className="flex-1 font-bold"
-          style={{ fontSize: moderateScale(14), color: theme.text }}
-          numberOfLines={1}
-        >
-          {session.fromStation} → {session.toStation}
-        </Text>
-
-        <Pressable
-          onPress={refresh}
-          disabled={loading}
-          hitSlop={10}
-          className="active:opacity-60"
-          style={{ padding: scale(6) }}
-          accessibilityRole="button"
-          accessibilityLabel="새로고침"
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={ACCENT} />
-          ) : (
-            <Feather name="refresh-cw" size={moderateScale(16)} color={ACCENT} />
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={confirmStop}
-          className="active:opacity-70 rounded-full bg-white"
-          style={{
-            paddingHorizontal: scale(12),
-            paddingVertical: verticalScale(7),
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="탑승 종료"
-        >
-          <Text
-            className="font-semibold text-gray-600"
-            style={{ fontSize: moderateScale(12) }}
-          >
-            탑승 종료
-          </Text>
-        </Pressable>
-      </View>
-
-      {error ? (
-        <Text
-          style={{
-            fontSize: moderateScale(12),
-            color: "#D92D20",
-            marginTop: verticalScale(10),
-          }}
-        >
-          {error}
-        </Text>
-      ) : null}
-
-      {/* 관광지 top3 */}
-      {result && result.items.length > 0 ? (
-        <View style={{ marginTop: verticalScale(12), gap: verticalScale(8) }}>
-          {result.items.map((item, index) => (
-            <SpotCard
-              key={`${item.name}-${item.distance_m}`}
-              item={item}
-              // 서버가 거리순으로 준다 → 첫 장이 가장 가까운 곳(내비게이션의 '다음 안내').
-              primary={index === 0}
-              // 같은 곳만 반복될 땐 강조하지 않는다(매 폴링마다 NEW 가 뜨지 않게).
-              highlight={hasNewSpots}
-              // 그림 배경 위라 흰 카드 + 회색 뱃지로 뒤집는다.
-              backgroundColor="#FFFFFF"
-              badgeColor="#F4F4F6"
-            />
-          ))}
-        </View>
-      ) : (
-        <Text
-          style={{
-            fontSize: moderateScale(13),
-            marginTop: verticalScale(12),
-            marginBottom: verticalScale(2),
-            color: theme.subText,
-          }}
-        >
-          {result ? "지금은 보이는 관광지가 없어요" : "주변을 살펴보는 중이에요…"}
-        </Text>
-      )}
-
-      <View style={{ height: verticalScale(12) }} />
-    </View>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* 탑승 전 CTA — 위치 권한 받아두기                                      */
-/*                                                                     */
-/* 시스템 권한창을 바로 띄우지 않고 왜 필요한지 먼저 설명한다. 한 번 거부  */
-/* 되면 안드로이드가 다시 묻지 않아 설정으로 보내야 하므로, 맥락을 모르는  */
-/* 상태에서 권한창을 맞닥뜨리게 하지 않는 편이 허용률에 유리하다.          */
-/* ------------------------------------------------------------------ */
-function LocationPrimerButton({
-  onResult,
-}: {
-  /** 권한 요청 결과 — 부모가 CTA 를 촬영 버튼으로 넘기는 데 쓴다. */
-  onResult: (granted: boolean) => void;
-}) {
-  const [asking, setAsking] = useState(false);
-
-  const request = async () => {
-    setAsking(true);
-    const ok = await ensureForegroundLocationPermission();
-    setAsking(false);
-    onResult(ok);
-    if (!ok) {
-      Alert.alert(
-        "위치 권한이 필요해요",
-        "창밖 풍경을 알려드리려면 위치 권한을 허용해 주세요. 설정 > 앱 > 권한에서 바꿀 수 있어요.",
-      );
-    }
-  };
-
-  const onPress = () => {
-    Alert.alert(
-      "기차에 탑승하셨나요?",
-      "현재 위치를 기반으로 실시간 풍경 스팟을 알려드리고, 최적의 여행 경험을 제공하기 위해 위치 정보에 접근합니다.",
-      [
-        { text: "나중에", style: "cancel" },
-        { text: "확인", onPress: () => void request() },
-      ],
-    );
-  };
-
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={asking}
-      className="items-center justify-center rounded-2xl active:opacity-80"
-      style={{
-        height: verticalScale(56),
-        backgroundColor: ACCENT,
-        opacity: asking ? 0.6 : 1,
-      }}
-      accessibilityRole="button"
-      accessibilityLabel="기차에 탑승하셨나요?"
-    >
-      {asking ? (
-        <ActivityIndicator color="#FFFFFF" />
-      ) : (
-        <Text
-          className="text-white font-bold"
-          style={{ fontSize: moderateScale(16) }}
-        >
-          기차에 탑승하셨나요?
-        </Text>
-      )}
-    </Pressable>
   );
 }
 

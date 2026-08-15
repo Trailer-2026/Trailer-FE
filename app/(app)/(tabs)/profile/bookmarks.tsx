@@ -20,7 +20,8 @@ import { useLikedReels } from "@/src/features/user/queries";
 import type { MyReelsItem } from "@/src/features/user/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-/* Figma '북마크'(360x800) 기준 수치 — 카드 122x81, X 버튼 19, 좌측 여백 21 */
+/* Figma '북마크'(360x800) 시안 기준 수치 — 카드 122x81, X 버튼 19, 좌측 여백 21.
+   (시안 이름은 북마크지만 실제 내용은 좋아요한 영상이라 화면 문구는 그쪽으로 맞췄다.) */
 const TEXT_DARK = "#353535";
 const TEXT_MUTED = "#656565";
 const PIN_GRAY = "#666666";
@@ -35,9 +36,10 @@ const XBTN = scale(19);
 const ROW_GAP = verticalScale(14);
 
 /**
- * 북마크 — 좋아요한 릴스 목록(가로 한 줄 카드).
+ * 좋아요한 영상 — 내가 하트를 누른 릴스 목록(가로 한 줄 카드).
  *
- * 별도 북마크 API 가 없어 좋아요가 곧 북마크다(GET /api/users/me/reels/liked).
+ * GET /api/users/me/reels/liked. 별도 북마크 기능이 없어 좋아요가 곧 저장이라,
+ * 화면 이름도 실제 동작대로 '좋아요한 영상'으로 부른다(라우트만 bookmarks 로 남음).
  * 좌측 X 는 좋아요 취소 — 성공하면 목록이 무효화돼 그 줄이 사라진다.
  * 줄을 누르면 그 릴스부터 세로 스와이프 재생(reels-player, list=liked).
  */
@@ -74,7 +76,7 @@ export default function BookmarksScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <StatusBar style="dark" />
 
-      {/* 헤더 — 뒤로 + '북마크' */}
+      {/* 헤더 — 뒤로 + '좋아요한 영상' */}
       <View
         className="flex-row items-center"
         style={{
@@ -103,7 +105,7 @@ export default function BookmarksScreen() {
             fontWeight: "700",
           }}
         >
-          북마크
+          좋아요한 영상
         </Text>
       </View>
 
@@ -117,7 +119,7 @@ export default function BookmarksScreen() {
           style={{ paddingHorizontal: scale(24), gap: verticalScale(10) }}
         >
           <Text style={{ color: TEXT_DARK, fontSize: moderateScale(14) }}>
-            북마크를 불러오지 못했어요.
+            좋아요한 영상을 불러오지 못했어요.
           </Text>
           <Text
             className="text-center text-gray-400"
@@ -187,7 +189,7 @@ export default function BookmarksScreen() {
               }}
             >
               {/* 로드된 개수 — 다음 페이지가 남았으면 '+' 로 더 있음을 표시 */}
-              북마크 {reels.length}
+              좋아요한 영상 {reels.length}
               {hasNextPage ? "+" : ""}
             </Text>
           }
@@ -246,7 +248,7 @@ function BookmarkRow({
         className="items-center justify-center rounded-full active:opacity-70"
         style={{ width: XBTN, height: XBTN, backgroundColor: XBTN_BG }}
         accessibilityRole="button"
-        accessibilityLabel={`${item.title ?? "영상"} 북마크 해제`}
+        accessibilityLabel={`${item.title ?? "영상"} 좋아요 취소`}
       >
         {removing ? (
           <ActivityIndicator color="#FFFFFF" size="small" />

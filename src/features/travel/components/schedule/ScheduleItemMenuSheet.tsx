@@ -7,13 +7,14 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 const DANGER = "#EF4444";
 
 /**
- * 일정 항목의 ⋮ 를 누르면 뜨는 바텀시트 — 편집 / 삭제.
+ * 일정 항목의 ⋮ 를 누르면 뜨는 바텀시트 — 사진 추가 / 편집 / 삭제.
  * 여행 카드의 TravelMenuSheet 와 같은 형태로 맞춰 앱 안에서 일관되게 보이게 한다.
  */
 export default function ScheduleItemMenuSheet({
   visible,
   title,
   onClose,
+  onAddPhoto,
   onEdit,
   onDelete,
 }: {
@@ -21,6 +22,8 @@ export default function ScheduleItemMenuSheet({
   /** 어떤 항목인지 헷갈리지 않도록 시트 상단에 항목 제목을 보여준다. */
   title: string;
   onClose: () => void;
+  /** 없으면 사진 추가 항목을 그리지 않는다. */
+  onAddPhoto?: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -55,6 +58,12 @@ export default function ScheduleItemMenuSheet({
           >
             {title}
           </Text>
+          {onAddPhoto ? (
+            <>
+              <Row label="사진 추가하기" onPress={onAddPhoto} />
+              <Divider />
+            </>
+          ) : null}
           <Row label="편집하기" onPress={onEdit} />
           <Divider />
           <Row label="삭제하기" onPress={onDelete} danger />

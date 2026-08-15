@@ -100,8 +100,20 @@ export type TravelDay = {
 };
 
 /**
+ * 일정에 붙은 사용자 사진 1장(여행 상세 응답의 `images`).
+ * image_idx 는 삭제(DELETE /api/travels/{travel_idx}/images/{image_idx})에 쓴다.
+ */
+export type TravelScheduleImage = {
+  image_idx: number;
+  schedule_idx: number | null;
+  url: string;
+};
+
+/**
  * 일정 항목 1개. kind 로 표현이 갈린다("train" 이면 열차 정보 필드 사용).
  * 주의: start_time/end_time 은 ISO datetime 이 아니라 "HH:MM:SS" 시각 문자열이다.
+ *
+ * image_url 은 관광지 대표 이미지(서버가 주는 것), images 는 **사용자가 올린 사진**이다.
  */
 export type TravelScheduleItem = {
   schedule_idx: number;
@@ -120,6 +132,8 @@ export type TravelScheduleItem = {
   longitude: number | null;
   image_url: string | null;
   memo: string | null;
+  /** 사용자가 이 일정에 붙인 사진들. 없으면 빈 배열(옛 응답은 아예 없을 수 있다). */
+  images?: TravelScheduleImage[];
 };
 
 /**

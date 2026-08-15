@@ -12,17 +12,24 @@ import {
 } from "react-native";
 
 import { describeApiError } from "@/src/api/errors";
+import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import HeartIcon from "@/src/components/icons/HeartIcon";
 import { Text } from "@/src/components/Text";
-import { useBlockUser, useMyProfile } from "@/src/features/user/queries";
+import {
+  useBlockUser,
+  useMyProfile,
+  useReportUser,
+} from "@/src/features/user/queries";
 
-import ReportBlockSheet from "./ReportBlockSheet";
+import ReportBlockSheet, { MyCommentSheet } from "./ReportBlockSheet";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import {
   useCreateReelsComment,
+  useDeleteReelsComment,
   useReelsComments,
   useToggleCommentLike,
+  useUpdateReelsComment,
 } from "../queries";
 import type { ReelsComment } from "../types";
 
@@ -63,13 +70,18 @@ export default function CommentsSheet({
   const { data: comments, isLoading, isError, error, refetch, isFetching } =
     useReelsComments(reelsIdx);
   const create = useCreateReelsComment(reelsIdx);
+  const update = useUpdateReelsComment(reelsIdx);
+  const remove = useDeleteReelsComment(reelsIdx);
   const like = useToggleCommentLike(reelsIdx);
   const block = useBlockUser();
-  // 내 댓글에는 차단 메뉴를 띄우지 않는다(서버도 자기 자신 차단은 400).
+  const report = useReportUser();
+  // 내 댓글이면 신고·차단 대신 수정·삭제 메뉴를 띄운다(자기 자신 차단은 서버도 400).
   const { data: me } = useMyProfile();
 
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  /** 수정 중인 내 댓글. null 이면 새 댓글 작성 모드. */
+  const [editing, setEditing] = useState<ReelsComment | null>(null);
   const inputRef = useRef<TextInput>(null);
 
   // 시트를 닫았다 다시 열면 이전 입력이 남지 않게 초기화.
@@ -77,6 +89,7 @@ export default function CommentsSheet({
     if (reelsIdx == null) {
       setDraft("");
       setReplyTo(null);
+      setEditing(null);
     }
   }, [reelsIdx]);
 
@@ -96,35 +109,40 @@ export default function CommentsSheet({
     inputRef.current?.focus();
   };
 
-  // 댓글 길게 누르기 → 릴스 ⋯ 와 같은 신고·차단 시트(신고 API 가 없어 둘 다 차단으로 처리).
+  // 댓글 길게 누르기 → 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단 시트.
   const [moreFor, setMoreFor] = useState<ReelsComment | null>(null);
+  const isMine = moreFor != null && me?.user_idx === moreFor.user_idx;
+  // 확인/결과는 OS 기본 Alert 대신 앱 UI 다이얼로그로 띄운다.
+  const { dialog, ask, notify } = useConfirmDialog();
 
   const confirmBlock = (comment: ReelsComment, reason: "report" | "block") => {
     setMoreFor(null);
     const nickname = comment.nickname ?? "이 사용자";
-    Alert.alert(
-      reason === "report"
-        ? `${nickname}님의 댓글을 신고할까요?`
-        : `${nickname}님을 차단할까요?`,
-      "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: reason === "report" ? "신고하기" : "차단하기",
-          style: "destructive",
-          onPress: () =>
-            block.mutate(comment.user_idx, {
-              onSuccess: () =>
-                Alert.alert(
-                  reason === "report" ? "신고했어요" : "차단했어요",
-                  "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
-                ),
-              onError: (err) =>
-                Alert.alert("차단 실패", describeApiError(err)),
+    ask({
+      title:
+        reason === "report"
+          ? `${nickname}님의 댓글을 신고할까요?`
+          : `${nickname}님을 차단할까요?`,
+      message:
+        reason === "report"
+          ? "관리자에게 신고가 접수되고, 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요."
+          : "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
+      confirmLabel: reason === "report" ? "신고하기" : "차단하기",
+      danger: true,
+      onConfirm: () =>
+        (reason === "report" ? report : block).mutate(comment.user_idx, {
+          onSuccess: () =>
+            notify({
+              title: reason === "report" ? "신고했어요" : "차단했어요",
+              message: "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
             }),
-        },
-      ],
-    );
+          onError: (err) =>
+            notify({
+              title: reason === "report" ? "신고 실패" : "차단 실패",
+              message: describeApiError(err),
+            }),
+        }),
+    });
   };
 
   const toggleLike = (comment: ReelsComment) => {
@@ -136,9 +154,61 @@ export default function CommentsSheet({
     );
   };
 
+  /** 내 댓글 수정 시작 — 입력창을 그대로 재사용한다(내용 채우고 포커스). */
+  const startEdit = (comment: ReelsComment) => {
+    setMoreFor(null);
+    setReplyTo(null);
+    setEditing(comment);
+    setDraft(comment.content);
+    inputRef.current?.focus();
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setDraft("");
+  };
+
+  const confirmDelete = (comment: ReelsComment) => {
+    setMoreFor(null);
+    ask({
+      title: "댓글을 삭제할까요?",
+      message: "이 댓글에 달린 답글도 함께 삭제되고 되돌릴 수 없어요.",
+      confirmLabel: "삭제하기",
+      danger: true,
+      onConfirm: () =>
+        remove.mutate(comment.comment_idx, {
+          onError: (err) =>
+            notify({ title: "삭제 실패", message: describeApiError(err) }),
+        }),
+    });
+  };
+
   const submit = () => {
     const content = draft.trim();
-    if (!content || create.isPending) return;
+    if (!content) return;
+
+    if (editing) {
+      if (update.isPending) return;
+      // 내용이 그대로면 요청을 보내지 않고 편집만 끝낸다.
+      if (content === editing.content) {
+        cancelEdit();
+        Keyboard.dismiss();
+        return;
+      }
+      update.mutate(
+        { commentIdx: editing.comment_idx, content },
+        {
+          onSuccess: () => {
+            cancelEdit();
+            Keyboard.dismiss();
+          },
+          onError: (err) => Alert.alert("댓글 수정 실패", describeApiError(err)),
+        },
+      );
+      return;
+    }
+
+    if (create.isPending) return;
     create.mutate(
       { content, parentIdx: replyTo?.parentIdx ?? null },
       {
@@ -265,7 +335,6 @@ export default function CommentsSheet({
                   onReply={startReply}
                   onToggleLike={toggleLike}
                   onLongPress={setMoreFor}
-                  blockable={me?.user_idx !== item.comment.user_idx}
                 />
               )}
             />
@@ -284,7 +353,32 @@ export default function CommentsSheet({
               gap: verticalScale(8),
             }}
           >
-            {replyTo ? (
+            {editing ? (
+              <View
+                className="flex-row items-center justify-between"
+                style={{ paddingHorizontal: scale(4) }}
+              >
+                <Text
+                  className="text-gray-400"
+                  style={{ fontSize: moderateScale(11) }}
+                >
+                  댓글 수정 중
+                </Text>
+                <Pressable
+                  onPress={cancelEdit}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="수정 취소"
+                >
+                  <Text
+                    className="text-gray-500"
+                    style={{ fontSize: moderateScale(11) }}
+                  >
+                    취소
+                  </Text>
+                </Pressable>
+              </View>
+            ) : replyTo ? (
               <View
                 className="flex-row items-center justify-between"
                 style={{ paddingHorizontal: scale(4) }}
@@ -316,7 +410,13 @@ export default function CommentsSheet({
                 ref={inputRef}
                 value={draft}
                 onChangeText={setDraft}
-                placeholder={replyTo ? "답글을 입력하세요" : "댓글을 입력하세요"}
+                placeholder={
+                  editing
+                    ? "댓글을 수정하세요"
+                    : replyTo
+                      ? "답글을 입력하세요"
+                      : "댓글을 입력하세요"
+                }
                 placeholderTextColor="#6B7280"
                 multiline
                 maxLength={500}
@@ -333,7 +433,9 @@ export default function CommentsSheet({
               />
               <Pressable
                 onPress={submit}
-                disabled={!draft.trim() || create.isPending}
+                disabled={
+                  !draft.trim() || create.isPending || update.isPending
+                }
                 className="rounded-full active:opacity-70"
                 style={{
                   backgroundColor: draft.trim() ? "#5E84F4" : "#3A3A3A",
@@ -341,16 +443,16 @@ export default function CommentsSheet({
                   paddingVertical: verticalScale(10),
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="댓글 등록"
+                accessibilityLabel={editing ? "댓글 수정" : "댓글 등록"}
               >
-                {create.isPending ? (
+                {create.isPending || update.isPending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text
                     className="font-semibold text-white"
                     style={{ fontSize: moderateScale(13) }}
                   >
-                    등록
+                    {editing ? "수정" : "등록"}
                   </Text>
                 )}
               </Pressable>
@@ -360,14 +462,25 @@ export default function CommentsSheet({
       </Pressable>
     </Modal>
 
+    {/* 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단 */}
+    <MyCommentSheet
+      visible={moreFor != null && isMine}
+      name={moreFor?.nickname ?? "내 댓글"}
+      onClose={() => setMoreFor(null)}
+      onEdit={() => moreFor && startEdit(moreFor)}
+      onDelete={() => moreFor && confirmDelete(moreFor)}
+    />
+
     <ReportBlockSheet
-      visible={moreFor != null}
+      visible={moreFor != null && !isMine}
       name={moreFor?.nickname ?? "이 사용자"}
       reportLabel="이 댓글 신고하기"
       onClose={() => setMoreFor(null)}
       onReport={() => moreFor && confirmBlock(moreFor, "report")}
       onBlock={() => moreFor && confirmBlock(moreFor, "block")}
     />
+
+    {dialog}
     </>
   );
 }
@@ -388,22 +501,20 @@ function CommentRow({
   onReply,
   onToggleLike,
   onLongPress,
-  blockable,
 }: {
   comment: ReelsComment;
   depth: number;
   onReply: (comment: ReelsComment, depth: number) => void;
   onToggleLike: (comment: ReelsComment) => void;
+  /** 길게 누르면 메뉴 — 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단. */
   onLongPress: (comment: ReelsComment) => void;
-  /** 내 댓글이면 false — 길게 눌러도 메뉴가 뜨지 않는다. */
-  blockable: boolean;
 }) {
   const avatar = moderateScale(depth > 0 ? 26 : 32);
 
   return (
     <Pressable
       className="flex-row active:opacity-70"
-      onLongPress={blockable ? () => onLongPress(comment) : undefined}
+      onLongPress={() => onLongPress(comment)}
       delayLongPress={400}
       style={{ gap: scale(10), paddingLeft: scale(depth * 34) }}
     >

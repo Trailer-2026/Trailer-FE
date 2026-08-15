@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
+import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
 import ShareUpIcon from "@/src/components/icons/ShareUpIcon";
 import { Text } from "@/src/components/Text";
@@ -32,7 +33,11 @@ import {
   useToggleReelsLike,
 } from "@/src/features/reels/queries";
 import type { LikeResponse, Reels } from "@/src/features/reels/types";
-import { useBlockUser, useMyProfile } from "@/src/features/user/queries";
+import {
+  useBlockUser,
+  useMyProfile,
+  useReportUser,
+} from "@/src/features/user/queries";
 import {
   downloadMyReelsVideo,
   getReelsShareUrl,
@@ -119,9 +124,12 @@ export default function FeedTab() {
   // 댓글 시트를 연 릴스. null 이면 닫힘.
   const [commentsFor, setCommentsFor] = useState<number | null>(null);
 
-  // ⋯ 메뉴를 연 릴스. 신고·차단 모두 차단 API 로 처리한다(신고 API 는 아직 없다).
+  // ⋯ 메뉴를 연 릴스. 신고는 신고 API, 차단은 차단 API 로 각각 나간다.
   const [moreFor, setMoreFor] = useState<Reels | null>(null);
   const block = useBlockUser();
+  const report = useReportUser();
+  // 신고·차단 확인/결과는 OS 기본 Alert 대신 앱 UI 다이얼로그로 띄운다.
+  const { dialog, ask, notify } = useConfirmDialog();
 
   const blockAuthor = useCallback(
     (target: Reels, reason: "report" | "block") => {
@@ -129,37 +137,39 @@ export default function FeedTab() {
       const userIdx = target.author.user_idx;
       if (userIdx == null) {
         // 추천 API 응답에 작성자 PK 가 없으면 차단 대상을 특정할 수 없다.
-        Alert.alert(
-          "처리할 수 없어요",
-          "작성자 정보를 받지 못했어요. 잠시 후 다시 시도해 주세요.",
-        );
+        notify({
+          title: "처리할 수 없어요",
+          message: "작성자 정보를 받지 못했어요. 잠시 후 다시 시도해 주세요.",
+        });
         return;
       }
-      Alert.alert(
-        reason === "report"
-          ? `${target.author.name}님의 릴스를 신고할까요?`
-          : `${target.author.name}님을 차단할까요?`,
-        "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
-        [
-          { text: "취소", style: "cancel" },
-          {
-            text: reason === "report" ? "신고하기" : "차단하기",
-            style: "destructive",
-            onPress: () =>
-              block.mutate(userIdx, {
-                onSuccess: () =>
-                  Alert.alert(
-                    reason === "report" ? "신고했어요" : "차단했어요",
-                    "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
-                  ),
-                onError: (err) =>
-                  Alert.alert("실패", describeApiError(err)),
+      ask({
+        title:
+          reason === "report"
+            ? `${target.author.name}님의 릴스를 신고할까요?`
+            : `${target.author.name}님을 차단할까요?`,
+        message:
+          reason === "report"
+            ? "관리자에게 신고가 접수되고, 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요."
+            : "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
+        confirmLabel: reason === "report" ? "신고하기" : "차단하기",
+        danger: true,
+        onConfirm: () =>
+          (reason === "report" ? report : block).mutate(userIdx, {
+            onSuccess: () =>
+              notify({
+                title: reason === "report" ? "신고했어요" : "차단했어요",
+                message: "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
               }),
-          },
-        ],
-      );
+            onError: (err) =>
+              notify({
+                title: reason === "report" ? "신고 실패" : "차단 실패",
+                message: describeApiError(err),
+              }),
+          }),
+      });
     },
-    [block],
+    [block, report, ask, notify],
   );
 
   // 공유/다운로드 —
@@ -451,6 +461,8 @@ export default function FeedTab() {
         onReport={() => moreFor && blockAuthor(moreFor, "report")}
         onBlock={() => moreFor && blockAuthor(moreFor, "block")}
       />
+
+      {dialog}
     </View>
   );
 }

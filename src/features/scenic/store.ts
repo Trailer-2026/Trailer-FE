@@ -42,13 +42,23 @@ type ScenicState = {
   loading: boolean;
   /** 마지막 조회 실패 메시지. 성공하면 null 로 지운다. */
   error: string | null;
+  /**
+   * 사용자가 직접 '탑승 종료'를 누른 구간의 scheduleIdx.
+   * 자동 탑승(AutoBoarding)이 도착 시각 전이라는 이유로 곧바로 다시 켜버리면
+   * 종료 버튼이 무의미해지므로, 이 구간만 자동 시작에서 제외한다.
+   */
+  skipAutoScheduleIdx: number | null;
 };
 
 type ScenicActions = {
   startRiding: (
     session: Omit<ScenicSession, "startedAt"> & { startedAt?: number },
   ) => void;
-  stopRiding: () => void;
+  /**
+   * 탑승 종료. 사용자가 직접 누른 종료면 `{ skipAuto: true }` 로 불러
+   * 그 구간이 자동으로 다시 켜지지 않게 한다(자동 종료는 옵션 없이 호출).
+   */
+  stopRiding: (options?: { skipAuto?: boolean }) => void;
   /** 실제 API 호출에 성공했을 때의 좌표·시각 기록 */
   markCalled: (position: LatLng, at: number) => void;
   setResult: (res: ScenicNearbyResponse) => void;
@@ -65,6 +75,7 @@ const initialState: ScenicState = {
   hasNewSpots: false,
   loading: false,
   error: null,
+  skipAutoScheduleIdx: null,
 };
 
 /**
@@ -84,7 +95,13 @@ export const useScenicStore = create<ScenicState & ScenicActions>((set, get) => 
       session: { ...session, startedAt: session.startedAt ?? Date.now() },
     }),
 
-  stopRiding: () => set(initialState),
+  stopRiding: (options) =>
+    set({
+      ...initialState,
+      skipAutoScheduleIdx: options?.skipAuto
+        ? get().session?.scheduleIdx ?? null
+        : null,
+    }),
 
   markCalled: (position, at) => set({ lastPosition: position, lastCalledAt: at }),
 

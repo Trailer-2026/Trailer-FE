@@ -38,7 +38,7 @@ import {
   type TrainInfo,
 } from "@/src/features/course/types";
 import { useCreateTravel } from "@/src/features/travel/queries";
-import { headerBarStyle } from "@/src/utils/header";
+import { HEADER_TOP_GAP, headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 // http:// 이미지가 안드로이드 cleartext 로 막히거나 서버가 null 로 줄 때의 대체 이미지.
@@ -183,9 +183,13 @@ export default function ResultScreen() {
           gap: scale(3),
         }}
       >
+        {/* 뒤로가 아니라 홈으로 — 추천 조건 화면으로 되돌아가 봐야 할 일이 없고,
+            담지 않고 빠져나갈 길이 여기뿐이다. */}
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => router.replace("/")}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="홈으로"
           style={{
             width: scale(28),
             height: scale(28),
@@ -194,12 +198,34 @@ export default function ResultScreen() {
         >
           <BackIcon width={moderateScale(12)} height={moderateScale(17)} />
         </Pressable>
-        <Text
-          className="text-gray-900"
-          style={{ fontSize: moderateScale(17), fontWeight: 650 as never }}
+        <Pressable onPress={() => router.replace("/")} hitSlop={8}>
+          <Text
+            className="text-gray-500"
+            style={{ fontSize: moderateScale(13) }}
+          >
+            홈으로
+          </Text>
+        </Pressable>
+        {/* 제목은 헤더 폭 기준 정중앙 — 좌측 '< 홈으로' 길이에 밀리지 않게 겹쳐 놓는다.
+            top 은 헤더의 paddingTop 과 맞춰야 세로 중앙이 다른 화면과 같아진다. */}
+        <View
+          pointerEvents="none"
+          className="items-center justify-center"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: HEADER_TOP_GAP,
+            bottom: 0,
+          }}
         >
-          일정 추천
-        </Text>
+          <Text
+            className="text-gray-900"
+            style={{ fontSize: moderateScale(17), fontWeight: 650 as never }}
+          >
+            일정 추천
+          </Text>
+        </View>
       </View>
 
       {isLoading ? (

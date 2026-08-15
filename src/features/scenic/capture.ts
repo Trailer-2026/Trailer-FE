@@ -15,6 +15,11 @@ import type { MediaSource } from "@/src/features/reels/components/MediaSourceShe
  */
 export async function pickScenicPhoto(
   source: MediaSource,
+  /**
+   * 좌표가 없는 사진을 막을지. 붙일 일정(schedule_idx)을 이미 아는 경우엔
+   * 서버가 GPS 로 일정을 찾을 필요가 없어 false 로 부른다.
+   */
+  { requireLocation = true }: { requireLocation?: boolean } = {},
 ): Promise<ReelsMediaAsset | null> {
   if (source === "camera") {
     const media = await captureFromCamera();
@@ -37,24 +42,15 @@ export async function pickScenicPhoto(
 
   // 시스템 피커가 지운 GPS 를 원본 asset 에서 되찾는다(서버가 좌표로 일정에 매핑).
   const photo = await fillLocationFromLibrary(result.assets[0]);
-  if (photo.latitude == null && !(await confirmNoLocation())) return null;
-  return photo;
-}
 
-/**
- * 좌표가 없는 사진은 일정에 자동 연결되지 않는다 — 그대로 올릴지 먼저 묻는다.
- * (스크린샷·다운로드 사진처럼 원본에도 위치가 없는 경우)
- */
-function confirmNoLocation(): Promise<boolean> {
-  return new Promise((resolve) => {
+  // 붙일 일정을 모르는데 좌표까지 없으면 서버가 매핑할 방법이 없어 아예 받지 않는다.
+  // (스크린샷·다운로드 사진, 위치 기록을 끄고 찍은 사진)
+  if (requireLocation && (photo.latitude == null || photo.longitude == null)) {
     Alert.alert(
       "위치 정보가 없는 사진이에요",
-      "이 사진은 여행 일정에 자동으로 연결되지 않고 여행에만 등록돼요. 계속할까요?",
-      [
-        { text: "취소", style: "cancel", onPress: () => resolve(false) },
-        { text: "계속", onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
+      "여행 일정에 붙이려면 촬영 위치가 기록된 사진이어야 해요. 다른 사진을 골라주세요.",
     );
-  });
+    return null;
+  }
+  return photo;
 }

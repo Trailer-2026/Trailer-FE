@@ -18,14 +18,29 @@ import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import MediaSourceSheet, {
+  type MediaSource,
+} from "@/src/features/reels/components/MediaSourceSheet";
+import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
+import LocationPermissionPrompt from "@/src/features/scenic/components/LocationPermissionPrompt";
 import { HEADER_HEIGHT, HEADER_TOP_GAP } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { describeScheduleError } from "../errors";
 import { formatClockTime, formatDayDate, formatLongDate } from "../format";
-import { useDeleteSchedule, useTravelDetail } from "../queries";
-import type { TravelDay, TravelDetail, TravelScheduleItem } from "../types";
+import {
+  useAddTravelImages,
+  useDeleteSchedule,
+  useDeleteTravelImage,
+  useTravelDetail,
+} from "../queries";
+import type {
+  TravelDay,
+  TravelDetail,
+  TravelScheduleImage,
+  TravelScheduleItem,
+} from "../types";
 import AddScheduleModal, {
   type ScheduleKind,
 } from "./schedule/AddScheduleModal";
@@ -76,6 +91,7 @@ export default function TravelDetailView({
     dayNo: number;
   } | null>(null);
   const del = useDeleteSchedule(travelIdx);
+  const delImage = useDeleteTravelImage(travelIdx);
 
   // 히어로의 'KTX 티켓 정보 추가하기' → 승차권 화면(저장된 게 있으면 목록, 없으면 폼).
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -85,6 +101,57 @@ export default function TravelDetailView({
     item: TravelScheduleItem;
     dayNo: number;
   } | null>(null);
+
+  /**
+   * 사진을 붙일 일정(schedule_idx). 값이 있으면 촬영/갤러리 선택 시트가 열린다.
+   * 일정을 지정해 올리므로 사진에 좌표가 없어도 그 일정에 그대로 붙는다.
+   */
+  const [photoTarget, setPhotoTarget] = useState<number | null>(null);
+  const addImages = useAddTravelImages();
+  /**
+   * 업로드 중인 사진 — 그 일정의 썸네일 줄에 흐린 미리보기 + 스피너로 먼저 보여준다.
+   * 서버 응답을 기다리는 동안 아무 반응이 없으면 눌린 건지 알 수 없다.
+   */
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    scheduleIdx: number;
+    uri: string;
+  } | null>(null);
+
+  const onPickPhoto = async (source: MediaSource) => {
+    const scheduleIdx = photoTarget;
+    setPhotoTarget(null);
+    if (scheduleIdx == null) return;
+
+    const photo = await pickScenicPhoto(source, { requireLocation: false });
+    if (!photo) return; // 취소·권한 거부
+
+    setPendingPhoto({ scheduleIdx, uri: photo.uri });
+    addImages.mutate(
+      { travelIdx, photos: [photo], scheduleIdx },
+      {
+        onError: (e) =>
+          Alert.alert("사진 등록 실패", describeScheduleError(e)),
+        // 성공이든 실패든 미리보기를 걷는다(성공 시 갱신된 목록이 대신 그려진다).
+        onSettled: () => setPendingPhoto(null),
+      },
+    );
+  };
+
+  /** 일정에 붙인 사진 1장 삭제 — 저장소에서도 지워져 되돌릴 수 없다. */
+  const confirmDeleteImage = (image: TravelScheduleImage) => {
+    Alert.alert("사진을 삭제할까요?", "삭제한 사진은 되돌릴 수 없어요.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () =>
+          delImage.mutate(image.image_idx, {
+            onError: (e) =>
+              Alert.alert("사진 삭제 실패", describeScheduleError(e)),
+          }),
+      },
+    ]);
+  };
 
   const confirmDeleteItem = (item: TravelScheduleItem) => {
     Alert.alert(
@@ -173,8 +240,12 @@ export default function TravelDetailView({
           actionKind={completed ? "video" : "ticket"}
         />
 
-        {/* 실시간 창밖 풍경 — 탑승 시작/종료와 폴링 결과. 열차 항목이 없으면 안 뜬다. */}
+        {/* 실시간 창밖 풍경 — 탑승 상태 표시. 열차 항목이 없으면 안 뜬다. */}
         {completed ? null : <LiveScenerySection detail={data} />}
+
+        {/* 열차 출발 시각에 시스템 창이 불쑥 뜨지 않도록 여기서 미리 권한을 받아둔다.
+            이미 허용됐거나 앱 실행 중 한 번 물어봤으면 아무것도 렌더하지 않는다. */}
+        {completed ? null : <LocationPermissionPrompt />}
 
         <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(4) }}>
           {data.days.length === 0 ? (
@@ -197,6 +268,9 @@ export default function TravelDetailView({
                     ? undefined
                     : (item) => setMenuTarget({ item, dayNo: day.day_no })
                 }
+                onDeleteImage={completed ? undefined : confirmDeleteImage}
+                onAddPhoto={completed ? undefined : setPhotoTarget}
+                pendingPhoto={pendingPhoto}
               />
             ))
           )}
@@ -219,10 +293,22 @@ export default function TravelDetailView({
         />
       ) : null}
 
+      {/* 촬영하기 / 갤러리에서 선택 — 풍경알림 카드와 같은 시트를 그대로 쓴다. */}
+      <MediaSourceSheet
+        visible={photoTarget != null}
+        onSelect={onPickPhoto}
+        onClose={() => setPhotoTarget(null)}
+      />
+
       <ScheduleItemMenuSheet
         visible={!!menuTarget}
         title={menuTarget?.item.title || "일정"}
         onClose={() => setMenuTarget(null)}
+        onAddPhoto={() => {
+          const t = menuTarget;
+          setMenuTarget(null);
+          if (t) setPhotoTarget(t.item.schedule_idx);
+        }}
         onEdit={() => {
           const t = menuTarget;
           setMenuTarget(null);
@@ -466,12 +552,21 @@ function DaySection({
   day,
   onAdd,
   onItemMenu,
+  onDeleteImage,
+  onAddPhoto,
+  pendingPhoto,
 }: {
   day: TravelDay;
   /** 없으면 '일정 추가' 버튼을 그리지 않는다(다녀온 여행). */
   onAdd?: () => void;
   /** 없으면 항목 ⋮ 도 그리지 않는다(다녀온 여행). */
   onItemMenu?: (item: TravelScheduleItem) => void;
+  /** 없으면 사진 썸네일의 X(삭제)를 그리지 않는다. */
+  onDeleteImage?: (image: TravelScheduleImage) => void;
+  /** 썸네일 옆 + 로 사진 추가. 없으면 그리지 않는다. */
+  onAddPhoto?: (scheduleIdx: number) => void;
+  /** 업로드 중인 사진(해당 일정에만 미리보기로 붙는다). */
+  pendingPhoto?: { scheduleIdx: number; uri: string } | null;
 }) {
   // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
   const rows = toRows(sortByStartTime(day.items));
@@ -516,6 +611,15 @@ function DaySection({
             number={number}
             isLast={i === rows.length - 1}
             onMenu={onItemMenu ? () => onItemMenu(row.item) : undefined}
+            onDeleteImage={onDeleteImage}
+            onAddPhoto={
+              onAddPhoto ? () => onAddPhoto(row.item.schedule_idx) : undefined
+            }
+            pendingPhotoUri={
+              pendingPhoto?.scheduleIdx === row.item.schedule_idx
+                ? pendingPhoto.uri
+                : null
+            }
           />
         );
       })}
@@ -556,12 +660,21 @@ function TimelineRow({
   number,
   isLast,
   onMenu,
+  onDeleteImage,
+  onAddPhoto,
+  pendingPhotoUri,
 }: {
   row: Row;
   number: number | null;
   isLast: boolean;
   /** 없으면 ⋮·길게 누르기 모두 비활성(다녀온 여행). */
   onMenu?: () => void;
+  /** 없으면 사진 썸네일의 X(삭제) 버튼을 그리지 않는다. */
+  onDeleteImage?: (image: TravelScheduleImage) => void;
+  /** 썸네일 옆 + 버튼. 없으면 그리지 않는다. */
+  onAddPhoto?: () => void;
+  /** 이 일정에 업로드 중인 사진의 로컬 URI. 없으면 null. */
+  pendingPhotoUri?: string | null;
 }) {
   const hasMenu = !!onMenu;
   return (
@@ -609,6 +722,18 @@ function TimelineRow({
           <PlaceCard item={row.item} hasMenu={hasMenu} />
         )}
 
+        {/* 이 일정에 붙인 사용자 사진들. 하차 줄은 승차 줄과 같은 항목이라 건너뛴다
+            (안 그러면 같은 사진이 두 번 나온다). */}
+        {row.t !== "alight" &&
+        ((row.item.images?.length ?? 0) > 0 || pendingPhotoUri) ? (
+          <SchedulePhotos
+            images={row.item.images ?? []}
+            onDelete={onDeleteImage}
+            onAdd={onAddPhoto}
+            pendingUri={pendingPhotoUri}
+          />
+        ) : null}
+
         {/* 편집/삭제 진입점. 길게 누르기만으론 아무도 못 찾아서 ⋮ 를 항상 보여준다.
             카드 우측 상단에 얹고, 겹칠 수 있는 텍스트에는 MENU_INSET 만큼 여백을 준다. */}
         {onMenu ? (
@@ -634,6 +759,118 @@ function TimelineRow({
         ) : null}
       </Pressable>
     </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 일정에 붙인 사용자 사진 — 가로 스크롤 썸네일 + X(삭제)                  */
+/* ------------------------------------------------------------------ */
+const PHOTO = scale(64);
+const PHOTO_X = scale(18);
+
+function SchedulePhotos({
+  images,
+  onDelete,
+  onAdd,
+  pendingUri,
+}: {
+  images: TravelScheduleImage[];
+  onDelete?: (image: TravelScheduleImage) => void;
+  /** 없으면 + 타일을 그리지 않는다(다녀온 여행). */
+  onAdd?: () => void;
+  /** 업로드 중인 사진의 로컬 URI — 흐리게 + 스피너로 먼저 보여준다. */
+  pendingUri?: string | null;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      // 부모가 길게 누르기(메뉴)를 받고 있어 가로 스크롤이 먹히도록 여기서 끊는다.
+      onStartShouldSetResponder={() => true}
+      contentContainerStyle={{
+        gap: scale(8),
+        paddingTop: verticalScale(8),
+        // X 버튼이 썸네일 위로 반쯤 나와 잘리지 않게.
+        paddingRight: scale(6),
+      }}
+    >
+      {images.map((image) => (
+        <View key={image.image_idx} style={{ width: PHOTO, height: PHOTO }}>
+          <Image
+            source={{ uri: image.url }}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: scale(8),
+              backgroundColor: CARD_BG,
+            }}
+            contentFit="cover"
+            transition={150}
+          />
+          {onDelete ? (
+            <Pressable
+              onPress={() => onDelete(image)}
+              hitSlop={8}
+              className="items-center justify-center rounded-full active:opacity-70"
+              style={{
+                position: "absolute",
+                top: -PHOTO_X / 3,
+                right: -PHOTO_X / 3,
+                width: PHOTO_X,
+                height: PHOTO_X,
+                backgroundColor: "rgba(0,0,0,0.6)",
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="사진 삭제"
+            >
+              <Feather name="x" size={moderateScale(11)} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+        </View>
+      ))}
+
+      {/* 업로드 중 — 방금 고른 사진을 흐리게 깔고 그 위에 스피너를 돌린다. */}
+      {pendingUri ? (
+        <View style={{ width: PHOTO, height: PHOTO }}>
+          <Image
+            source={{ uri: pendingUri }}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: scale(8),
+              opacity: 0.4,
+            }}
+            contentFit="cover"
+          />
+          <View
+            className="absolute inset-0 items-center justify-center"
+            style={{ borderRadius: scale(8), backgroundColor: "rgba(0,0,0,0.15)" }}
+          >
+            <ActivityIndicator color={ACCENT} />
+          </View>
+        </View>
+      ) : null}
+
+      {/* 사진이 이미 있을 때의 추가 진입점 — ⋮ 메뉴까지 안 가도 되게 옆에 둔다. */}
+      {onAdd ? (
+        <Pressable
+          onPress={onAdd}
+          className="items-center justify-center active:opacity-70"
+          style={{
+            width: PHOTO,
+            height: PHOTO,
+            borderRadius: scale(8),
+            borderWidth: 1,
+            borderColor: "#D9DCE1",
+            backgroundColor: "#FFFFFF",
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="사진 추가"
+        >
+          <Feather name="plus" size={moderateScale(20)} color="#9CA3AF" />
+        </Pressable>
+      ) : null}
+    </ScrollView>
   );
 }
 

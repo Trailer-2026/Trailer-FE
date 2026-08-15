@@ -8,7 +8,7 @@ import * as Location from "expo-location";
  * 묻지 않고 통과한다(기기 GPS 를 꺼둬도 됨).
  * 확인이 끝나면 false 로 되돌릴 것. (__DEV__ 라 릴리스 빌드에는 영향 없음)
  */
-export const MOCK_LOCATION = __DEV__ && true;
+export const MOCK_LOCATION = __DEV__ && false;
 
 /**
  * 목업 시작 좌표 — Swagger 의 예시 좌표(오송역 부근) 그대로.

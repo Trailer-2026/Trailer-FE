@@ -1,4 +1,7 @@
-import type { TravelDetail } from "@/src/features/travel/types";
+import type {
+  TravelDetail,
+  TravelScheduleItem,
+} from "@/src/features/travel/types";
 
 /** 여행 상세에서 뽑아낸 열차 구간 1개 — 탑승 시작의 단위. */
 export type TrainSegment = {
@@ -9,6 +12,11 @@ export type TrainSegment = {
   label: string;
   /** 출발 일시(해당 일차 날짜 + start_time). 시각 정보가 없으면 null. */
   departAt: Date | null;
+  /**
+   * 도착 일시(해당 일차 날짜 + end_time). 자동 탑승 종료의 기준.
+   * 도착이 출발보다 이르면 자정을 넘긴 것으로 보고 하루를 더한다.
+   */
+  arriveAt: Date | null;
 };
 
 /** "2026-08-06" + "09:30:00" → Date. 둘 중 하나라도 이상하면 null. */
@@ -30,12 +38,19 @@ export function collectTrainSegments(detail: TravelDetail): TrainSegment[] {
       if (!item.dep_station || !item.arr_station) return;
       const label =
         [item.train_grade, item.train_no].filter(Boolean).join(" ") || "열차";
+      const departAt = toDateTime(day.date, item.start_time);
+      let arriveAt = toDateTime(day.date, item.end_time);
+      // 심야 열차 — 도착이 출발보다 이르면 다음 날 도착이다.
+      if (departAt && arriveAt && arriveAt.getTime() <= departAt.getTime()) {
+        arriveAt = new Date(arriveAt.getTime() + 24 * 60 * 60 * 1000);
+      }
       out.push({
         scheduleIdx: item.schedule_idx,
         fromStation: item.dep_station,
         toStation: item.arr_station,
         label,
-        departAt: toDateTime(day.date, item.start_time),
+        departAt,
+        arriveAt,
       });
     });
   });
@@ -48,26 +63,82 @@ export function collectTrainSegments(detail: TravelDetail): TrainSegment[] {
   });
 }
 
-/** 출발 시각 배너를 띄우는 창 — 출발 전후 30분. */
-export const BOARDING_SUGGEST_WINDOW_MS = 30 * 60 * 1000;
+/** 종료 시각이 없는 방문 일정을 얼마나 진행 중으로 볼지. */
+const VISIT_FALLBACK_MS = 60 * 60 * 1000;
 
 /**
- * 지금이 출발 시각 ±30분인 구간. 여러 개면 가장 가까운 것 1개.
- * 시각 정보가 없는 구간은 제안하지 않는다.
+ * 지금 진행 중인 **열차가 아닌** 일정 항목. 없으면 null.
+ *
+ * 알림 카드가 "지금 ○○ 일정 중이에요" 문구와, 사진을 붙일 schedule_idx 를
+ * 정하는 데 쓴다(열차 구간은 탑승 세션에 이미 scheduleIdx 가 들어 있다).
+ *
+ * ponytail: 종료 시각이 없거나 시작보다 이르면 1시간짜리로 친다. 실제 체류
+ * 시간이 필요해지면 서버 end_time 을 필수로 받아야 한다.
  */
-export function findBoardingSuggestion(
+export function findCurrentScheduleItem(
+  detail: TravelDetail,
+  now: Date,
+): TravelScheduleItem | null {
+  for (const day of detail.days) {
+    for (const item of day.items) {
+      if (item.kind === "train") continue;
+      const start = toDateTime(day.date, item.start_time);
+      if (!start) continue;
+      let end = toDateTime(day.date, item.end_time);
+      if (!end || end.getTime() <= start.getTime()) {
+        end = new Date(start.getTime() + VISIT_FALLBACK_MS);
+      }
+      if (now.getTime() >= start.getTime() && now.getTime() < end.getTime()) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 시각이 가장 가까운 일정 항목(열차 포함). 진행 중인 일정이 없을 때의 대비책.
+ *
+ * 좌표 없는 사진은 서버가 어디에 붙일지 못 정하므로 schedule_idx 를 반드시
+ * 채워 보내야 한다 — 일정 사이 빈 시간에 찍은 사진도 가장 가까운 일정에 붙인다.
+ */
+export function findNearestScheduleItem(
+  detail: TravelDetail,
+  now: Date,
+): TravelScheduleItem | null {
+  let best: TravelScheduleItem | null = null;
+  let bestGap = Infinity;
+  for (const day of detail.days) {
+    for (const item of day.items) {
+      const start = toDateTime(day.date, item.start_time);
+      if (!start) continue;
+      const gap = Math.abs(start.getTime() - now.getTime());
+      if (gap < bestGap) {
+        best = item;
+        bestGap = gap;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * 지금 **타고 있는 중**인 구간 — 출발 시각 ≤ 지금 < 도착 시각.
+ * 자동 탑승 시작/종료의 기준이라 출발·도착 시각이 **둘 다** 있는 구간만 본다
+ * (도착 시각을 모르면 언제 끝내야 할지 알 수 없어 자동으로 켜지 않는다).
+ *
+ * 구간이 겹치면 나중에 출발한 쪽을 고른다 — 환승 직후엔 새 열차가 맞다.
+ */
+export function findActiveSegment(
   segments: TrainSegment[],
   now: Date,
 ): TrainSegment | null {
   let best: TrainSegment | null = null;
-  let bestGap = Infinity;
   segments.forEach((seg) => {
-    if (!seg.departAt) return;
-    const gap = Math.abs(seg.departAt.getTime() - now.getTime());
-    if (gap <= BOARDING_SUGGEST_WINDOW_MS && gap < bestGap) {
-      best = seg;
-      bestGap = gap;
-    }
+    if (!seg.departAt || !seg.arriveAt) return;
+    const t = now.getTime();
+    if (t < seg.departAt.getTime() || t >= seg.arriveAt.getTime()) return;
+    if (!best || seg.departAt.getTime() > best.departAt!.getTime()) best = seg;
   });
   return best;
 }

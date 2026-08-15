@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  deleteReelsComment,
   getReelsComments,
   getRecommendedReels,
   likeComment,
@@ -13,6 +14,7 @@ import {
   postReelsComment,
   unlikeComment,
   unlikeReels,
+  updateReelsComment,
 } from "./api";
 import { userKeys } from "@/src/features/user/keys";
 
@@ -42,6 +44,41 @@ export function useCreateReelsComment(reelsIdx: number | null) {
   return useMutation({
     mutationFn: (vars: { content: string; parentIdx: number | null }) =>
       postReelsComment(reelsIdx!, vars.content, vars.parentIdx),
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        queryKey: reelsKeys.comments(reelsIdx ?? -1),
+      }),
+  });
+}
+
+/**
+ * 내 댓글 수정. 응답이 갱신된 댓글이라 목록 캐시의 그 항목만 갈아끼운다
+ * (전체 무효화하면 보고 있던 스크롤 위치가 흔들린다).
+ */
+export function useUpdateReelsComment(reelsIdx: number | null) {
+  const queryClient = useQueryClient();
+  const queryKey = reelsKeys.comments(reelsIdx ?? -1);
+
+  return useMutation({
+    mutationFn: (vars: { commentIdx: number; content: string }) =>
+      updateReelsComment(vars.commentIdx, vars.content),
+    onSuccess: (updated, vars) => {
+      queryClient.setQueryData<ReelsComment[]>(queryKey, (list) =>
+        patchComment(list, vars.commentIdx, { content: updated.content }),
+      );
+    },
+  });
+}
+
+/**
+ * 내 댓글 삭제. 답글까지 함께 사라지므로 목록을 다시 받아온다
+ * (한 항목만 지우면 서버가 지운 답글이 화면에 남는다).
+ */
+export function useDeleteReelsComment(reelsIdx: number | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (commentIdx: number) => deleteReelsComment(commentIdx),
     onSettled: () =>
       queryClient.invalidateQueries({
         queryKey: reelsKeys.comments(reelsIdx ?? -1),

@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import EditPencilIcon from "@/src/components/icons/EditPencilIcon";
 import ForwardIcon from "@/src/components/icons/ForwardIcon";
@@ -31,11 +32,13 @@ export default function MyProfileScreen() {
       await updateImage.mutateAsync(file);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
+      // 400 만 원인이 분명해 자체 문구를 쓰고, 나머지는 실제 오류를 그대로 보여준다
+      // ("잠시 후 다시 시도" 로 뭉개면 무엇이 실패했는지 알 수 없다).
       Alert.alert(
         "사진 변경 실패",
         status === 400
           ? "이미지 파일(jpg/png/webp, 10MB 이하)만 올릴 수 있어요."
-          : "잠시 후 다시 시도해 주세요.",
+          : describeApiError(e),
       );
     }
   }

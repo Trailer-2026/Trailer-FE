@@ -14,6 +14,7 @@ import {
   deleteSchedule,
   deleteTravel,
   deleteTravelCoverImage,
+  deleteTravelImage,
   getCurrentTravel,
   getPastTravels,
   getTravelDetail,
@@ -470,5 +471,18 @@ export function useAddTravelImages() {
       queryClient.invalidateQueries({
         queryKey: travelKeys.detail(vars.travelIdx),
       }),
+  });
+}
+
+/**
+ * 일정에 붙인 사진 1장 삭제. 되돌릴 수 없어 호출부에서 확인을 받고 부른다.
+ * 성공하면 상세를 다시 받아 썸네일 목록이 갱신된다.
+ */
+export function useDeleteTravelImage(travelIdx: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (imageIdx: number) => deleteTravelImage(travelIdx, imageIdx),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: travelKeys.detail(travelIdx) }),
   });
 }
