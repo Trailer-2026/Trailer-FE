@@ -13,6 +13,7 @@ import {
   getLikedReels,
   getMyProfile,
   getMyReels,
+  reportUser,
   unblockUser,
   updateNickname,
   updateProfileImage,
@@ -71,6 +72,20 @@ export function useBlockUser() {
       // 차단 목록 화면이 열려 있지 않아도 무효화해 둔다 — 다음에 들어가면 새로 받는다.
       queryClient.invalidateQueries({ queryKey: userKeys.blocks() });
     },
+  });
+}
+
+/**
+ * 사용자 신고. 신고해도 그 사람의 릴스·댓글이 나에게 안 보이게 되므로
+ * 차단과 똑같이 릴스 캐시를 무효화한다.
+ *
+ * 차단 목록(GET /api/blocks)에는 신고가 잡히지 않는다 — 신고 해제 화면은 없다.
+ */
+export function useReportUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userIdx: number) => reportUser(userIdx),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: reelsKeys.all }),
   });
 }
 

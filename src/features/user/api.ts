@@ -69,6 +69,17 @@ export async function blockUser(userIdx: number): Promise<void> {
 }
 
 /**
+ * 사용자 신고. POST /api/reports/{user_idx}
+ *
+ * 차단과 마찬가지로 단방향 — 신고하면 그 사용자의 릴스·댓글이 나에게만 안 보인다.
+ * 멱등이라 이미 신고한 상대에게 다시 호출해도 성공한다.
+ * 400: 자기 자신 신고 / 404: 사용자 없음 / 401: 인증 필요.
+ */
+export async function reportUser(userIdx: number): Promise<void> {
+  await api.post<CommonResponse<null>>(`/api/reports/${userIdx}`);
+}
+
+/**
  * 내가 차단한 사용자 목록(최근 차단순). GET /api/blocks
  * data 가 null 이면 빈 목록으로 취급한다(차단 이력이 없는 계정).
  */

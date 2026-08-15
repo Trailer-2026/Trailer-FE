@@ -12,7 +12,8 @@ const DANGER = "#E5484D";
 /**
  * 신고·차단 시트 — 릴스 액션바 ⋯ 와 댓글 길게 누르기가 같은 UI 를 쓴다.
  *
- * 신고 API 가 아직 없어 호출부는 두 항목 모두 차단(POST /api/blocks/{user_idx})으로 처리한다.
+ * 신고는 POST /api/reports/{user_idx}, 차단은 POST /api/blocks/{user_idx} 로 각각 나간다.
+ * 둘 다 단방향이라 결과(상대의 릴스·댓글이 나에게만 안 보임)는 같다.
  */
 export default function ReportBlockSheet({
   visible,

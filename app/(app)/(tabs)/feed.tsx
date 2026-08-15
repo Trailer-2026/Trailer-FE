@@ -33,7 +33,11 @@ import {
   useToggleReelsLike,
 } from "@/src/features/reels/queries";
 import type { LikeResponse, Reels } from "@/src/features/reels/types";
-import { useBlockUser, useMyProfile } from "@/src/features/user/queries";
+import {
+  useBlockUser,
+  useMyProfile,
+  useReportUser,
+} from "@/src/features/user/queries";
 import {
   downloadMyReelsVideo,
   getReelsShareUrl,
@@ -120,9 +124,10 @@ export default function FeedTab() {
   // 댓글 시트를 연 릴스. null 이면 닫힘.
   const [commentsFor, setCommentsFor] = useState<number | null>(null);
 
-  // ⋯ 메뉴를 연 릴스. 신고·차단 모두 차단 API 로 처리한다(신고 API 는 아직 없다).
+  // ⋯ 메뉴를 연 릴스. 신고는 신고 API, 차단은 차단 API 로 각각 나간다.
   const [moreFor, setMoreFor] = useState<Reels | null>(null);
   const block = useBlockUser();
+  const report = useReportUser();
   // 신고·차단 확인/결과는 OS 기본 Alert 대신 앱 UI 다이얼로그로 띄운다.
   const { dialog, ask, notify } = useConfirmDialog();
 
@@ -145,19 +150,16 @@ export default function FeedTab() {
             : `${target.author.name}님을 차단할까요?`,
         message:
           reason === "report"
-            ? "관리자에게 신고가 접수되고, 이 사용자는 자동으로 차단돼요. 차단된 사용자의 릴스와 댓글은 나에게만 보이지 않아요."
+            ? "관리자에게 신고가 접수되고, 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요."
             : "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
         confirmLabel: reason === "report" ? "신고하기" : "차단하기",
         danger: true,
         onConfirm: () =>
-          block.mutate(userIdx, {
+          (reason === "report" ? report : block).mutate(userIdx, {
             onSuccess: () =>
               notify({
                 title: reason === "report" ? "신고했어요" : "차단했어요",
-                message:
-                  reason === "report"
-                    ? "관리자에게 신고가 접수됐어요. 이 사용자는 자동으로 차단되어 릴스와 댓글이 더 이상 보이지 않아요."
-                    : "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
+                message: "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
               }),
             onError: (err) =>
               notify({
@@ -167,7 +169,7 @@ export default function FeedTab() {
           }),
       });
     },
-    [block, ask, notify],
+    [block, report, ask, notify],
   );
 
   // 공유/다운로드 —

@@ -15,7 +15,11 @@ import { describeApiError } from "@/src/api/errors";
 import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import HeartIcon from "@/src/components/icons/HeartIcon";
 import { Text } from "@/src/components/Text";
-import { useBlockUser, useMyProfile } from "@/src/features/user/queries";
+import {
+  useBlockUser,
+  useMyProfile,
+  useReportUser,
+} from "@/src/features/user/queries";
 
 import ReportBlockSheet, { MyCommentSheet } from "./ReportBlockSheet";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -70,6 +74,7 @@ export default function CommentsSheet({
   const remove = useDeleteReelsComment(reelsIdx);
   const like = useToggleCommentLike(reelsIdx);
   const block = useBlockUser();
+  const report = useReportUser();
   // 내 댓글이면 신고·차단 대신 수정·삭제 메뉴를 띄운다(자기 자신 차단은 서버도 400).
   const { data: me } = useMyProfile();
 
@@ -105,7 +110,6 @@ export default function CommentsSheet({
   };
 
   // 댓글 길게 누르기 → 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단 시트.
-  // (신고 API 가 없어 신고도 차단으로 처리한다.)
   const [moreFor, setMoreFor] = useState<ReelsComment | null>(null);
   const isMine = moreFor != null && me?.user_idx === moreFor.user_idx;
   // 확인/결과는 OS 기본 Alert 대신 앱 UI 다이얼로그로 띄운다.
@@ -121,19 +125,16 @@ export default function CommentsSheet({
           : `${nickname}님을 차단할까요?`,
       message:
         reason === "report"
-          ? "관리자에게 신고가 접수되고, 이 사용자는 자동으로 차단돼요. 차단된 사용자의 릴스와 댓글은 나에게만 보이지 않아요."
+          ? "관리자에게 신고가 접수되고, 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요."
           : "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
       confirmLabel: reason === "report" ? "신고하기" : "차단하기",
       danger: true,
       onConfirm: () =>
-        block.mutate(comment.user_idx, {
+        (reason === "report" ? report : block).mutate(comment.user_idx, {
           onSuccess: () =>
             notify({
               title: reason === "report" ? "신고했어요" : "차단했어요",
-              message:
-                reason === "report"
-                  ? "관리자에게 신고가 접수됐어요. 이 사용자는 자동으로 차단되어 릴스와 댓글이 더 이상 보이지 않아요."
-                  : "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
+              message: "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
             }),
           onError: (err) =>
             notify({
