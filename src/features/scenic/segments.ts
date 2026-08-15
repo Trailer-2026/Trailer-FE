@@ -1,4 +1,7 @@
-import type { TravelDetail } from "@/src/features/travel/types";
+import type {
+  TravelDetail,
+  TravelScheduleItem,
+} from "@/src/features/travel/types";
 
 /** 여행 상세에서 뽑아낸 열차 구간 1개 — 탑승 시작의 단위. */
 export type TrainSegment = {
@@ -64,16 +67,18 @@ export function collectTrainSegments(detail: TravelDetail): TrainSegment[] {
 const VISIT_FALLBACK_MS = 60 * 60 * 1000;
 
 /**
- * 지금 진행 중인 **열차가 아닌** 일정의 제목. 없으면 null.
- * 알림 카드가 "지금 ○○ 일정 중이에요" 를 띄우는 데 쓴다.
+ * 지금 진행 중인 **열차가 아닌** 일정 항목. 없으면 null.
+ *
+ * 알림 카드가 "지금 ○○ 일정 중이에요" 문구와, 사진을 붙일 schedule_idx 를
+ * 정하는 데 쓴다(열차 구간은 탑승 세션에 이미 scheduleIdx 가 들어 있다).
  *
  * ponytail: 종료 시각이 없거나 시작보다 이르면 1시간짜리로 친다. 실제 체류
  * 시간이 필요해지면 서버 end_time 을 필수로 받아야 한다.
  */
-export function findCurrentScheduleTitle(
+export function findCurrentScheduleItem(
   detail: TravelDetail,
   now: Date,
-): string | null {
+): TravelScheduleItem | null {
   for (const day of detail.days) {
     for (const item of day.items) {
       if (item.kind === "train") continue;
@@ -84,7 +89,7 @@ export function findCurrentScheduleTitle(
         end = new Date(start.getTime() + VISIT_FALLBACK_MS);
       }
       if (now.getTime() >= start.getTime() && now.getTime() < end.getTime()) {
-        return item.title?.trim() || null;
+        return item;
       }
     }
   }

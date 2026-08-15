@@ -36,7 +36,7 @@ import {
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import { formatBasedAt, formatClockLabel } from "@/src/features/scenic/format";
 import { useMinuteTick, useScenicPolling } from "@/src/features/scenic/queries";
-import { findCurrentScheduleTitle } from "@/src/features/scenic/segments";
+import { findCurrentScheduleItem } from "@/src/features/scenic/segments";
 import { useScenicStore } from "@/src/features/scenic/store";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
@@ -262,9 +262,17 @@ function SceneryPromoCard({
   onToggle: () => void;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  // 방금 붙인 사진 — 성공을 시스템 알림창 대신 카드 안에서 보여준다.
+  // 방금 붙인 사진 — 성공을 시스템 알림창 대신 카드 안에서 잠깐 보여준다.
   const [added, setAdded] = useState<ReelsMediaAsset | null>(null);
   const addImages = useAddTravelImages();
+
+  // 붙였다는 표시는 5초만 — 그 뒤엔 다시 촬영 버튼으로 돌아간다.
+  // 업로드 중에는 타이머를 걸지 않는다(진행 표시가 도중에 사라지면 안 된다).
+  useEffect(() => {
+    if (!added || addImages.isPending) return;
+    const timer = setTimeout(() => setAdded(null), 5000);
+    return () => clearTimeout(timer);
+  }, [added, addImages.isPending]);
 
   const profile = useMyProfile().data;
   const nickname = profile?.nickname ?? "여행자";
@@ -282,10 +290,18 @@ function SceneryPromoCard({
   const { data: detail } = useTravelDetail(
     currentTravel?.status === "ONGOING" ? currentTravel.travel_idx : undefined,
   );
-  const currentScheduleTitle = useMemo(
-    () => (detail && !session ? findCurrentScheduleTitle(detail, now) : null),
+  const currentSchedule = useMemo(
+    () => (detail && !session ? findCurrentScheduleItem(detail, now) : null),
     [detail, session, now],
   );
+  const currentScheduleTitle = currentSchedule?.title?.trim() || null;
+
+  /**
+   * 사진을 붙일 일정. 탑승 중이면 그 열차 구간, 아니면 지금 진행 중인 일정.
+   * 이 값을 함께 보내면 서버가 GPS 로 일정을 찾지 않아도 되므로,
+   * 좌표 없는 사진(스크린샷 등)도 그대로 받을 수 있다.
+   */
+  const scheduleIdx = session?.scheduleIdx ?? currentSchedule?.schedule_idx ?? null;
 
   // 카드가 결과 목록을 그리지 않아도 폴링은 여기서 계속 건다 — 이 호출이 곧 풍경
   // 알림 푸시 발송이라, 멈추면 기능 자체가 죽는다. 세션이 없으면 훅이 알아서 쉰다.
@@ -297,7 +313,10 @@ function SceneryPromoCard({
 
   const onPickPhoto = async (source: MediaSource) => {
     setSheetOpen(false);
-    const photo = await pickScenicPhoto(source);
+    // 붙일 일정을 알면 좌표가 없어도 된다.
+    const photo = await pickScenicPhoto(source, {
+      requireLocation: scheduleIdx == null,
+    });
     if (!photo) return; // 취소·권한 거부
     if (photoTravelIdx == null) {
       Alert.alert(
@@ -311,9 +330,9 @@ function SceneryPromoCard({
     const previous = added;
     setAdded(photo);
 
-    // schedule_idx 는 보내지 않는다 — 서버가 사진 EXIF 의 GPS 로 가까운 일정에 매핑한다.
+    // schedule_idx 를 알면 그 일정에 바로 붙이고, 모르면 비워 서버가 사진 GPS 로 매핑한다.
     addImages.mutate(
-      { travelIdx: photoTravelIdx, photos: [photo] },
+      { travelIdx: photoTravelIdx, photos: [photo], scheduleIdx },
       {
         onError: (err) => {
           setAdded(previous);
