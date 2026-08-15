@@ -36,6 +36,18 @@ export type MyReelsListResponse = {
   next_cursor: number | null;
 };
 
+/**
+ * GET /api/blocks 의 항목 — 내가 차단한 사용자 1명.
+ *
+ * profile_image 는 **아직 서버 응답에 없다**(추가 예정). 그래서 옵셔널로 두고
+ * 화면은 값이 없으면 기본 아바타를 그린다 — 서버가 필드를 붙이는 순간 저절로 뜬다.
+ */
+export type BlockedUser = {
+  user_idx: number;
+  nickname: string | null;
+  profile_image?: string | null;
+};
+
 /** multipart 업로드에 넣을 이미지 파일 형태. expo-image-picker asset 에서 좁혀서 만든다. */
 export type ProfileImageFile = {
   uri: string;

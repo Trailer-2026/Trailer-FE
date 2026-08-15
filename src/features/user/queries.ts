@@ -9,9 +9,11 @@ import { reelsKeys } from "@/src/features/reels/keys";
 
 import {
   blockUser,
+  getBlockedUsers,
   getLikedReels,
   getMyProfile,
   getMyReels,
+  unblockUser,
   updateNickname,
   updateProfileImage,
 } from "./api";
@@ -64,8 +66,35 @@ export function useBlockUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userIdx: number) => blockUser(userIdx),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: reelsKeys.all }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
+      // 차단 목록 화면이 열려 있지 않아도 무효화해 둔다 — 다음에 들어가면 새로 받는다.
+      queryClient.invalidateQueries({ queryKey: userKeys.blocks() });
+    },
+  });
+}
+
+/** 내가 차단한 사용자 목록. 차단/해제 mutation 이 이 캐시를 무효화한다. */
+export function useBlockedUsers() {
+  return useQuery({
+    queryKey: userKeys.blocks(),
+    queryFn: getBlockedUsers,
+    staleTime: 1000 * 30,
+  });
+}
+
+/**
+ * 차단 해제. 목록에서 그 줄이 사라지고, 상대의 릴스·댓글이 다시 보여야 하므로
+ * 차단 목록과 릴스 캐시를 함께 무효화한다(차단할 때와 정확히 반대).
+ */
+export function useUnblockUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userIdx: number) => unblockUser(userIdx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.blocks() });
+      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
+    },
   });
 }
 

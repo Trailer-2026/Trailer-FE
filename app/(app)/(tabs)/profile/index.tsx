@@ -110,6 +110,12 @@ export default function ProfileTab() {
       // 별도 북마크 기능이 없어 릴스 좋아요가 곧 저장이다(서버 설명 기준).
       onPress: () => router.push("/profile/bookmarks"),
     },
+    {
+      key: "blocks",
+      label: "차단 목록",
+      icon: <Feather name="slash" size={moderateScale(20)} color={MENU_ICON} />,
+      onPress: () => router.push("/profile/blocks"),
+    },
   ];
   const menu2: MenuRow[] = [
     {

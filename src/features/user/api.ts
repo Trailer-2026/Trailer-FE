@@ -2,6 +2,7 @@ import { api } from "@/src/api/client";
 import type { CommonResponse } from "@/src/api/types";
 
 import type {
+  BlockedUser,
   MyProfile,
   MyReelsListResponse,
   ProfileImageFile,
@@ -65,6 +66,23 @@ export async function getLikedReels(
  */
 export async function blockUser(userIdx: number): Promise<void> {
   await api.post(`/api/blocks/${userIdx}`);
+}
+
+/**
+ * 내가 차단한 사용자 목록(최근 차단순). GET /api/blocks
+ * data 가 null 이면 빈 목록으로 취급한다(차단 이력이 없는 계정).
+ */
+export async function getBlockedUsers(): Promise<BlockedUser[]> {
+  const res = await api.get<CommonResponse<BlockedUser[]>>("/api/blocks");
+  return res.data.data ?? [];
+}
+
+/**
+ * 차단 해제. DELETE /api/blocks/{user_idx}
+ * 차단하지 않은 상대에게 호출해도 성공(멱등)이라 중복 탭 방어가 필요 없다.
+ */
+export async function unblockUser(userIdx: number): Promise<void> {
+  await api.delete(`/api/blocks/${userIdx}`);
 }
 
 /**
