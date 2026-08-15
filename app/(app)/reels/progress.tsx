@@ -15,6 +15,15 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
 
+/**
+ * 릴스 스택(create/gallery/edit/progress)을 모두 닫고 홈 탭으로.
+ * dismissAll 만 하면 이 흐름을 시작한 탭으로 돌아가므로 홈을 명시한다.
+ */
+function goHome() {
+  router.dismissAll();
+  router.navigate("/");
+}
+
 /** 서버 phase 문자열 → 사용자용 라벨. 모르는 값이면 원문/기본 문구로 폴백. */
 function phaseLabel(phase: string, percent: number): string {
   const map: Record<string, string> = {
@@ -231,7 +240,7 @@ function RunningState({ status }: { status: VideoRenderStatusResponse }) {
       </Text>
 
       <Pressable
-        onPress={() => router.dismissAll()}
+        onPress={goHome}
         className="active:opacity-70"
         style={{ marginTop: verticalScale(8), paddingVertical: verticalScale(8) }}
         accessibilityRole="button"

@@ -360,21 +360,43 @@ export default function ResultScreen() {
             )}
           </ScrollView>
 
-          {/* 플로팅 담기 버튼 — 배경 없이 콘텐츠 위에 떠 있어 뒤 배경이 그대로 비침 */}
+          {/* 플로팅 버튼 — 배경 없이 콘텐츠 위에 떠 있어 뒤 배경이 그대로 비침 */}
           <View
             pointerEvents="box-none"
+            className="flex-row"
             style={{
               position: "absolute",
               left: 0,
               right: 0,
               bottom: verticalScale(12),
               paddingHorizontal: scale(20),
+              gap: scale(10),
             }}
           >
+            {/* 담지 않고 나가기 — 추천을 안 쓸 때 홈으로 빠져나갈 유일한 길. */}
+            <Pressable
+              onPress={() => router.replace("/")}
+              disabled={createTravel.isPending}
+              className="items-center justify-center rounded-2xl bg-white active:opacity-70"
+              style={{
+                width: scale(96),
+                height: verticalScale(50),
+                borderWidth: 1,
+                borderColor: "#D1D5DB",
+              }}
+            >
+              <Text
+                className="font-semibold text-gray-600"
+                style={{ fontSize: moderateScale(15) }}
+              >
+                홈으로
+              </Text>
+            </Pressable>
+
             <Pressable
               onPress={onSaveTravel}
               disabled={!activePlan || createTravel.isPending}
-              className="w-full items-center justify-center rounded-2xl"
+              className="flex-1 items-center justify-center rounded-2xl"
               style={{
                 height: verticalScale(50),
                 backgroundColor: activePlan ? "#5E84F4" : "#D1D5DB",
