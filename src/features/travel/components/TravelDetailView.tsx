@@ -18,6 +18,10 @@ import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
+import MediaSourceSheet, {
+  type MediaSource,
+} from "@/src/features/reels/components/MediaSourceSheet";
+import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
 import LocationPermissionPrompt from "@/src/features/scenic/components/LocationPermissionPrompt";
 import { HEADER_HEIGHT, HEADER_TOP_GAP } from "@/src/utils/header";
@@ -26,6 +30,7 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 import { describeScheduleError } from "../errors";
 import { formatClockTime, formatDayDate, formatLongDate } from "../format";
 import {
+  useAddTravelImages,
   useDeleteSchedule,
   useDeleteTravelImage,
   useTravelDetail,
@@ -96,6 +101,30 @@ export default function TravelDetailView({
     item: TravelScheduleItem;
     dayNo: number;
   } | null>(null);
+
+  /**
+   * 사진을 붙일 일정(schedule_idx). 값이 있으면 촬영/갤러리 선택 시트가 열린다.
+   * 일정을 지정해 올리므로 사진에 좌표가 없어도 그 일정에 그대로 붙는다.
+   */
+  const [photoTarget, setPhotoTarget] = useState<number | null>(null);
+  const addImages = useAddTravelImages();
+
+  const onPickPhoto = async (source: MediaSource) => {
+    const scheduleIdx = photoTarget;
+    setPhotoTarget(null);
+    if (scheduleIdx == null) return;
+
+    const photo = await pickScenicPhoto(source, { requireLocation: false });
+    if (!photo) return; // 취소·권한 거부
+
+    addImages.mutate(
+      { travelIdx, photos: [photo], scheduleIdx },
+      {
+        onError: (e) =>
+          Alert.alert("사진 등록 실패", describeScheduleError(e)),
+      },
+    );
+  };
 
   /** 일정에 붙인 사진 1장 삭제 — 저장소에서도 지워져 되돌릴 수 없다. */
   const confirmDeleteImage = (image: TravelScheduleImage) => {
@@ -229,6 +258,7 @@ export default function TravelDetailView({
                     : (item) => setMenuTarget({ item, dayNo: day.day_no })
                 }
                 onDeleteImage={completed ? undefined : confirmDeleteImage}
+                onAddPhoto={completed ? undefined : setPhotoTarget}
               />
             ))
           )}
@@ -251,10 +281,22 @@ export default function TravelDetailView({
         />
       ) : null}
 
+      {/* 촬영하기 / 갤러리에서 선택 — 풍경알림 카드와 같은 시트를 그대로 쓴다. */}
+      <MediaSourceSheet
+        visible={photoTarget != null}
+        onSelect={onPickPhoto}
+        onClose={() => setPhotoTarget(null)}
+      />
+
       <ScheduleItemMenuSheet
         visible={!!menuTarget}
         title={menuTarget?.item.title || "일정"}
         onClose={() => setMenuTarget(null)}
+        onAddPhoto={() => {
+          const t = menuTarget;
+          setMenuTarget(null);
+          if (t) setPhotoTarget(t.item.schedule_idx);
+        }}
         onEdit={() => {
           const t = menuTarget;
           setMenuTarget(null);
@@ -499,6 +541,7 @@ function DaySection({
   onAdd,
   onItemMenu,
   onDeleteImage,
+  onAddPhoto,
 }: {
   day: TravelDay;
   /** 없으면 '일정 추가' 버튼을 그리지 않는다(다녀온 여행). */
@@ -507,6 +550,8 @@ function DaySection({
   onItemMenu?: (item: TravelScheduleItem) => void;
   /** 없으면 사진 썸네일의 X(삭제)를 그리지 않는다. */
   onDeleteImage?: (image: TravelScheduleImage) => void;
+  /** 썸네일 옆 + 로 사진 추가. 없으면 그리지 않는다. */
+  onAddPhoto?: (scheduleIdx: number) => void;
 }) {
   // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
   const rows = toRows(sortByStartTime(day.items));
@@ -552,6 +597,9 @@ function DaySection({
             isLast={i === rows.length - 1}
             onMenu={onItemMenu ? () => onItemMenu(row.item) : undefined}
             onDeleteImage={onDeleteImage}
+            onAddPhoto={
+              onAddPhoto ? () => onAddPhoto(row.item.schedule_idx) : undefined
+            }
           />
         );
       })}
@@ -593,6 +641,7 @@ function TimelineRow({
   isLast,
   onMenu,
   onDeleteImage,
+  onAddPhoto,
 }: {
   row: Row;
   number: number | null;
@@ -601,6 +650,8 @@ function TimelineRow({
   onMenu?: () => void;
   /** 없으면 사진 썸네일의 X(삭제) 버튼을 그리지 않는다. */
   onDeleteImage?: (image: TravelScheduleImage) => void;
+  /** 썸네일 옆 + 버튼. 없으면 그리지 않는다. */
+  onAddPhoto?: () => void;
 }) {
   const hasMenu = !!onMenu;
   return (
@@ -654,6 +705,7 @@ function TimelineRow({
           <SchedulePhotos
             images={row.item.images ?? []}
             onDelete={onDeleteImage}
+            onAdd={onAddPhoto}
           />
         ) : null}
 
@@ -694,9 +746,12 @@ const PHOTO_X = scale(18);
 function SchedulePhotos({
   images,
   onDelete,
+  onAdd,
 }: {
   images: TravelScheduleImage[];
   onDelete?: (image: TravelScheduleImage) => void;
+  /** 없으면 + 타일을 그리지 않는다(다녀온 여행). */
+  onAdd?: () => void;
 }) {
   return (
     <ScrollView
@@ -745,6 +800,26 @@ function SchedulePhotos({
           ) : null}
         </View>
       ))}
+
+      {/* 사진이 이미 있을 때의 추가 진입점 — ⋮ 메뉴까지 안 가도 되게 옆에 둔다. */}
+      {onAdd ? (
+        <Pressable
+          onPress={onAdd}
+          className="items-center justify-center active:opacity-70"
+          style={{
+            width: PHOTO,
+            height: PHOTO,
+            borderRadius: scale(8),
+            borderWidth: 1,
+            borderColor: "#D9DCE1",
+            backgroundColor: "#FFFFFF",
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="사진 추가"
+        >
+          <Feather name="plus" size={moderateScale(20)} color="#9CA3AF" />
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }
