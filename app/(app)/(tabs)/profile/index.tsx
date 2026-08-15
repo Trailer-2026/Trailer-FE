@@ -286,9 +286,6 @@ export default function ProfileTab() {
           ))}
         </View>
 
-        {/* 구분 여백 */}
-        <View style={{ height: verticalScale(8), backgroundColor: "#F3F4F6" }} />
-
         {/* 메뉴: 알림/약관/버전/계정 */}
         <View>
           {menu2.map((row) => (
