@@ -60,6 +60,37 @@ export function collectTrainSegments(detail: TravelDetail): TrainSegment[] {
   });
 }
 
+/** 종료 시각이 없는 방문 일정을 얼마나 진행 중으로 볼지. */
+const VISIT_FALLBACK_MS = 60 * 60 * 1000;
+
+/**
+ * 지금 진행 중인 **열차가 아닌** 일정의 제목. 없으면 null.
+ * 알림 카드가 "지금 ○○ 일정 중이에요" 를 띄우는 데 쓴다.
+ *
+ * ponytail: 종료 시각이 없거나 시작보다 이르면 1시간짜리로 친다. 실제 체류
+ * 시간이 필요해지면 서버 end_time 을 필수로 받아야 한다.
+ */
+export function findCurrentScheduleTitle(
+  detail: TravelDetail,
+  now: Date,
+): string | null {
+  for (const day of detail.days) {
+    for (const item of day.items) {
+      if (item.kind === "train") continue;
+      const start = toDateTime(day.date, item.start_time);
+      if (!start) continue;
+      let end = toDateTime(day.date, item.end_time);
+      if (!end || end.getTime() <= start.getTime()) {
+        end = new Date(start.getTime() + VISIT_FALLBACK_MS);
+      }
+      if (now.getTime() >= start.getTime() && now.getTime() < end.getTime()) {
+        return item.title?.trim() || null;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * 지금 **타고 있는 중**인 구간 — 출발 시각 ≤ 지금 < 도착 시각.
  * 자동 탑승 시작/종료의 기준이라 출발·도착 시각이 **둘 다** 있는 구간만 본다
