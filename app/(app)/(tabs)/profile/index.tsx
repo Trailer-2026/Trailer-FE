@@ -6,7 +6,6 @@ import { Alert, ImageBackground, Pressable, ScrollView, View } from "react-nativ
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AlarmIcon from "@/src/components/icons/AlarmIcon";
-import BookmarkIcon from "@/src/components/icons/BookmarkIcon";
 import ForwardIcon from "@/src/components/icons/ForwardIcon";
 import InfoIcon from "@/src/components/icons/InfoIcon";
 import LogoutIcon from "@/src/components/icons/LogoutIcon";
@@ -99,15 +98,10 @@ export default function ProfileTab() {
   const menu: MenuRow[] = [
     {
       key: "bookmark",
-      label: "북마크",
-      icon: (
-        <BookmarkIcon
-          width={moderateScale(14)}
-          height={moderateScale(20)}
-          color={MENU_ICON}
-        />
-      ),
+      label: "좋아요한 영상",
+      icon: <Feather name="heart" size={moderateScale(20)} color={MENU_ICON} />,
       // 별도 북마크 기능이 없어 릴스 좋아요가 곧 저장이다(서버 설명 기준).
+      // 라우트 이름은 /profile/bookmarks 로 남아 있다 — 화면 문구만 실제 동작에 맞췄다.
       onPress: () => router.push("/profile/bookmarks"),
     },
     {
@@ -279,7 +273,7 @@ export default function ProfileTab() {
           </View>
         </ImageBackground>
 
-        {/* 메뉴: 북마크 */}
+        {/* 메뉴: 좋아요한 영상 / 차단 목록 */}
         <View style={{ paddingTop: verticalScale(8) }}>
           {menu.map((row) => (
             <MenuItem key={row.key} row={row} />
