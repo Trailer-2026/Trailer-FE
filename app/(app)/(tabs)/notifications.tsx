@@ -25,7 +25,6 @@ import { openNotificationTarget } from "@/src/features/notification/routing";
 import MediaSourceSheet, {
   type MediaSource,
 } from "@/src/features/reels/components/MediaSourceSheet";
-import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { normalizeStationName } from "@/src/features/scenic/api";
 import {
   SCENERY_BACKGROUNDS,
@@ -36,7 +35,10 @@ import {
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import { formatBasedAt, formatClockLabel } from "@/src/features/scenic/format";
 import { useMinuteTick, useScenicPolling } from "@/src/features/scenic/queries";
-import { findCurrentScheduleItem } from "@/src/features/scenic/segments";
+import {
+  findCurrentScheduleItem,
+  findNearestScheduleItem,
+} from "@/src/features/scenic/segments";
 import { useScenicStore } from "@/src/features/scenic/store";
 import type { NotificationLogItem } from "@/src/features/notification/types";
 import {
@@ -262,17 +264,15 @@ function SceneryPromoCard({
   onToggle: () => void;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  // 방금 붙인 사진 — 성공을 시스템 알림창 대신 카드 안에서 잠깐 보여준다.
-  const [added, setAdded] = useState<ReelsMediaAsset | null>(null);
+  // 방금 붙였다는 표시 — 버튼을 바꾸지 않고 위에 5초만 띄운다(시안은 버튼이 항상 촬영).
+  const [justAdded, setJustAdded] = useState(false);
   const addImages = useAddTravelImages();
 
-  // 붙였다는 표시는 5초만 — 그 뒤엔 다시 촬영 버튼으로 돌아간다.
-  // 업로드 중에는 타이머를 걸지 않는다(진행 표시가 도중에 사라지면 안 된다).
   useEffect(() => {
-    if (!added || addImages.isPending) return;
-    const timer = setTimeout(() => setAdded(null), 5000);
+    if (!justAdded) return;
+    const timer = setTimeout(() => setJustAdded(false), 5000);
     return () => clearTimeout(timer);
-  }, [added, addImages.isPending]);
+  }, [justAdded]);
 
   const profile = useMyProfile().data;
   const nickname = profile?.nickname ?? "여행자";
@@ -297,11 +297,16 @@ function SceneryPromoCard({
   const currentScheduleTitle = currentSchedule?.title?.trim() || null;
 
   /**
-   * 사진을 붙일 일정. 탑승 중이면 그 열차 구간, 아니면 지금 진행 중인 일정.
-   * 이 값을 함께 보내면 서버가 GPS 로 일정을 찾지 않아도 되므로,
-   * 좌표 없는 사진(스크린샷 등)도 그대로 받을 수 있다.
+   * 좌표 없는 사진을 붙일 일정.
+   *
+   * 서버는 사진 GPS 로만 일정을 찾기 때문에, 메타데이터에 좌표가 없으면
+   * schedule_idx 가 null 로 남는다(= 어느 일정에도 안 붙음). 그래서 앱이
+   * 탑승 중 구간 → 진행 중 일정 → 시각이 가장 가까운 일정 순으로 골라 채워 보낸다.
    */
-  const scheduleIdx = session?.scheduleIdx ?? currentSchedule?.schedule_idx ?? null;
+  const fallbackScheduleIdx =
+    session?.scheduleIdx ??
+    currentSchedule?.schedule_idx ??
+    (detail ? (findNearestScheduleItem(detail, now)?.schedule_idx ?? null) : null);
 
   // 카드가 결과 목록을 그리지 않아도 폴링은 여기서 계속 건다 — 이 호출이 곧 풍경
   // 알림 푸시 발송이라, 멈추면 기능 자체가 죽는다. 세션이 없으면 훅이 알아서 쉰다.
@@ -313,9 +318,9 @@ function SceneryPromoCard({
 
   const onPickPhoto = async (source: MediaSource) => {
     setSheetOpen(false);
-    // 붙일 일정을 알면 좌표가 없어도 된다.
+    // 붙일 일정을 정할 수 있으면 좌표가 없어도 받는다.
     const photo = await pickScenicPhoto(source, {
-      requireLocation: scheduleIdx == null,
+      requireLocation: fallbackScheduleIdx == null,
     });
     if (!photo) return; // 취소·권한 거부
     if (photoTravelIdx == null) {
@@ -325,19 +330,19 @@ function SceneryPromoCard({
       );
       return;
     }
-    // 방금 고른 사진을 바로 보여준다(업로드가 끝날 때까지 기다리지 않는다).
-    // 실패하면 직전 사진으로 되돌린다.
-    const previous = added;
-    setAdded(photo);
 
-    // schedule_idx 를 알면 그 일정에 바로 붙이고, 모르면 비워 서버가 사진 GPS 로 매핑한다.
+    // 좌표가 있으면 서버가 GPS 로 정확히 매핑한다. 없을 때만 앱이 고른 일정을 붙인다
+    // (안 보내면 schedule_idx 가 null 로 남아 어느 일정에도 안 붙는다).
+    const hasLocation = photo.latitude != null && photo.longitude != null;
     addImages.mutate(
-      { travelIdx: photoTravelIdx, photos: [photo], scheduleIdx },
       {
-        onError: (err) => {
-          setAdded(previous);
-          Alert.alert("사진 등록 실패", describeApiError(err));
-        },
+        travelIdx: photoTravelIdx,
+        photos: [photo],
+        scheduleIdx: hasLocation ? null : fallbackScheduleIdx,
+      },
+      {
+        onSuccess: () => setJustAdded(true),
+        onError: (err) => Alert.alert("사진 등록 실패", describeApiError(err)),
       },
     );
   };
@@ -495,90 +500,55 @@ function SceneryPromoCard({
             left: scale(20),
             right: scale(20),
             bottom: verticalScale(25),
+            gap: verticalScale(8),
           }}
         >
-          {added ? (
-            /* 방금 붙인 사진 — 썸네일 + 안내. 누르면 한 장 더 붙일 수 있다. */
-            <Pressable
-              onPress={() => setSheetOpen(true)}
-              disabled={addImages.isPending}
-              className="flex-row items-center bg-white active:opacity-80"
+          {/* 방금 붙였다는 알림 — 버튼 위에 5초만 떴다 사라진다. */}
+          {justAdded ? (
+            <View
+              className="flex-row items-center bg-white"
               style={{
-                height: verticalScale(48),
-                borderRadius: scale(10),
+                alignSelf: "flex-start",
+                borderRadius: 999,
                 paddingHorizontal: scale(12),
-                gap: scale(12),
+                paddingVertical: verticalScale(6),
+                gap: scale(6),
               }}
-              accessibilityRole="button"
-              accessibilityLabel="사진 한 장 더 붙이기"
             >
-              <View>
-                <Image
-                  source={{ uri: added.uri }}
-                  style={{
-                    width: scale(34),
-                    height: scale(34),
-                    borderRadius: scale(8),
-                    opacity: addImages.isPending ? 0.45 : 1,
-                  }}
-                  contentFit="cover"
-                />
-                {addImages.isPending ? (
-                  <View className="absolute inset-0 items-center justify-center">
-                    <ActivityIndicator size="small" color={ACCENT} />
-                  </View>
-                ) : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  className="font-bold"
-                  style={{ fontSize: moderateScale(14), color: "#353535" }}
-                >
-                  {addImages.isPending ? "사진을 올리는 중" : "사진을 붙였어요"}
-                </Text>
-                <Text
-                  className="text-gray-500"
-                  numberOfLines={1}
-                  style={{ fontSize: moderateScale(12) }}
-                >
-                  여행 영상을 만들 때 함께 담겨요
-                </Text>
-              </View>
-              {addImages.isPending ? null : (
-                <Text
-                  className="font-semibold"
-                  style={{ fontSize: moderateScale(13), color: ACCENT }}
-                >
-                  한 장 더
-                </Text>
-              )}
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => setSheetOpen(true)}
-              disabled={addImages.isPending}
-              className="items-center justify-center active:opacity-80"
-              style={{
-                height: verticalScale(48),
-                borderRadius: scale(10),
-                backgroundColor: ACCENT,
-                opacity: addImages.isPending ? 0.6 : 1,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="지금 촬영하러 가기"
-            >
-              {addImages.isPending ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text
-                  className="text-white"
-                  style={{ fontSize: moderateScale(16), fontWeight: "600" }}
-                >
-                  지금 촬영하러 가기
-                </Text>
-              )}
-            </Pressable>
-          )}
+              <Feather name="check" size={moderateScale(12)} color={ACCENT} />
+              <Text
+                className="font-semibold"
+                style={{ fontSize: moderateScale(12), color: "#353535" }}
+              >
+                사진을 붙였어요
+              </Text>
+            </View>
+          ) : null}
+
+          <Pressable
+            onPress={() => setSheetOpen(true)}
+            disabled={addImages.isPending}
+            className="items-center justify-center active:opacity-80"
+            style={{
+              height: verticalScale(48),
+              borderRadius: scale(10),
+              backgroundColor: ACCENT,
+              opacity: addImages.isPending ? 0.6 : 1,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="지금 촬영하러 가기"
+          >
+            {addImages.isPending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text
+                className="text-white"
+                style={{ fontSize: moderateScale(16), fontWeight: "600" }}
+              >
+                지금 촬영하러 가기
+              </Text>
+            )}
+          </Pressable>
         </View>
       ) : null}
 

@@ -97,6 +97,32 @@ export function findCurrentScheduleItem(
 }
 
 /**
+ * 시각이 가장 가까운 일정 항목(열차 포함). 진행 중인 일정이 없을 때의 대비책.
+ *
+ * 좌표 없는 사진은 서버가 어디에 붙일지 못 정하므로 schedule_idx 를 반드시
+ * 채워 보내야 한다 — 일정 사이 빈 시간에 찍은 사진도 가장 가까운 일정에 붙인다.
+ */
+export function findNearestScheduleItem(
+  detail: TravelDetail,
+  now: Date,
+): TravelScheduleItem | null {
+  let best: TravelScheduleItem | null = null;
+  let bestGap = Infinity;
+  for (const day of detail.days) {
+    for (const item of day.items) {
+      const start = toDateTime(day.date, item.start_time);
+      if (!start) continue;
+      const gap = Math.abs(start.getTime() - now.getTime());
+      if (gap < bestGap) {
+        best = item;
+        bestGap = gap;
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * 지금 **타고 있는 중**인 구간 — 출발 시각 ≤ 지금 < 도착 시각.
  * 자동 탑승 시작/종료의 기준이라 출발·도착 시각이 **둘 다** 있는 구간만 본다
  * (도착 시각을 모르면 언제 끝내야 할지 알 수 없어 자동으로 켜지 않는다).
