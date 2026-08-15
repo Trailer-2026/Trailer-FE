@@ -36,6 +36,30 @@ export async function postReelsComment(
 }
 
 /**
+ * 내 댓글 수정. PATCH /api/comments/{comment_idx}
+ * 내용만 바꾼다(1~1000자). 남의 댓글이면 404 — 서버가 존재 자체를 숨긴다.
+ */
+export async function updateReelsComment(
+  commentIdx: number,
+  content: string,
+): Promise<ReelsComment> {
+  const res = await api.patch<CommonResponse<ReelsComment>>(
+    `/api/comments/${commentIdx}`,
+    { content },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
+/**
+ * 내 댓글 삭제(소프트 삭제). DELETE /api/comments/{comment_idx}
+ * **그 댓글의 답글도 함께 삭제된다.** 남의 댓글이면 404.
+ */
+export async function deleteReelsComment(commentIdx: number): Promise<void> {
+  await api.delete<CommonResponse<null>>(`/api/comments/${commentIdx}`);
+}
+
+/**
  * 릴스 무작위 추천 10개. GET /api/videos/reels/recommend
  *
  * exclude 에 이미 받은 reels_idx 를 누적해 넘기면 그만큼 빼고 새로 뽑는다.

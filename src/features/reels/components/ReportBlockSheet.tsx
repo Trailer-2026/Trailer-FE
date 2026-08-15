@@ -32,6 +32,79 @@ export default function ReportBlockSheet({
   onClose: () => void;
 }) {
   return (
+    <Sheet visible={visible} name={name} onClose={onClose}>
+      <SheetRow
+            label={reportLabel}
+            color={DANGER}
+            icon={
+              <MaterialCommunityIcons
+                name="alarm-light"
+                size={moderateScale(18)}
+                color={DANGER}
+              />
+            }
+            onPress={onReport}
+          />
+      <SheetRow
+        label="이 사용자 차단하기"
+        icon={<Feather name="slash" size={moderateScale(17)} color="#FFFFFF" />}
+        onPress={onBlock}
+      />
+      <SheetRow label="닫기" muted onPress={onClose} />
+    </Sheet>
+  );
+}
+
+/**
+ * 내가 쓴 댓글을 길게 눌렀을 때 뜨는 시트 — 신고·차단 대신 수정·삭제.
+ * (자기 자신은 차단할 수 없고, 신고할 이유도 없다.)
+ */
+export function MyCommentSheet({
+  visible,
+  name,
+  onEdit,
+  onDelete,
+  onClose,
+}: {
+  visible: boolean;
+  name: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet visible={visible} name={name} onClose={onClose}>
+      <SheetRow
+        label="댓글 수정하기"
+        icon={<Feather name="edit-2" size={moderateScale(16)} color="#FFFFFF" />}
+        onPress={onEdit}
+      />
+      <SheetRow
+        label="댓글 삭제하기"
+        color={DANGER}
+        icon={
+          <Feather name="trash-2" size={moderateScale(16)} color={DANGER} />
+        }
+        onPress={onDelete}
+      />
+      <SheetRow label="닫기" muted onPress={onClose} />
+    </Sheet>
+  );
+}
+
+/** 두 시트가 공유하는 껍데기 — 반투명 배경 + 하단 어두운 시트 + 대상 이름. */
+function Sheet({
+  visible,
+  name,
+  children,
+  onClose,
+}: {
+  visible: boolean;
+  name: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
     <Modal
       visible={visible}
       transparent
@@ -71,26 +144,7 @@ export default function ReportBlockSheet({
             </Text>
           </View>
 
-          <SheetRow
-            label={reportLabel}
-            color={DANGER}
-            icon={
-              <MaterialCommunityIcons
-                name="alarm-light"
-                size={moderateScale(18)}
-                color={DANGER}
-              />
-            }
-            onPress={onReport}
-          />
-          <SheetRow
-            label="이 사용자 차단하기"
-            icon={
-              <Feather name="slash" size={moderateScale(17)} color="#FFFFFF" />
-            }
-            onPress={onBlock}
-          />
-          <SheetRow label="닫기" muted onPress={onClose} />
+          {children}
         </Pressable>
       </Pressable>
     </Modal>
