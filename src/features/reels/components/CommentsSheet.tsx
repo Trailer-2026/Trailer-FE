@@ -106,7 +106,9 @@ export default function CommentsSheet({
       reason === "report"
         ? `${nickname}님의 댓글을 신고할까요?`
         : `${nickname}님을 차단할까요?`,
-      "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
+      reason === "report"
+        ? "관리자에게 신고가 접수되고, 이 사용자는 자동으로 차단돼요. 차단된 사용자의 릴스와 댓글은 나에게만 보이지 않아요."
+        : "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
       [
         { text: "취소", style: "cancel" },
         {
@@ -117,10 +119,15 @@ export default function CommentsSheet({
               onSuccess: () =>
                 Alert.alert(
                   reason === "report" ? "신고했어요" : "차단했어요",
-                  "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
+                  reason === "report"
+                    ? "관리자에게 신고가 접수됐어요. 이 사용자는 자동으로 차단되어 릴스와 댓글이 더 이상 보이지 않아요."
+                    : "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
                 ),
               onError: (err) =>
-                Alert.alert("차단 실패", describeApiError(err)),
+                Alert.alert(
+                  reason === "report" ? "신고 실패" : "차단 실패",
+                  describeApiError(err),
+                ),
             }),
         },
       ],

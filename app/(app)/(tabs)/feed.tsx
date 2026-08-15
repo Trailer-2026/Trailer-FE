@@ -139,7 +139,9 @@ export default function FeedTab() {
         reason === "report"
           ? `${target.author.name}님의 릴스를 신고할까요?`
           : `${target.author.name}님을 차단할까요?`,
-        "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
+        reason === "report"
+          ? "관리자에게 신고가 접수되고, 이 사용자는 자동으로 차단돼요. 차단된 사용자의 릴스와 댓글은 나에게만 보이지 않아요."
+          : "차단하면 이 사용자의 릴스와 댓글이 나에게만 보이지 않아요.",
         [
           { text: "취소", style: "cancel" },
           {
@@ -150,7 +152,9 @@ export default function FeedTab() {
                 onSuccess: () =>
                   Alert.alert(
                     reason === "report" ? "신고했어요" : "차단했어요",
-                    "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
+                    reason === "report"
+                      ? "관리자에게 신고가 접수됐어요. 이 사용자는 자동으로 차단되어 릴스와 댓글이 더 이상 보이지 않아요."
+                      : "이 사용자의 릴스와 댓글이 더 이상 보이지 않아요.",
                   ),
                 onError: (err) =>
                   Alert.alert("실패", describeApiError(err)),
