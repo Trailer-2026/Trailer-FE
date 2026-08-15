@@ -3,10 +3,11 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
+import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
 import { useBlockedUsers, useUnblockUser } from "@/src/features/user/queries";
@@ -35,28 +36,24 @@ export default function BlocksScreen() {
   const unblock = useUnblockUser();
   // 해제 요청 중인 사용자 — 그 줄만 흐리게 하고 중복 탭을 막는다.
   const [removing, setRemoving] = useState<number | null>(null);
+  const { dialog, ask, notify } = useConfirmDialog();
 
   const confirmUnblock = (user: BlockedUser) => {
     if (removing != null) return;
     const name = user.nickname ?? "이 사용자";
-    Alert.alert(
-      `${name}님의 차단을 해제할까요?`,
-      "해제하면 이 사용자의 릴스와 댓글이 다시 보여요.",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "차단 해제",
-          onPress: () => {
-            setRemoving(user.user_idx);
-            unblock.mutate(user.user_idx, {
-              onError: (err) =>
-                Alert.alert("차단 해제 실패", describeApiError(err)),
-              onSettled: () => setRemoving(null),
-            });
-          },
-        },
-      ],
-    );
+    ask({
+      title: `${name}님의 차단을 해제할까요?`,
+      message: "해제하면 이 사용자의 릴스와 댓글이 다시 보여요.",
+      confirmLabel: "차단 해제",
+      onConfirm: () => {
+        setRemoving(user.user_idx);
+        unblock.mutate(user.user_idx, {
+          onError: (err) =>
+            notify({ title: "차단 해제 실패", message: describeApiError(err) }),
+          onSettled: () => setRemoving(null),
+        });
+      },
+    });
   };
 
   return (
@@ -169,6 +166,8 @@ export default function BlocksScreen() {
           )}
         />
       )}
+
+      {dialog}
     </SafeAreaView>
   );
 }
