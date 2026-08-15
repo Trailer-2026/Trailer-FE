@@ -1,6 +1,7 @@
+import { useIsFocused } from "@react-navigation/native";
 import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -118,19 +119,35 @@ export default function NotificationsTab() {
     [readOne],
   );
 
-  const onReadAll = useCallback(() => {
-    if (unreadCount === 0) return;
+  /**
+   * 알림 탭에 들어오면 자동으로 전체 읽음 처리한다('모두 읽음' 버튼 대체).
+   *
+   * 화면이 포커스된 뒤에 목록이 도착하는 경우(첫 진입·콜드 스타트)도 있어서
+   * 포커스 여부와 unreadCount 를 함께 본다 — 둘 중 뭐가 먼저 와도 한 번은 실행된다.
+   *
+   * 실패하면 다시 시도하지 않는다 — 낙관 업데이트가 롤백되며 unreadCount 가 되살아나
+   * 그대로 두면 같은 요청을 무한 반복하게 된다. 탭을 나갔다 오면 다시 시도한다.
+   */
+  const isFocused = useIsFocused();
+  const readAllFailed = useRef(false);
+  useEffect(() => {
+    if (!isFocused) {
+      readAllFailed.current = false;
+      return;
+    }
+    if (unreadCount === 0 || readAll.isPending || readAllFailed.current) return;
     readAll.mutate(undefined, {
-      onError: () =>
-        Alert.alert("알림", "전체 읽음 처리에 실패했어요. 다시 시도해 주세요."),
+      onError: () => {
+        readAllFailed.current = true;
+      },
     });
-  }, [unreadCount, readAll]);
+  }, [isFocused, unreadCount, readAll]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* 헤더 */}
+      {/* 헤더 — 읽음 처리는 진입 시 자동이라 버튼이 없다. */}
       <View
-        className="flex-row items-center justify-between"
+        className="flex-row items-center"
         style={{
           paddingHorizontal: scale(20),
           // 앱 전체 상단바와 같은 높이로 맞추기 위한 여백.
@@ -144,21 +161,6 @@ export default function NotificationsTab() {
         >
           알림
         </Text>
-        <Pressable
-          onPress={onReadAll}
-          disabled={unreadCount === 0 || readAll.isPending}
-          hitSlop={8}
-          className="active:opacity-60"
-        >
-          <Text
-            style={{
-              fontSize: moderateScale(13),
-              color: unreadCount === 0 ? "#C4C4C4" : ACCENT,
-            }}
-          >
-            모두 읽음
-          </Text>
-        </Pressable>
       </View>
 
       <FlatList
