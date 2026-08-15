@@ -183,9 +183,13 @@ export default function ResultScreen() {
           gap: scale(3),
         }}
       >
+        {/* 뒤로가 아니라 홈으로 — 추천 조건 화면으로 되돌아가 봐야 할 일이 없고,
+            담지 않고 빠져나갈 길이 여기뿐이다. */}
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => router.replace("/")}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="홈으로"
           style={{
             width: scale(28),
             height: scale(28),
@@ -360,43 +364,21 @@ export default function ResultScreen() {
             )}
           </ScrollView>
 
-          {/* 플로팅 버튼 — 배경 없이 콘텐츠 위에 떠 있어 뒤 배경이 그대로 비침 */}
+          {/* 플로팅 담기 버튼 — 배경 없이 콘텐츠 위에 떠 있어 뒤 배경이 그대로 비침 */}
           <View
             pointerEvents="box-none"
-            className="flex-row"
             style={{
               position: "absolute",
               left: 0,
               right: 0,
               bottom: verticalScale(12),
               paddingHorizontal: scale(20),
-              gap: scale(10),
             }}
           >
-            {/* 담지 않고 나가기 — 추천을 안 쓸 때 홈으로 빠져나갈 유일한 길. */}
-            <Pressable
-              onPress={() => router.replace("/")}
-              disabled={createTravel.isPending}
-              className="items-center justify-center rounded-2xl bg-white active:opacity-70"
-              style={{
-                width: scale(96),
-                height: verticalScale(50),
-                borderWidth: 1,
-                borderColor: "#D1D5DB",
-              }}
-            >
-              <Text
-                className="font-semibold text-gray-600"
-                style={{ fontSize: moderateScale(15) }}
-              >
-                홈으로
-              </Text>
-            </Pressable>
-
             <Pressable
               onPress={onSaveTravel}
               disabled={!activePlan || createTravel.isPending}
-              className="flex-1 items-center justify-center rounded-2xl"
+              className="w-full items-center justify-center rounded-2xl"
               style={{
                 height: verticalScale(50),
                 backgroundColor: activePlan ? "#5E84F4" : "#D1D5DB",
