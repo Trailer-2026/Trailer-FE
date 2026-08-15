@@ -25,8 +25,17 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { describeScheduleError } from "../errors";
 import { formatClockTime, formatDayDate, formatLongDate } from "../format";
-import { useDeleteSchedule, useTravelDetail } from "../queries";
-import type { TravelDay, TravelDetail, TravelScheduleItem } from "../types";
+import {
+  useDeleteSchedule,
+  useDeleteTravelImage,
+  useTravelDetail,
+} from "../queries";
+import type {
+  TravelDay,
+  TravelDetail,
+  TravelScheduleImage,
+  TravelScheduleItem,
+} from "../types";
 import AddScheduleModal, {
   type ScheduleKind,
 } from "./schedule/AddScheduleModal";
@@ -77,6 +86,7 @@ export default function TravelDetailView({
     dayNo: number;
   } | null>(null);
   const del = useDeleteSchedule(travelIdx);
+  const delImage = useDeleteTravelImage(travelIdx);
 
   // 히어로의 'KTX 티켓 정보 추가하기' → 승차권 화면(저장된 게 있으면 목록, 없으면 폼).
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -86,6 +96,22 @@ export default function TravelDetailView({
     item: TravelScheduleItem;
     dayNo: number;
   } | null>(null);
+
+  /** 일정에 붙인 사진 1장 삭제 — 저장소에서도 지워져 되돌릴 수 없다. */
+  const confirmDeleteImage = (image: TravelScheduleImage) => {
+    Alert.alert("사진을 삭제할까요?", "삭제한 사진은 되돌릴 수 없어요.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () =>
+          delImage.mutate(image.image_idx, {
+            onError: (e) =>
+              Alert.alert("사진 삭제 실패", describeScheduleError(e)),
+          }),
+      },
+    ]);
+  };
 
   const confirmDeleteItem = (item: TravelScheduleItem) => {
     Alert.alert(
@@ -202,6 +228,7 @@ export default function TravelDetailView({
                     ? undefined
                     : (item) => setMenuTarget({ item, dayNo: day.day_no })
                 }
+                onDeleteImage={completed ? undefined : confirmDeleteImage}
               />
             ))
           )}
@@ -471,12 +498,15 @@ function DaySection({
   day,
   onAdd,
   onItemMenu,
+  onDeleteImage,
 }: {
   day: TravelDay;
   /** 없으면 '일정 추가' 버튼을 그리지 않는다(다녀온 여행). */
   onAdd?: () => void;
   /** 없으면 항목 ⋮ 도 그리지 않는다(다녀온 여행). */
   onItemMenu?: (item: TravelScheduleItem) => void;
+  /** 없으면 사진 썸네일의 X(삭제)를 그리지 않는다. */
+  onDeleteImage?: (image: TravelScheduleImage) => void;
 }) {
   // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
   const rows = toRows(sortByStartTime(day.items));
@@ -521,6 +551,7 @@ function DaySection({
             number={number}
             isLast={i === rows.length - 1}
             onMenu={onItemMenu ? () => onItemMenu(row.item) : undefined}
+            onDeleteImage={onDeleteImage}
           />
         );
       })}
@@ -561,12 +592,15 @@ function TimelineRow({
   number,
   isLast,
   onMenu,
+  onDeleteImage,
 }: {
   row: Row;
   number: number | null;
   isLast: boolean;
   /** 없으면 ⋮·길게 누르기 모두 비활성(다녀온 여행). */
   onMenu?: () => void;
+  /** 없으면 사진 썸네일의 X(삭제) 버튼을 그리지 않는다. */
+  onDeleteImage?: (image: TravelScheduleImage) => void;
 }) {
   const hasMenu = !!onMenu;
   return (
@@ -614,6 +648,15 @@ function TimelineRow({
           <PlaceCard item={row.item} hasMenu={hasMenu} />
         )}
 
+        {/* 이 일정에 붙인 사용자 사진들. 하차 줄은 승차 줄과 같은 항목이라 건너뛴다
+            (안 그러면 같은 사진이 두 번 나온다). */}
+        {row.t !== "alight" && (row.item.images?.length ?? 0) > 0 ? (
+          <SchedulePhotos
+            images={row.item.images ?? []}
+            onDelete={onDeleteImage}
+          />
+        ) : null}
+
         {/* 편집/삭제 진입점. 길게 누르기만으론 아무도 못 찾아서 ⋮ 를 항상 보여준다.
             카드 우측 상단에 얹고, 겹칠 수 있는 텍스트에는 MENU_INSET 만큼 여백을 준다. */}
         {onMenu ? (
@@ -639,6 +682,70 @@ function TimelineRow({
         ) : null}
       </Pressable>
     </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 일정에 붙인 사용자 사진 — 가로 스크롤 썸네일 + X(삭제)                  */
+/* ------------------------------------------------------------------ */
+const PHOTO = scale(64);
+const PHOTO_X = scale(18);
+
+function SchedulePhotos({
+  images,
+  onDelete,
+}: {
+  images: TravelScheduleImage[];
+  onDelete?: (image: TravelScheduleImage) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      // 부모가 길게 누르기(메뉴)를 받고 있어 가로 스크롤이 먹히도록 여기서 끊는다.
+      onStartShouldSetResponder={() => true}
+      contentContainerStyle={{
+        gap: scale(8),
+        paddingTop: verticalScale(8),
+        // X 버튼이 썸네일 위로 반쯤 나와 잘리지 않게.
+        paddingRight: scale(6),
+      }}
+    >
+      {images.map((image) => (
+        <View key={image.image_idx} style={{ width: PHOTO, height: PHOTO }}>
+          <Image
+            source={{ uri: image.url }}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: scale(8),
+              backgroundColor: CARD_BG,
+            }}
+            contentFit="cover"
+            transition={150}
+          />
+          {onDelete ? (
+            <Pressable
+              onPress={() => onDelete(image)}
+              hitSlop={8}
+              className="items-center justify-center rounded-full active:opacity-70"
+              style={{
+                position: "absolute",
+                top: -PHOTO_X / 3,
+                right: -PHOTO_X / 3,
+                width: PHOTO_X,
+                height: PHOTO_X,
+                backgroundColor: "rgba(0,0,0,0.6)",
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="사진 삭제"
+            >
+              <Feather name="x" size={moderateScale(11)} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
