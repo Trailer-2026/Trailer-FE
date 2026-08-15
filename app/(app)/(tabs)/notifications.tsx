@@ -565,10 +565,15 @@ function RidingDetail({
   // 새로고침만 쓴다 — 구독(폴링 유지)은 부모의 useScenicPolling 이 이미 하고 있다.
   const { refresh } = useScenicPolling();
 
+  // 직접 종료한 구간은 도착 시각 전이라도 자동으로 다시 켜지 않는다.
   const confirmStop = () =>
     Alert.alert("탑승을 종료할까요?", "실시간 풍경 알림이 멈춰요.", [
       { text: "취소", style: "cancel" },
-      { text: "종료", style: "destructive", onPress: stopRiding },
+      {
+        text: "종료",
+        style: "destructive",
+        onPress: () => stopRiding({ skipAuto: true }),
+      },
     ]);
 
   return (

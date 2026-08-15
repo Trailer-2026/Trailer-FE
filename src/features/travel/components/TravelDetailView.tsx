@@ -19,6 +19,7 @@ import PlayIcon from "@/src/components/icons/PlayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
 import { Text } from "@/src/components/Text";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
+import LocationPermissionPrompt from "@/src/features/scenic/components/LocationPermissionPrompt";
 import { HEADER_HEIGHT, HEADER_TOP_GAP } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -173,8 +174,12 @@ export default function TravelDetailView({
           actionKind={completed ? "video" : "ticket"}
         />
 
-        {/* 실시간 창밖 풍경 — 탑승 시작/종료와 폴링 결과. 열차 항목이 없으면 안 뜬다. */}
+        {/* 실시간 창밖 풍경 — 탑승 상태 표시. 열차 항목이 없으면 안 뜬다. */}
         {completed ? null : <LiveScenerySection detail={data} />}
+
+        {/* 열차 출발 시각에 시스템 창이 불쑥 뜨지 않도록 여기서 미리 권한을 받아둔다.
+            이미 허용됐거나 앱 실행 중 한 번 물어봤으면 아무것도 렌더하지 않는다. */}
+        {completed ? null : <LocationPermissionPrompt />}
 
         <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(4) }}>
           {data.days.length === 0 ? (

@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 
+import AutoBoarding from "@/src/features/scenic/components/AutoBoarding";
 import RenderTracker from "@/src/features/video/components/RenderTracker";
 
 export default function AppLayout() {
@@ -16,6 +17,8 @@ export default function AppLayout() {
       </Stack>
       {/* 진행 중 렌더를 앱 어느 화면에서든 추적 → 완료 시 상단 배너 */}
       <RenderTracker />
+      {/* 열차 출발 시각이 되면 풍경 알림 자동 시작, 도착하면 자동 종료 */}
+      <AutoBoarding />
     </>
   );
 }
