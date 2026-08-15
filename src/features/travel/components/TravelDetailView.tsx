@@ -108,6 +108,14 @@ export default function TravelDetailView({
    */
   const [photoTarget, setPhotoTarget] = useState<number | null>(null);
   const addImages = useAddTravelImages();
+  /**
+   * 업로드 중인 사진 — 그 일정의 썸네일 줄에 흐린 미리보기 + 스피너로 먼저 보여준다.
+   * 서버 응답을 기다리는 동안 아무 반응이 없으면 눌린 건지 알 수 없다.
+   */
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    scheduleIdx: number;
+    uri: string;
+  } | null>(null);
 
   const onPickPhoto = async (source: MediaSource) => {
     const scheduleIdx = photoTarget;
@@ -117,11 +125,14 @@ export default function TravelDetailView({
     const photo = await pickScenicPhoto(source, { requireLocation: false });
     if (!photo) return; // 취소·권한 거부
 
+    setPendingPhoto({ scheduleIdx, uri: photo.uri });
     addImages.mutate(
       { travelIdx, photos: [photo], scheduleIdx },
       {
         onError: (e) =>
           Alert.alert("사진 등록 실패", describeScheduleError(e)),
+        // 성공이든 실패든 미리보기를 걷는다(성공 시 갱신된 목록이 대신 그려진다).
+        onSettled: () => setPendingPhoto(null),
       },
     );
   };
@@ -259,6 +270,7 @@ export default function TravelDetailView({
                 }
                 onDeleteImage={completed ? undefined : confirmDeleteImage}
                 onAddPhoto={completed ? undefined : setPhotoTarget}
+                pendingPhoto={pendingPhoto}
               />
             ))
           )}
@@ -542,6 +554,7 @@ function DaySection({
   onItemMenu,
   onDeleteImage,
   onAddPhoto,
+  pendingPhoto,
 }: {
   day: TravelDay;
   /** 없으면 '일정 추가' 버튼을 그리지 않는다(다녀온 여행). */
@@ -552,6 +565,8 @@ function DaySection({
   onDeleteImage?: (image: TravelScheduleImage) => void;
   /** 썸네일 옆 + 로 사진 추가. 없으면 그리지 않는다. */
   onAddPhoto?: (scheduleIdx: number) => void;
+  /** 업로드 중인 사진(해당 일정에만 미리보기로 붙는다). */
+  pendingPhoto?: { scheduleIdx: number; uri: string } | null;
 }) {
   // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
   const rows = toRows(sortByStartTime(day.items));
@@ -600,6 +615,11 @@ function DaySection({
             onAddPhoto={
               onAddPhoto ? () => onAddPhoto(row.item.schedule_idx) : undefined
             }
+            pendingPhotoUri={
+              pendingPhoto?.scheduleIdx === row.item.schedule_idx
+                ? pendingPhoto.uri
+                : null
+            }
           />
         );
       })}
@@ -642,6 +662,7 @@ function TimelineRow({
   onMenu,
   onDeleteImage,
   onAddPhoto,
+  pendingPhotoUri,
 }: {
   row: Row;
   number: number | null;
@@ -652,6 +673,8 @@ function TimelineRow({
   onDeleteImage?: (image: TravelScheduleImage) => void;
   /** 썸네일 옆 + 버튼. 없으면 그리지 않는다. */
   onAddPhoto?: () => void;
+  /** 이 일정에 업로드 중인 사진의 로컬 URI. 없으면 null. */
+  pendingPhotoUri?: string | null;
 }) {
   const hasMenu = !!onMenu;
   return (
@@ -701,11 +724,13 @@ function TimelineRow({
 
         {/* 이 일정에 붙인 사용자 사진들. 하차 줄은 승차 줄과 같은 항목이라 건너뛴다
             (안 그러면 같은 사진이 두 번 나온다). */}
-        {row.t !== "alight" && (row.item.images?.length ?? 0) > 0 ? (
+        {row.t !== "alight" &&
+        ((row.item.images?.length ?? 0) > 0 || pendingPhotoUri) ? (
           <SchedulePhotos
             images={row.item.images ?? []}
             onDelete={onDeleteImage}
             onAdd={onAddPhoto}
+            pendingUri={pendingPhotoUri}
           />
         ) : null}
 
@@ -747,11 +772,14 @@ function SchedulePhotos({
   images,
   onDelete,
   onAdd,
+  pendingUri,
 }: {
   images: TravelScheduleImage[];
   onDelete?: (image: TravelScheduleImage) => void;
   /** 없으면 + 타일을 그리지 않는다(다녀온 여행). */
   onAdd?: () => void;
+  /** 업로드 중인 사진의 로컬 URI — 흐리게 + 스피너로 먼저 보여준다. */
+  pendingUri?: string | null;
 }) {
   return (
     <ScrollView
@@ -800,6 +828,28 @@ function SchedulePhotos({
           ) : null}
         </View>
       ))}
+
+      {/* 업로드 중 — 방금 고른 사진을 흐리게 깔고 그 위에 스피너를 돌린다. */}
+      {pendingUri ? (
+        <View style={{ width: PHOTO, height: PHOTO }}>
+          <Image
+            source={{ uri: pendingUri }}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: scale(8),
+              opacity: 0.4,
+            }}
+            contentFit="cover"
+          />
+          <View
+            className="absolute inset-0 items-center justify-center"
+            style={{ borderRadius: scale(8), backgroundColor: "rgba(0,0,0,0.15)" }}
+          >
+            <ActivityIndicator color={ACCENT} />
+          </View>
+        </View>
+      ) : null}
 
       {/* 사진이 이미 있을 때의 추가 진입점 — ⋮ 메뉴까지 안 가도 되게 옆에 둔다. */}
       {onAdd ? (
