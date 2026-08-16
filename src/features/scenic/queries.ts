@@ -22,6 +22,19 @@ import { useScenicStore } from "./store";
 export const SCENIC_POLL_INTERVAL_MS = MOCK_LOCATION ? 2 * 1000 : 3 * 60 * 1000;
 
 /**
+ * 타이머가 도는 주기. **호출 주기가 아니다** — 매 틱마다 runTick 이 돌지만,
+ * 실제 호출은 아래 (4) 최소 간격 조건을 통과할 때만 나간다.
+ *
+ * 간격만큼 길게 잡으면 한 번 실패했을 때 다음 시도까지 3분을 기다리게 된다.
+ * 위치 획득 실패(GPS 미확보·터널)는 몇 초 뒤면 풀리는 일이 흔한데 화면에는
+ * 에러가 3분간 그대로 남는다. 그래서 틱은 짧게 돌리고 억제는 조건에 맡긴다.
+ *
+ * ⚠️ 이 값을 줄여도 호출 빈도는 늘지 않는다. 마지막 **성공** 시각(lastCalledAt)
+ *    으로 막기 때문에, 실패해서 lastCalledAt 이 안 찍혔을 때만 매 틱 재시도된다.
+ */
+const TICK_MS = MOCK_LOCATION ? 2 * 1000 : 10 * 1000;
+
+/**
  * 이 거리(m) 미만으로 움직였으면 호출을 건너뛴다(정차·미이동 시 알림 스팸 방지).
  * 목업 모드에선 한 틱 이동량이 이 값에 걸려 조용히 스킵되는 일이 없도록 0 으로 둔다.
  */
@@ -73,7 +86,8 @@ let appStateSub: ReturnType<typeof AppState.addEventListener> | null = null;
  *  1) 세션 없음(탑승 종료)
  *  2) 이미 조회 중
  *  3) 앱이 백그라운드 — 포그라운드 복귀 시 재개
- *  4) 직전 호출로부터 3분이 지나지 않음(화면 재진입·포그라운드 복귀 중복 방지)
+ *  4) 직전 **성공** 호출로부터 3분이 지나지 않음(화면 재진입·포그라운드 복귀 중복 방지).
+ *     실패했을 때는 이 조건이 비어 있어 TICK_MS(10초)마다 다시 시도한다.
  *  5) 직전 **호출 지점** 대비 이동이 500m 미만
  */
 async function runTick(force = false) {
@@ -86,7 +100,9 @@ async function runTick(force = false) {
   if (!force && AppState.currentState !== "active") return; // (3) 백그라운드
 
   const now = Date.now();
-  // (4) 최소 간격 — 화면 재진입/포그라운드 복귀로 인한 중복 호출 차단
+  // (4) 최소 간격 — 화면 재진입/포그라운드 복귀로 인한 중복 호출 차단.
+  //     lastCalledAt 은 **호출에 성공했을 때만** 찍히므로(markCalled), 위치 획득이나
+  //     조회가 실패한 동안에는 이 조건에 걸리지 않고 매 틱(TICK_MS) 재시도된다.
   if (
     !force &&
     lastCalledAt !== null &&
@@ -156,7 +172,8 @@ function startPolling() {
   // 탑승 시작 시에는 스토어가 초기화되어 lastCalledAt 이 null → 즉시 1회 호출된다.
   void runTick();
 
-  timer = setInterval(() => void runTick(), SCENIC_POLL_INTERVAL_MS);
+  // 틱은 짧게, 억제는 runTick 의 (4) 조건이 한다(TICK_MS 주석 참고).
+  timer = setInterval(() => void runTick(), TICK_MS);
   appStateSub = AppState.addEventListener("change", (state) => {
     if (state === "active") void runTick(); // 백그라운드 동안 건너뛴 주기 보충
   });
