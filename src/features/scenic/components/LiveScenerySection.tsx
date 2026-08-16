@@ -21,8 +21,9 @@ const BORDER = "#E5E7EB";
  * **탑승 시작 버튼은 없다.** 열차 출발 시각이 되면 AutoBoarding 이 알아서 켜고,
  * 도착 시각이 지나면 끈다. 여기서 사용자가 할 일은 중간에 끄는 것뿐이다.
  *
- * **실시간 풍경 결과도 여기서 보여주지 않는다.** 관광지 목록·기준 시각·새로고침은
- * 알림 탭의 풍경알림 카드 한 곳에서만 그린다(폴링 구독도 그쪽에만 있다).
+ * **실시간 관광지 목록은 여기가 아니라 타임라인 안에 그린다** — 승차 ↔ 하차 사이의
+ * ScenicTimelineRow. 창밖을 보는 사람에게는 "지금 이 구간의 어디쯤"이 곧 위치라,
+ * 목록도 그 자리에 있어야 읽힌다. 이 섹션은 탑승 상태와 종료 버튼만 맡는다.
  */
 export default function LiveScenerySection({
   detail,
@@ -40,7 +41,7 @@ export default function LiveScenerySection({
         className="text-gray-400"
         style={{ fontSize: moderateScale(12), lineHeight: moderateScale(18) }}
       >
-        열차 출발 시각이 되면 창밖으로 보이는 관광지를 알림 탭에서 알려드려요.
+        열차 출발 시각이 되면 창밖으로 보이는 관광지를 일정 사이에 보여드려요.
       </Text>
     </Section>
   );
@@ -49,9 +50,9 @@ export default function LiveScenerySection({
 /* ------------------------------------------------------------------ */
 /* 탑승 중 — 상태 + 탑승 종료                                            */
 /*                                                                     */
-/* ⚠️ 여기서는 실시간 결과(관광지 top3·기준 시각·새로고침)를 그리지 않는다.  */
-/*    풍경 알림을 보여주는 곳은 알림 탭의 풍경알림 카드 한 곳뿐이다.        */
-/*    폴링도 걸지 않는다 — 이 화면이 구독하면 호출이 그만큼 늘어난다.       */
+/* ⚠️ 여기서는 실시간 결과(관광지 top3·기준 시각)를 그리지 않는다.          */
+/*    목록은 타임라인의 승차 ↔ 하차 사이(ScenicTimelineRow)에서만 그린다.   */
+/*    폴링도 걸지 않는다 — 여기서 또 구독하면 호출이 그만큼 늘어난다.       */
 /* ------------------------------------------------------------------ */
 function RidingPanel() {
   const session = useScenicStore((s) => s.session);
@@ -129,7 +130,7 @@ function RidingPanel() {
           lineHeight: moderateScale(18),
         }}
       >
-        창밖으로 보이는 관광지는 알림 탭에서 알려드려요.
+        창밖으로 보이는 관광지는 아래 승차 일정에 이어서 보여드려요.
       </Text>
     </Section>
   );

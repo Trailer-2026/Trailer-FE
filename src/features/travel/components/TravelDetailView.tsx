@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import MediaSourceSheet, {
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
 import LocationPermissionPrompt from "@/src/features/scenic/components/LocationPermissionPrompt";
+import ScenicTimelineRow from "@/src/features/scenic/components/ScenicTimelineRow";
 import { HEADER_HEIGHT, HEADER_TOP_GAP } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -605,22 +606,33 @@ function DaySection({
       {rows.map((row, i) => {
         const number = row.t === "alight" ? null : ++seq;
         return (
-          <TimelineRow
-            key={`${row.item.schedule_idx}-${row.t}`}
-            row={row}
-            number={number}
-            isLast={i === rows.length - 1}
-            onMenu={onItemMenu ? () => onItemMenu(row.item) : undefined}
-            onDeleteImage={onDeleteImage}
-            onAddPhoto={
-              onAddPhoto ? () => onAddPhoto(row.item.schedule_idx) : undefined
-            }
-            pendingPhotoUri={
-              pendingPhoto?.scheduleIdx === row.item.schedule_idx
-                ? pendingPhoto.uri
-                : null
-            }
-          />
+          <Fragment key={`${row.item.schedule_idx}-${row.t}`}>
+            <TimelineRow
+              row={row}
+              number={number}
+              isLast={i === rows.length - 1}
+              onMenu={onItemMenu ? () => onItemMenu(row.item) : undefined}
+              onDeleteImage={onDeleteImage}
+              onAddPhoto={
+                onAddPhoto ? () => onAddPhoto(row.item.schedule_idx) : undefined
+              }
+              pendingPhotoUri={
+                pendingPhoto?.scheduleIdx === row.item.schedule_idx
+                  ? pendingPhoto.uri
+                  : null
+              }
+            />
+            {/* 탑승 중인 구간이면 승차 ↔ 하차 사이에 실시간 창밖 풍경을 끼운다.
+                탑승 중이 아니면 컴포넌트가 스스로 null 을 돌려준다. */}
+            {row.t === "board" ? (
+              <ScenicTimelineRow
+                scheduleIdx={row.item.schedule_idx}
+                railWidth={RAIL_W}
+                railGap={RAIL_GAP}
+                railColor={RAIL_LINE}
+              />
+            ) : null}
+          </Fragment>
         );
       })}
 
