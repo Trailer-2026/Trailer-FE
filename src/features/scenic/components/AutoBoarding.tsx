@@ -9,7 +9,7 @@ import {
   ensureForegroundLocationPermission,
   resetMockLocation,
 } from "../location";
-import { useMinuteTick } from "../queries";
+import { useMinuteTick, useScenicPolling } from "../queries";
 import { collectTrainSegments, findActiveSegment } from "../segments";
 import { useScenicStore } from "../store";
 
@@ -93,6 +93,12 @@ export default function AutoBoarding() {
     startRiding,
     stopRiding,
   ]);
+
+  // 세션을 켜는 쪽이 폴링도 책임진다. 알림 탭에 두면 탭이 lazy mount 라
+  // 사용자가 그 탭을 한 번도 열지 않는 동안 타이머가 아예 안 돌아 푸시가 0건이 된다.
+  // 이 컴포넌트는 앱 루트에 항상 마운트돼 있어 어느 화면을 보든 폴링이 유지된다.
+  // (세션이 없으면 훅이 알아서 쉰다)
+  useScenicPolling();
 
   return null;
 }
