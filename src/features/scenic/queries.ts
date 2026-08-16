@@ -6,6 +6,7 @@ import { describeScenicError } from "./errors";
 import { haversineMeters } from "./geo";
 import {
   MOCK_LOCATION,
+  MOCK_MANUAL,
   MOCK_STATIONS,
   ensureForegroundLocationPermission,
   getCurrentLatLng,
@@ -32,7 +33,7 @@ export const SCENIC_POLL_INTERVAL_MS = MOCK_LOCATION ? 2 * 1000 : 3 * 60 * 1000;
  * ⚠️ 이 값을 줄여도 호출 빈도는 늘지 않는다. 마지막 **성공** 시각(lastCalledAt)
  *    으로 막기 때문에, 실패해서 lastCalledAt 이 안 찍혔을 때만 매 틱 재시도된다.
  */
-const TICK_MS = MOCK_LOCATION ? 2 * 1000 : 10 * 1000;
+const TICK_MS = MOCK_LOCATION ? (MOCK_MANUAL ? 60 * 60 * 1000 : 2 * 1000) : 10 * 1000;
 
 /**
  * 이 거리(m) 미만으로 움직였으면 호출을 건너뛴다(정차·미이동 시 알림 스팸 방지).

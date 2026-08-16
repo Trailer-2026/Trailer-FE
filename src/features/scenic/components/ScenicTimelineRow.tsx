@@ -1,13 +1,18 @@
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 import { formatBasedAt } from "../format";
+import { MOCK_LOCATION, MOCK_MANUAL } from "../location";
+import { useScenicPolling } from "../queries";
 import { useScenicStore } from "../store";
 import SpotCard from "./SpotCard";
 
 const SIDE_ACCENT = "#668DFF";
+
+/** 목업 좌표를 손으로 한 칸씩 밀어보는 개발용 버튼을 그릴지. */
+const SHOW_MOCK_STEP_BUTTON = __DEV__ && MOCK_LOCATION && MOCK_MANUAL;
 
 /**
  * 여행 상세 타임라인의 승차 ↔ 하차 사이에 끼는 실시간 창밖 풍경 목록.
@@ -36,6 +41,9 @@ export default function ScenicTimelineRow({
   const loading = useScenicStore((s) => s.loading);
   const error = useScenicStore((s) => s.error);
   const hasNewSpots = useScenicStore((s) => s.hasNewSpots);
+  // 이미 AutoBoarding 이 구독 중이라 여기서 훅을 써도 타이머는 하나뿐이다
+  // (queries.ts 의 subscribers). refresh 는 간격·이동거리 조건을 무시하고 즉시 호출한다.
+  const { refresh } = useScenicPolling();
 
   if (!riding) return null;
 
@@ -79,6 +87,10 @@ export default function ScenicTimelineRow({
         </View>
 
         <Body error={error} result={result} hasNewSpots={hasNewSpots} />
+
+        {SHOW_MOCK_STEP_BUTTON ? (
+          <MockStepButton onPress={refresh} disabled={loading} />
+        ) : null}
       </View>
     </View>
   );
@@ -114,6 +126,46 @@ function Body({
         />
       ))}
     </View>
+  );
+}
+
+/**
+ * 개발용 — 누를 때마다 목업 좌표가 노선을 따라 한 칸(약 1km) 전진하고 즉시 재조회한다.
+ * 좌표를 미는 주체는 location.ts 의 getCurrentLatLng 이라, 여기서는 조회만 시키면 된다.
+ * 릴리스 빌드에는 __DEV__ 가드로 아예 포함되지 않는다.
+ */
+function MockStepButton({
+  onPress,
+  disabled,
+}: {
+  onPress: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      className="self-start active:opacity-70"
+      style={{
+        marginTop: verticalScale(8),
+        paddingHorizontal: scale(12),
+        paddingVertical: verticalScale(7),
+        borderRadius: 999,
+        borderWidth: 1,
+        borderStyle: "dashed",
+        borderColor: SIDE_ACCENT,
+        opacity: disabled ? 0.5 : 1,
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="목업 위치 한 칸 이동"
+    >
+      <Text
+        className="font-semibold"
+        style={{ fontSize: moderateScale(11), color: SIDE_ACCENT }}
+      >
+        [DEV] 다음 위치로 이동
+      </Text>
+    </Pressable>
   );
 }
 
