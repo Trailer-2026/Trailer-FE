@@ -130,10 +130,10 @@ async function runTick(force = false) {
       return;
     }
 
-    // 목업 모드에선 구간도 덮어쓴다 — 목업 좌표(오송역 부근)와 맞는 구간이어야
-    // 결과가 나오므로, 실제 여행 일정이 어떤 구간이든 무시한다.
-    const fromStation = MOCK_LOCATION ? MOCK_STATIONS.from : session.fromStation;
-    const toStation = MOCK_LOCATION ? MOCK_STATIONS.to : session.toStation;
+    // 목업 노선이 역명까지 덮어쓰는 경우에만 세션 값을 무시한다(location.ts 의
+    // MOCK_ROUTE 참고). null 이면 실제 여행 구간 그대로 질의한다.
+    const fromStation = MOCK_STATIONS?.from ?? session.fromStation;
+    const toStation = MOCK_STATIONS?.to ?? session.toStation;
 
     const res = await getNearbyScenicSpots({
       lat: here.lat,
