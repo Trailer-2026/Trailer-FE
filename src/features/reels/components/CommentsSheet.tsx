@@ -194,6 +194,9 @@ export default function CommentsSheet({
           // 다른 댓글을 지운 경우엔 진행 중인 수정을 건드리지 않는다.
           onSuccess: () => {
             if (editing?.comment_idx === comment.comment_idx) cancelEdit();
+            setReplyTo((current) =>
+              current?.parentIdx === comment.comment_idx ? null : current,
+            );
           },
           onError: (err) =>
             notify({ title: "삭제 실패", message: describeApiError(err) }),

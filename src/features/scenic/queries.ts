@@ -93,8 +93,15 @@ let appStateSub: ReturnType<typeof AppState.addEventListener> | null = null;
  */
 async function runTick(force = false) {
   // 최신 상태를 렌더와 무관하게 읽는다.
-  const { session, lastPosition, lastCalledAt, markCalled, setResult, setStatus } =
-    useScenicStore.getState();
+  const {
+    session,
+    lastPosition,
+    lastCalledAt,
+    error,
+    markCalled,
+    setResult,
+    setStatus,
+  } = useScenicStore.getState();
 
   if (!session) return; // (1) 세션 종료
   if (inFlight) return; // (2)
@@ -106,6 +113,7 @@ async function runTick(force = false) {
   //     조회가 실패한 동안에는 이 조건에 걸리지 않고 매 틱(TICK_MS) 재시도된다.
   if (
     !force &&
+    error === null &&
     lastCalledAt !== null &&
     now - lastCalledAt < SCENIC_POLL_INTERVAL_MS - CALL_GUARD_SLACK_MS
   ) {
@@ -125,6 +133,7 @@ async function runTick(force = false) {
     //     갱신해버리면 천천히 이동할 때 기준점이 따라와 영영 임계값을 못 넘긴다.
     if (
       !force &&
+      error === null &&
       lastPosition &&
       haversineMeters(lastPosition, here) < SCENIC_MIN_MOVE_METERS
     ) {

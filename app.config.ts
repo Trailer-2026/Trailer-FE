@@ -94,15 +94,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         android: {
           extraMavenRepos: ["https://devrepo.kakao.com/nexus/content/groups/public/"],
-          // 추천 API 응답의 place/lodging image_url 이 http:// 스킴으로 오는 경우가 많아
-          // 안드로이드 cleartext 차단을 풀어준다. 실패해도 RemoteImage 가 placeholder 로 대체.
-          //
-          // ⚠️ 이건 모든 도메인에 평문 HTTP 를 허용한다(감사 A7). 이미지 URL 은 이제
-          // utils/url.ts 의 toHttps 로 https 로 올려 요청하므로, 실기기에서 관광지·
-          // 숙소 이미지가 정상적으로 뜨는 것을 확인하면 이 옵션을 지워야 한다.
-          // expo-build-properties 에는 networkSecurityConfig 옵션이 없어서
-          // 도메인 allowlist 를 쓰려면 별도 config plugin 을 만들어야 한다.
-          usesCleartextTraffic: true,
         },
       },
     ],
