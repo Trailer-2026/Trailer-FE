@@ -85,7 +85,6 @@ export default function ReelsStudioScreen() {
    */
   const {
     data: videoInfo,
-    isLoading: urlLoading,
     isError: urlFailed,
     error: urlError,
   } = useReelsVideoUrl(reelsIdx);
@@ -429,6 +428,20 @@ export default function ReelsStudioScreen() {
     );
   }
 
+  // 소유 확인이 끝나기 전에는 편집 UI 를 그리지 않는다. 여기서 통과시키면
+  // is_mine 이 오기 전에 제목 수정 같은 편집 동작을 누를 수 있다.
+  if (videoInfo == null) {
+    return (
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-black"
+        edges={["top", "bottom"]}
+      >
+        <StatusBar style="light" />
+        <ActivityIndicator color="#FFFFFF" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <StatusBar style="light" />
@@ -554,8 +567,6 @@ export default function ReelsStudioScreen() {
               </Text>
             </Pressable>
           </View>
-        ) : urlLoading ? (
-          <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text className="text-gray-400" style={{ fontSize: moderateScale(13) }}>
             영상 주소를 받지 못했어요.
