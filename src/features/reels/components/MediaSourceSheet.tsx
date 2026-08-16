@@ -1,4 +1,5 @@
 import { Modal, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -25,6 +26,7 @@ export default function MediaSourceSheet({
   onSelect: (source: MediaSource) => void;
   onClose: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={visible}
@@ -44,7 +46,7 @@ export default function MediaSourceSheet({
             borderTopLeftRadius: scale(16),
             borderTopRightRadius: scale(16),
             paddingTop: verticalScale(16),
-            paddingBottom: verticalScale(24),
+            paddingBottom: insets.bottom + verticalScale(12),
           }}
         >
           <Text
