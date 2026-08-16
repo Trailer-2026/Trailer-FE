@@ -14,6 +14,17 @@ import { openNotificationTarget, targetFromFcmData } from "./routing";
  */
 
 /**
+ * 개발 빌드에서만 찍는 로그.
+ *
+ * 알림 페이로드에는 제목·본문 같은 사용자 콘텐츠가 그대로 들어 있어서,
+ * release 빌드에서 찍으면 logcat 에 평문으로 남는다(같은 기기의 다른 앱이나
+ * USB 디버깅으로 읽힌다). 디버깅용으로는 필요하니 지우지 않고 가둔다.
+ */
+function devLog(...args: unknown[]) {
+  if (__DEV__) console.log(...args);
+}
+
+/**
  * 포그라운드(앱이 화면에 켜져 있는 상태) 메시지 수신.
  * Android는 포그라운드일 때 시스템 알림이 자동으로 뜨지 않으므로,
  * 필요하면 여기서 인앱 배너/토스트를 직접 띄운다.
@@ -21,7 +32,7 @@ import { openNotificationTarget, targetFromFcmData } from "./routing";
  */
 export function setupForegroundHandler(): () => void {
   return onMessage(getMessaging(getApp()), async (remoteMessage) => {
-    console.log("[fcm] 포그라운드 수신:", JSON.stringify(remoteMessage));
+    devLog("[fcm] 포그라운드 수신:", JSON.stringify(remoteMessage));
     // TODO: 인앱 알림 배너/토스트 표시 (notifee 등으로 추후 확장)
   });
 }
@@ -37,17 +48,14 @@ export function setupNotificationOpenHandlers(): () => void {
 
   // 백그라운드 상태에서 알림 탭 → 앱 포그라운드로
   const unsubscribe = onNotificationOpenedApp(messaging, (remoteMessage) => {
-    console.log(
-      "[fcm] 백그라운드에서 알림 탭:",
-      JSON.stringify(remoteMessage),
-    );
+    devLog("[fcm] 백그라운드에서 알림 탭:", JSON.stringify(remoteMessage));
     openNotificationTarget(targetFromFcmData(remoteMessage?.data));
   });
 
   // 종료 상태에서 알림 탭 → 앱 실행 (실행 시 1회 확인)
   getInitialNotification(messaging).then((remoteMessage) => {
     if (!remoteMessage) return;
-    console.log(
+    devLog(
       "[fcm] 종료 상태에서 알림 탭으로 실행:",
       JSON.stringify(remoteMessage),
     );
