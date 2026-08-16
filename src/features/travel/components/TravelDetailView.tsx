@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,11 +25,6 @@ import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import LiveScenerySection from "@/src/features/scenic/components/LiveScenerySection";
 import LocationPermissionPrompt from "@/src/features/scenic/components/LocationPermissionPrompt";
 import ScenicTimelineRow from "@/src/features/scenic/components/ScenicTimelineRow";
-import {
-  findCurrentScheduleItem,
-  findNearestScheduleItem,
-} from "@/src/features/scenic/segments";
-import { useScenicStore } from "@/src/features/scenic/store";
 import { HEADER_HEIGHT, HEADER_TOP_GAP } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -66,63 +61,6 @@ const PLACEHOLDER = require("../../../../assets/images/Main1.png");
 const RAIL_W = scale(30);
 const RAIL_GAP = scale(12);
 
-/** 자동 스크롤이 대상 위에 남겨 두는 여백 — 앞 항목이 살짝 보여야 맥락이 읽힌다. */
-const FOCUS_TOP_GAP = verticalScale(90);
-
-/**
- * 진행 중인 일정으로 한 번 자동 스크롤한다.
- *
- * 여행 중에 앱을 열면 일정표 맨 위(Day 1 아침)가 뜨는데, 정작 보고 싶은 건
- * "지금 어디" 다. 첫 렌더에서 한 번만 내려주고, 그 뒤로는 사용자의 스크롤을
- * 건드리지 않는다(당겨서 새로고침이나 사진 추가로 다시 튀면 오히려 방해된다).
- *
- * 대상 우선순위: 탑승 중인 열차 구간 → 진행 중인 일정 → 시각이 가장 가까운 일정.
- * 다녀온 여행(COMPLETED)은 '지금'이 없으므로 대상이 없다.
- */
-function useFocusScroll(detail: TravelDetail | undefined) {
-  const scrollRef = useRef<ScrollView>(null);
-  const contentRef = useRef<View>(null);
-  /** 이미 한 번 내렸는지. 리렌더마다 다시 스크롤하지 않게 막는다. */
-  const done = useRef(false);
-
-  const session = useScenicStore((s) => s.session);
-
-  const scheduleIdx = useMemo(() => {
-    if (!detail || detail.status === "COMPLETED") return null;
-    if (session?.travelIdx === detail.travel_idx) return session.scheduleIdx;
-    const now = new Date();
-    return (
-      findCurrentScheduleItem(detail, now)?.schedule_idx ??
-      findNearestScheduleItem(detail, now)?.schedule_idx ??
-      null
-    );
-  }, [detail, session]);
-
-  const register = useCallback((node: View | null) => {
-    if (!node || done.current) return;
-    done.current = true;
-    // ref 콜백은 레이아웃이 확정되기 전에 불릴 수 있어 measureLayout 이 0 을 준다.
-    // 한 프레임 뒤로 미뤄 배치가 끝난 좌표를 읽는다.
-    requestAnimationFrame(() => {
-      const content = contentRef.current;
-      if (!content) return;
-      node.measureLayout(
-        content,
-        (_x, y) => {
-          scrollRef.current?.scrollTo({
-            y: Math.max(0, y - FOCUS_TOP_GAP),
-            animated: true,
-          });
-        },
-        // 측정 실패(언마운트 등)는 그냥 넘어간다 — 스크롤이 안 되는 게 전부다.
-        () => {},
-      );
-    });
-  }, []);
-
-  return { scrollRef, contentRef, scheduleIdx, register };
-}
-
 /**
  * 여행 1건의 일정표 상세(히어로 + 일자별 타임라인).
  * 일정 탭 '예정된 여행'(인라인)과 다녀온 여행 상세 화면(푸시)이 공통으로 사용한다.
@@ -142,7 +80,6 @@ export default function TravelDetailView({
 }) {
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
   const insets = useSafeAreaInsets();
-  const focus = useFocusScroll(data);
 
   // 추가 모달 상태 — kind 로 장소/티켓 폼이 바로 열린다(중간 선택 시트 없음).
   // dayNo 는 장소 폼의 날짜 프리필용.
@@ -283,14 +220,10 @@ export default function TravelDetailView({
   return (
     <>
       <ScrollView
-        ref={focus.scrollRef}
         className="flex-1 bg-white"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: verticalScale(32) + insets.bottom }}
       >
-        {/* measureLayout 의 기준이 되는 콘텐츠 루트. collapsable=false 가 없으면
-            안드로이드가 이 View 를 최적화로 없애 버려서 측정 대상이 사라진다. */}
-        <View ref={focus.contentRef} collapsable={false}>
         <Hero
           travel={data}
           coverUri={cover}
@@ -339,12 +272,9 @@ export default function TravelDetailView({
                 onDeleteImage={completed ? undefined : confirmDeleteImage}
                 onAddPhoto={completed ? undefined : setPhotoTarget}
                 pendingPhoto={pendingPhoto}
-                focusScheduleIdx={focus.scheduleIdx}
-                onFocusRow={focus.register}
               />
             ))
           )}
-        </View>
         </View>
       </ScrollView>
 
@@ -626,8 +556,6 @@ function DaySection({
   onDeleteImage,
   onAddPhoto,
   pendingPhoto,
-  focusScheduleIdx,
-  onFocusRow,
 }: {
   day: TravelDay;
   /** 없으면 '일정 추가' 버튼을 그리지 않는다(다녀온 여행). */
@@ -640,9 +568,6 @@ function DaySection({
   onAddPhoto?: (scheduleIdx: number) => void;
   /** 업로드 중인 사진(해당 일정에만 미리보기로 붙는다). */
   pendingPhoto?: { scheduleIdx: number; uri: string } | null;
-  /** 화면 진입 시 자동으로 스크롤할 일정. null 이면 아무 행도 등록하지 않는다. */
-  focusScheduleIdx?: number | null;
-  onFocusRow?: (node: View | null) => void;
 }) {
   // 시간순으로 보여준다(서버 sequence 순 대신). train 은 승차/하차가 한 묶음으로 이동.
   const rows = toRows(sortByStartTime(day.items));
@@ -695,14 +620,6 @@ function DaySection({
                 pendingPhoto?.scheduleIdx === row.item.schedule_idx
                   ? pendingPhoto.uri
                   : null
-              }
-              // 열차는 승차/하차 두 행으로 펼쳐지므로 승차 행만 등록한다
-              // (하차 행까지 등록하면 나중 것이 먼저 것을 덮어쓴다).
-              focusRef={
-                row.t !== "alight" &&
-                focusScheduleIdx === row.item.schedule_idx
-                  ? onFocusRow
-                  : undefined
               }
             />
             {/* 탑승 중인 구간이면 승차 ↔ 하차 사이에 실시간 창밖 풍경을 끼운다.
@@ -758,7 +675,6 @@ function TimelineRow({
   onDeleteImage,
   onAddPhoto,
   pendingPhotoUri,
-  focusRef,
 }: {
   row: Row;
   number: number | null;
@@ -771,12 +687,10 @@ function TimelineRow({
   onAddPhoto?: () => void;
   /** 이 일정에 업로드 중인 사진의 로컬 URI. 없으면 null. */
   pendingPhotoUri?: string | null;
-  /** 자동 스크롤 대상일 때만 넘어온다 — 레이아웃이 끝나면 이 행의 위치를 알린다. */
-  focusRef?: (node: View | null) => void;
 }) {
   const hasMenu = !!onMenu;
   return (
-    <View style={{ flexDirection: "row" }} ref={focusRef} collapsable={false}>
+    <View style={{ flexDirection: "row" }}>
       {/* 레일 (번호 노드 + 연결선) */}
       <View style={{ width: RAIL_W, alignItems: "center", marginRight: RAIL_GAP }}>
         <View
