@@ -173,14 +173,24 @@ export default function FeedTab() {
   );
 
   // 공유/다운로드 —
-  // 추천 API 가 작성자 user_idx 를 주지 않아 내 영상 판별은 닉네임 비교로 한다.
-  // (닉네임이 겹치면 오판할 수 있지만, 다운로드 API 가 남의 릴스에 404 를 주므로 서버가 최종 방어)
   const { data: me } = useMyProfile();
   const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
 
+  /**
+   * 내 릴스인지 — 작성자 PK 로 판정한다.
+   *
+   * 추천 API 가 user_idx 를 아직 안 내려주는 경우가 있어(ReelsAuthor 주석 참고)
+   * 없을 때만 닉네임으로 대체한다. 단 user_idx 가 있는데 나와 다르면 그대로 남의
+   * 릴스다 — 여기서 닉네임으로 되돌아가면 같은 닉네임을 쓰는 사용자의 릴스를
+   * 내 것으로 오인하게 되므로 대체하지 않는다.
+   */
   const isMyReels = useCallback(
-    (reels: Reels) => !!me?.nickname && me.nickname === reels.author.name,
-    [me?.nickname],
+    (reels: Reels) => {
+      if (me == null) return false;
+      if (reels.author.user_idx != null) return reels.author.user_idx === me.user_idx;
+      return !!me.nickname && me.nickname === reels.author.name;
+    },
+    [me],
   );
 
   const onShare = useCallback(
