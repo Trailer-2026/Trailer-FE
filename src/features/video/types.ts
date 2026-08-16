@@ -60,6 +60,21 @@ export type ReelsUploadResponse = {
   thumbnail_url: string | null;
 };
 
+/**
+ * GET /api/videos/reels/{reels_idx}/url 의 data.
+ *
+ * 딥링크에 영상 주소를 직접 싣지 않기 위한 API — 링크는 reels_idx 만 들고 오고
+ * 앱이 그 값으로 재생 주소를 받는다. 외부에서 만든 링크로 임의의 영상을 편집
+ * 화면에 밀어 넣을 수 없게 하는 게 목적이다.
+ *
+ * 릴스는 공개 피드라 남의 릴스도 url 자체는 내려온다. is_mine 이 false 면
+ * 편집 화면을 열지 않는다(편집 API 는 본인 릴스에만 응답하고 그 외엔 404).
+ */
+export type ReelsVideoUrlResponse = {
+  url: string;
+  is_mine: boolean;
+};
+
 /** GET /api/videos/render/{reels_idx} 및 렌더 시작 응답의 data. */
 export type VideoRenderStatusResponse = {
   /** 릴스 PK — 진행률 조회·다운로드·편집 공용 키 */

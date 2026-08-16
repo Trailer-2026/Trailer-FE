@@ -97,10 +97,9 @@ export default function ReelsProgressScreen() {
   };
 
   // 완성된 영상 편집으로. replace 라 뒤로가기가 진행률 화면으로 돌아오지 않는다.
-  const goToStudio = (videoUrl: string) => {
-    router.replace(
-      `/reels/studio?reels_idx=${reelsIdx}&url=${encodeURIComponent(videoUrl)}`,
-    );
+  // 영상 주소는 넘기지 않는다 — 편집 화면이 reels_idx 로 직접 받아 온다.
+  const goToStudio = () => {
+    router.replace(`/reels/studio?reels_idx=${reelsIdx}`);
   };
 
   return (
@@ -265,7 +264,7 @@ function DoneState({
 }: {
   status: VideoRenderStatusResponse;
   onFeed: () => void;
-  onEdit: (videoUrl: string) => void;
+  onEdit: () => void;
 }) {
   const source = status.video_url ?? status.reels_url;
   // 완료 화면 진입 시 자동 재생(반복). 세로 영상이라 contain 으로 맞춘다.
@@ -301,7 +300,7 @@ function DoneState({
 
       <View className="w-full" style={{ gap: verticalScale(10) }}>
         {source ? (
-          <PrimaryButton label="영상 편집하기" onPress={() => onEdit(source)} />
+          <PrimaryButton label="영상 편집하기" onPress={onEdit} />
         ) : null}
         <SecondaryButton label="피드로 이동" onPress={onFeed} />
       </View>

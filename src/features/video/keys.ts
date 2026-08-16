@@ -7,4 +7,7 @@ export const videoKeys = {
   status: (reelsIdx: number) =>
     [...videoKeys.all, "status", reelsIdx] as const,
   bgm: () => [...videoKeys.all, "bgm"] as const,
+  /** 편집 화면이 여는 릴스의 재생 주소 + 소유 여부. */
+  reelsUrl: (reelsIdx: number) =>
+    [...videoKeys.all, "reels-url", reelsIdx] as const,
 };

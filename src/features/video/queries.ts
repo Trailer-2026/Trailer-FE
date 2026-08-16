@@ -8,6 +8,7 @@ import {
   cutVideoSection,
   deleteReels,
   getBgmTracks,
+  getReelsVideoUrl,
   getRenderStatus,
   insertImageClip,
   renderPhotosOrdered,
@@ -24,6 +25,26 @@ export function useBgmTracks() {
     queryKey: videoKeys.bgm(),
     queryFn: getBgmTracks,
     staleTime: 1000 * 60 * 30, // 30분
+  });
+}
+
+/**
+ * 편집 화면이 열 릴스의 재생 주소 + 소유 여부.
+ *
+ * 편집은 되돌릴 수 없으므로 캐시된 값을 재사용하지 않는다(staleTime 0) —
+ * 소유 판정이 낡은 채로 편집 화면이 열리면 안 된다. 404(없음/렌더 미완료)는
+ * 재시도 없이 바로 화면에 노출한다.
+ */
+export function useReelsVideoUrl(reelsIdx: number | null) {
+  return useQuery({
+    queryKey: videoKeys.reelsUrl(reelsIdx ?? -1),
+    queryFn: () => getReelsVideoUrl(reelsIdx!),
+    enabled: reelsIdx != null,
+    staleTime: 0,
+    retry: (failureCount, error) => {
+      if (isRenderNotFound(error)) return false;
+      return failureCount < 1;
+    },
   });
 }
 
