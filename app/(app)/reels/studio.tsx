@@ -33,6 +33,7 @@ import TitleInputCard from "@/src/features/video/components/TitleInputCard";
 import {
   useCutVideoSection,
   useInsertImageClip,
+  useReelsVideoUrl,
   useUpdateReelsTitle,
 } from "@/src/features/video/queries";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
@@ -67,9 +68,8 @@ const PREVIEW_BATCH = 12;
  * 편집이 끝나면 응답의 새 video_url 로 플레이어 소스를 갈아끼운다(릴스 PK 는 그대로).
  */
 export default function ReelsStudioScreen() {
-  const { reels_idx, url, title: titleParam } = useLocalSearchParams<{
+  const { reels_idx, title: titleParam } = useLocalSearchParams<{
     reels_idx?: string;
-    url?: string;
     title?: string;
   }>();
   const reelsIdx =
@@ -77,7 +77,24 @@ export default function ReelsStudioScreen() {
       ? Number(reels_idx)
       : null;
 
-  const [source, setSource] = useState<string | null>(url ?? null);
+  /**
+   * 재생 주소는 화면 파라미터로 받지 않고 reels_idx 로 서버에서 받아온다.
+   * 파라미터로 받으면 딥링크가 임의의 영상을 화면에 밀어 넣을 수 있는데,
+   * 편집은 화면에 보이는 영상이 아니라 reels_idx 가 가리키는 릴스에 적용되고
+   * 이전 영상을 지워 되돌릴 수 없다.
+   */
+  const {
+    data: videoInfo,
+    isLoading: urlLoading,
+    isError: urlFailed,
+    error: urlError,
+  } = useReelsVideoUrl(reelsIdx);
+  /** 남의 릴스 — 편집 API 가 404 를 주기 전에 화면 자체를 열지 않는다. */
+  const notMine = videoInfo != null && !videoInfo.is_mine;
+
+  /** 편집 성공으로 갈아끼운 영상. 없으면 서버가 준 원본을 쓴다. */
+  const [edited, setEdited] = useState<string | null>(null);
+  const source = notMine ? null : (edited ?? videoInfo?.url ?? null);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   // 구간 선택 모드 — 켜면 타임라인에 좌우로 늘리는 선택 영역이 나온다.
@@ -209,7 +226,7 @@ export default function ReelsStudioScreen() {
 
   /** 편집 성공 → 새 영상으로 교체하고 선택 모드·프레임 캐시를 초기화. */
   const applyEdited = (videoUrl: string) => {
-    setSource(videoUrl);
+    setEdited(videoUrl);
     setEditing(false);
     setPosition(0);
     setPreviewTime(0);
@@ -396,6 +413,22 @@ export default function ReelsStudioScreen() {
     router.dismissAll();
   };
 
+  // 편집을 열면 안 되는 경우는 화면 자체를 그리지 않는다. 훅은 위에서 모두 실행됐다.
+  if (reelsIdx == null || notMine || urlFailed) {
+    return (
+      <BlockedScreen
+        message={
+          reelsIdx == null
+            ? "잘못된 접근이에요. 내 릴스 목록에서 다시 열어 주세요."
+            : notMine
+              ? "다른 사람의 릴스는 편집할 수 없어요."
+              : describeApiError(urlError)
+        }
+        onClose={done}
+      />
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <StatusBar style="light" />
@@ -521,6 +554,8 @@ export default function ReelsStudioScreen() {
               </Text>
             </Pressable>
           </View>
+        ) : urlLoading ? (
+          <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text className="text-gray-400" style={{ fontSize: moderateScale(13) }}>
             영상 주소를 받지 못했어요.
@@ -626,6 +661,43 @@ export default function ReelsStudioScreen() {
         heading="제목 수정"
         submitting={updateTitle.isPending}
       />
+    </SafeAreaView>
+  );
+}
+
+/** 편집을 열 수 없을 때 보여주는 안내 — 편집 UI 를 아예 그리지 않는다. */
+function BlockedScreen({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) {
+  return (
+    <SafeAreaView
+      className="flex-1 items-center justify-center bg-black"
+      edges={["top", "bottom"]}
+    >
+      <StatusBar style="light" />
+      <Text
+        className="text-center text-gray-300"
+        style={{
+          paddingHorizontal: scale(32),
+          fontSize: moderateScale(14),
+          lineHeight: moderateScale(21),
+        }}
+      >
+        {message}
+      </Text>
+      <View style={{ marginTop: verticalScale(20), width: scale(160) }}>
+        <ActionButton
+          label="닫기"
+          color={ACCENT}
+          disabled={false}
+          loading={false}
+          onPress={onClose}
+        />
+      </View>
     </SafeAreaView>
   );
 }

@@ -9,6 +9,7 @@ import { preparePhotoForUpload } from "./photo-upload";
 import type {
   BgmTrackResponse,
   ReelsUploadResponse,
+  ReelsVideoUrlResponse,
   RenderOptions,
   VideoEditResponse,
   VideoRenderStatusResponse,
@@ -298,6 +299,24 @@ export async function getReelsShareUrl(reelsIdx: number): Promise<string> {
   );
   if (!res.data.data?.share_url) throw new Error(res.data.message);
   return res.data.data.share_url;
+}
+
+/**
+ * 릴스 재생 주소 + 소유 여부. GET /api/videos/reels/{reels_idx}/url
+ *
+ * 편집 화면은 이 API 로만 영상을 받는다 — 화면 파라미터로 넘어온 주소를 그대로
+ * 재생하면 딥링크로 임의의 영상을 밀어 넣을 수 있고, 그 상태로 편집하면 화면에
+ * 보이던 영상이 아니라 reels_idx 가 가리키는 진짜 릴스가 잘려 나간다.
+ * 404: 없음/삭제됨/렌더 미완료. 401: 인증 필요.
+ */
+export async function getReelsVideoUrl(
+  reelsIdx: number,
+): Promise<ReelsVideoUrlResponse> {
+  const res = await api.get<CommonResponse<ReelsVideoUrlResponse>>(
+    `/api/videos/reels/${reelsIdx}/url`,
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
 }
 
 /**
