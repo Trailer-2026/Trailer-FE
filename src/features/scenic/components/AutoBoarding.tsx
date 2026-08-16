@@ -40,6 +40,15 @@ export default function AutoBoarding() {
     current?.status === "ONGOING" ? current.travel_idx : undefined;
   const { data: detail } = useTravelDetail(travelIdx);
 
+  /**
+   * 진행 중인 여행이 없다고 **확정**됐는지.
+   *
+   * 서버는 여행이 끝나면 data 를 null 로 준다. undefined 는 아직 로딩 중이거나
+   * 조회에 실패했다는 뜻이라, 이걸 "여행 없음"으로 오해하면 네트워크가 잠깐
+   * 끊긴 사이에 멀쩡히 탑승 중인 세션을 꺼버린다.
+   */
+  const travelResolved = current !== undefined;
+
   const now = useMinuteTick();
   const session = useScenicStore((s) => s.session);
   const skipAutoScheduleIdx = useScenicStore((s) => s.skipAutoScheduleIdx);
@@ -52,7 +61,13 @@ export default function AutoBoarding() {
   }, [detail, now]);
 
   useEffect(() => {
-    if (travelIdx == null) return;
+    if (travelIdx == null) {
+      // 여행이 COMPLETED 로 넘어가면 travelIdx 가 사라진다. 예전에는 여기서 그냥
+      // return 해 아래 종료 로직에 닿지 못했고, 끝난 여행의 세션이 스토어에 남아
+      // 앱을 끌 때까지 폴링(= 푸시)이 계속 나갔다.
+      if (travelResolved && session) stopRiding();
+      return;
+    }
 
     // 지금 진행 중인 여행의 활성 구간과 일치할 때만 세션을 유지한다.
     //
@@ -92,6 +107,7 @@ export default function AutoBoarding() {
     })();
   }, [
     travelIdx,
+    travelResolved,
     active,
     session,
     skipAutoScheduleIdx,
