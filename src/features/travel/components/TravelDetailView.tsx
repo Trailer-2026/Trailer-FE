@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import TicketIcon from "@/src/components/icons/TicketIcon";
@@ -80,6 +81,8 @@ export default function TravelDetailView({
 }) {
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
   const insets = useSafeAreaInsets();
+  // 확인/결과는 OS 기본 Alert 대신 앱 UI 다이얼로그로 띄운다.
+  const { dialog, ask, notify } = useConfirmDialog();
 
   // 추가 모달 상태 — kind 로 장소/티켓 폼이 바로 열린다(중간 선택 시트 없음).
   // dayNo 는 장소 폼의 날짜 프리필용.
@@ -140,18 +143,18 @@ export default function TravelDetailView({
 
   /** 일정에 붙인 사진 1장 삭제 — 저장소에서도 지워져 되돌릴 수 없다. */
   const confirmDeleteImage = (image: TravelScheduleImage) => {
-    Alert.alert("사진을 삭제할까요?", "삭제한 사진은 되돌릴 수 없어요.", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () =>
-          delImage.mutate(image.image_idx, {
-            onError: (e) =>
-              Alert.alert("사진 삭제 실패", describeScheduleError(e)),
-          }),
-      },
-    ]);
+    ask({
+      title: "사진을 삭제할까요?",
+      message: "이 일정에서 사진이 사라지고 되돌릴 수 없어요.",
+      confirmLabel: "삭제하기",
+      danger: true,
+      onConfirm: () =>
+        delImage.mutate(image.image_idx, {
+          // 실패 안내도 같은 다이얼로그로 이어 띄운다(확인을 누르면 교체된다).
+          onError: (e) =>
+            notify({ title: "사진 삭제 실패", message: describeScheduleError(e) }),
+        }),
+    });
   };
 
   const confirmDeleteItem = (item: TravelScheduleItem) => {
@@ -331,6 +334,8 @@ export default function TravelDetailView({
           dayNo={editTarget.dayNo}
         />
       ) : null}
+
+      {dialog}
     </>
   );
 }
