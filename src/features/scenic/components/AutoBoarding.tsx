@@ -54,11 +54,16 @@ export default function AutoBoarding() {
   useEffect(() => {
     if (travelIdx == null) return;
 
-    // 도착 시각이 지났거나 다른 구간으로 넘어갔으면 자동 종료.
-    // 다른 여행의 세션은 건드리지 않는다.
+    // 지금 진행 중인 여행의 활성 구간과 일치할 때만 세션을 유지한다.
+    //
+    // travelIdx 가 다른 경우: 계정 전환(A 로 탑승 중 로그아웃 → B 로 로그인)이나
+    // 여행이 연달아 바뀐 상황. 예전에는 이 세션을 그냥 두고 return 했는데,
+    // 그러면 끝난 여행(또는 남의 계정)의 구간으로 폴링이 계속 돌아 푸시가 나갔다.
+    //
+    // scheduleIdx 가 다른 경우: 도착 시각이 지났거나 다음 구간으로 넘어감.
     if (session) {
       if (
-        session.travelIdx === travelIdx &&
+        session.travelIdx !== travelIdx ||
         active?.scheduleIdx !== session.scheduleIdx
       ) {
         stopRiding();
