@@ -2,6 +2,13 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from "@/src/features/auth/storage";
 // refreshTokens 는 require cycle(client ↔ api) 방지를 위해 인터셉터 내부에서 동적 import 한다.
 
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    /** true 면 401 응답에도 토큰 재발급 인터셉터를 타지 않는다 (refresh 요청 전용). */
+    _skipAuthRefresh?: boolean;
+  }
+}
+
 // eslint-disable-next-line import/no-named-as-default-member
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL,
@@ -34,9 +41,18 @@ function processQueue(error: unknown, token: string | null) {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+      _skipAuthRefresh?: boolean;
+    };
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    // refresh 요청 자체가 401 이면 인터셉터를 타면 안 된다.
+    // (타면 자기 자신을 failedQueue 에 넣고 영원히 대기 → 앱 전체 데드락)
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      originalRequest._skipAuthRefresh
+    ) {
       return Promise.reject(error);
     }
 
@@ -44,6 +60,7 @@ api.interceptors.response.use(
       return new Promise<string>((resolve, reject) => {
         failedQueue.push({ resolve, reject });
       }).then((token) => {
+        originalRequest._retry = true;
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
       });

@@ -40,9 +40,12 @@ export async function refreshTokens(refreshToken: string): Promise<TokenResponse
   if (USE_MOCK) {
     return MOCK_TOKENS;
   }
-  const res = await api.post<CommonResponse<TokenResponse>>("/api/auth/refresh", {
-    refresh_token: refreshToken,
-  });
+  const res = await api.post<CommonResponse<TokenResponse>>(
+    "/api/auth/refresh",
+    { refresh_token: refreshToken },
+    // 401 이 와도 응답 인터셉터가 재-refresh 를 시도하지 않도록 우회 플래그
+    { _skipAuthRefresh: true },
+  );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
 }
