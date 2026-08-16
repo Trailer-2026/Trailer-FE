@@ -101,6 +101,13 @@ export default function CommentsSheet({
   ]);
 
   const startReply = (comment: ReelsComment, depth: number) => {
+    // 수정 중이었다면 먼저 끝낸다. editing 이 남아 있으면 submit 이 replyTo 를
+    // 보기도 전에 update 로 새어, 답글 내용이 원댓글 본문을 덮어쓴다.
+    // draft 도 같이 비운다 — 안 그러면 답글 입력창에 원댓글 본문이 남는다.
+    if (editing) {
+      setEditing(null);
+      setDraft("");
+    }
     setReplyTo({
       // depth 1 이면 부모(최상위)에 단다 — 답글의 답글은 서버가 400.
       parentIdx: depth === 0 ? comment.comment_idx : comment.parent_idx!,
@@ -177,6 +184,12 @@ export default function CommentsSheet({
       danger: true,
       onConfirm: () =>
         remove.mutate(comment.comment_idx, {
+          // 수정 중이던 댓글이 사라졌으면 편집 모드도 닫는다. 안 닫으면 없는
+          // 댓글을 가리킨 채 "수정 중"으로 남아 새 댓글을 쓸 수 없다.
+          // 다른 댓글을 지운 경우엔 진행 중인 수정을 건드리지 않는다.
+          onSuccess: () => {
+            if (editing?.comment_idx === comment.comment_idx) cancelEdit();
+          },
           onError: (err) =>
             notify({ title: "삭제 실패", message: describeApiError(err) }),
         }),
