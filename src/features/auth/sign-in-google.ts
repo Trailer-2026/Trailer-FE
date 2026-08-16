@@ -52,14 +52,9 @@ export async function signInWithGoogle(): Promise<void> {
     // 토큰 저장 완료 후 FCM 권한 요청 + 서버 등록 (실패해도 로그인 흐름은 계속)
     void syncFcmToken();
   } catch (err: unknown) {
-    // TEMP: 백엔드 응답 진단용 로깅 (원인 파악 후 제거)
-    const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
-    console.error("[loginGoogle FAIL]", {
-      status: axiosErr?.response?.status,
-      data: axiosErr?.response?.data,
-      message: axiosErr?.message,
-      idTokenHead: idToken.slice(0, 40) + "...",
-    });
+    // 인증 응답 본문과 idToken 은 로깅하지 않는다 — 릴리스 빌드에서도 console 이
+    // 제거되지 않아 logcat 에 그대로 남는다.
+    const axiosErr = err as { response?: { status?: number } };
     const status = axiosErr?.response?.status;
     if (status === 400) {
       throw { type: "invalid_token" } satisfies GoogleSignInError;

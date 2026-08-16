@@ -77,7 +77,9 @@ api.interceptors.response.use(
       const tokens = await refreshTokens(refreshToken);
       await saveTokens(tokens.access_token, tokens.refresh_token);
 
-      api.defaults.headers.common["Authorization"] = `Bearer ${tokens.access_token}`;
+      // defaults.headers.common 에는 토큰을 심지 않는다. 재시도든 큐 대기 요청이든
+      // api() 로 재진입하면서 요청 인터셉터가 저장소 토큰으로 헤더를 다시 채우고,
+      // defaults 에 남겨두면 로그아웃 후에도 헤더가 살아남아 다음 요청에 붙는다.
       originalRequest.headers.Authorization = `Bearer ${tokens.access_token}`;
 
       processQueue(null, tokens.access_token);
