@@ -40,6 +40,7 @@ import {
 import { useCreateTravel } from "@/src/features/travel/queries";
 import { HEADER_TOP_GAP, headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+import { toHttps } from "@/src/utils/url";
 
 // http:// 이미지가 안드로이드 cleartext 로 막히거나 서버가 null 로 줄 때의 대체 이미지.
 const PLACEHOLDER_IMAGE = require("../../../assets/images/Main1.png");
@@ -1277,10 +1278,12 @@ function RemoteImage({
   rounded?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  // 서버가 http:// 로 주는 이미지도 https 로 올려서 받는다(평문 차단·변조 방지).
+  const src = toHttps(uri);
   const radius = rounded
     ? { borderRadius: scale(14), marginTop: verticalScale(10) }
     : null;
-  if (!uri || failed) {
+  if (!src || failed) {
     return (
       <Image
         source={PLACEHOLDER_IMAGE}
@@ -1291,7 +1294,7 @@ function RemoteImage({
   }
   return (
     <Image
-      source={{ uri }}
+      source={{ uri: src }}
       resizeMode="cover"
       style={{ ...style, ...radius }}
       onError={() => setFailed(true)}

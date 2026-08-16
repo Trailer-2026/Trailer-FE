@@ -39,6 +39,7 @@ import { useCurrentTravel } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
 import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+import { toHttps } from "@/src/utils/url";
 
 // Figma 내보내기 아이콘 에셋 (Metro 는 대소문자 구분 — 실제 파일명 케이스와 정확히 일치시킬 것)
 const ICONS = {
@@ -910,11 +911,13 @@ function ThemedRemoteImage({
   children?: React.ReactNode;
 }) {
   const [failed, setFailed] = useState(false);
-  const useRemote = !!uri && !failed;
+  // 서버가 http:// 로 주는 이미지도 https 로 올려서 받는다(평문 차단·변조 방지).
+  const src = toHttps(uri);
+  const useRemote = !!src && !failed;
   if (useRemote) {
     return (
       <ImageBackground
-        source={{ uri: uri! }}
+        source={{ uri: src! }}
         resizeMode="cover"
         style={style}
         onError={() => setFailed(true)}
