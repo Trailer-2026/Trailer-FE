@@ -61,6 +61,9 @@ export default function AutoBoarding() {
   }, [detail, now]);
 
   useEffect(() => {
+    // 권한 동의 창을 기다리는 사이 이 이펙트가 낡았는지 표시한다(아래 cleanup).
+    let cancelled = false;
+
     if (travelIdx == null) {
       // 여행이 COMPLETED 로 넘어가면 travelIdx 가 사라진다. 예전에는 여기서 그냥
       // return 해 아래 종료 로직에 닿지 못했고, 끝난 여행의 세션이 스토어에 남아
@@ -98,8 +101,16 @@ export default function AutoBoarding() {
     void (async () => {
       // 권한이 있으면 묻지 않고 통과, 없으면 여기서 동의 창이 뜬다.
       const granted = await ensureForegroundLocationPermission();
-      if (!granted) return;
+      if (!granted) return; // permissionAskedFor 를 남겨 이 구간은 다시 묻지 않는다
       permissionAskedFor = null; // 허용됐으면 다음 구간도 정상 판단
+
+      // 동의 창을 오래 띄워두는 동안 상황이 바뀔 수 있다 — 구간이 끝났거나,
+      // 여행이 종료됐거나, 사용자가 탑승 종료를 눌렀거나. 아래 travelIdx·active 는
+      // 창이 뜨던 시점의 값이라 그대로 쓰면 이미 지난 구간으로 세션이 시작된다.
+      // 그 사이 값이 하나라도 바뀌었으면 이 이펙트는 정리되고 새 값으로 다시 도니
+      // 여기서는 조용히 빠지면 된다(권한은 이미 받았으므로 다음 회차는 창 없이 통과).
+      if (cancelled) return;
+
       resetMockLocation();
       startRiding({
         travelIdx,
@@ -109,6 +120,10 @@ export default function AutoBoarding() {
         label: active.label,
       });
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     travelIdx,
     travelResolved,
