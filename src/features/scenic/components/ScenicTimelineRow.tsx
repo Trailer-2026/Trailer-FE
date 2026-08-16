@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, View } from "react-native";
 
+import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -41,11 +42,24 @@ export default function ScenicTimelineRow({
   const loading = useScenicStore((s) => s.loading);
   const error = useScenicStore((s) => s.error);
   const hasNewSpots = useScenicStore((s) => s.hasNewSpots);
+  const stopRiding = useScenicStore((s) => s.stopRiding);
   // 이미 AutoBoarding 이 구독 중이라 여기서 훅을 써도 타이머는 하나뿐이다
   // (queries.ts 의 subscribers). refresh 는 간격·이동거리 조건을 무시하고 즉시 호출한다.
   const { refresh } = useScenicPolling();
+  // OS 기본 Alert 대신 앱 UI 다이얼로그 — 신고·차단·삭제와 같은 톤을 쓴다.
+  const { dialog, ask } = useConfirmDialog();
 
   if (!riding) return null;
+
+  // 직접 끈 구간은 도착 시각 전이라도 자동으로 다시 켜지지 않는다(skipAuto).
+  const onStop = () =>
+    ask({
+      title: "창밖 풍경 알림을 끌까요?",
+      message: "이 구간에서는 다시 자동으로 켜지지 않아요.",
+      confirmLabel: "끄기",
+      danger: true,
+      onConfirm: () => stopRiding({ skipAuto: true }),
+    });
 
   return (
     <View style={{ flexDirection: "row" }}>
@@ -84,6 +98,32 @@ export default function ScenicTimelineRow({
             </Text>
           ) : null}
           {loading ? <ActivityIndicator size="small" color={SIDE_ACCENT} /> : null}
+
+          {/* 끄는 버튼은 지금 타고 있는 그 열차 옆에만 둔다 — 어느 구간을 끄는지
+              헷갈릴 여지가 없고, 안 타는 동안에는 화면에 남지 않는다. */}
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={onStop}
+            hitSlop={8}
+            className="active:opacity-60"
+            style={{
+              paddingHorizontal: scale(10),
+              paddingVertical: verticalScale(5),
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+              backgroundColor: "#FFFFFF",
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="창밖 풍경 알림 끄기"
+          >
+            <Text
+              className="font-semibold text-gray-500"
+              style={{ fontSize: moderateScale(11) }}
+            >
+              알림 끄기
+            </Text>
+          </Pressable>
         </View>
 
         <Body error={error} result={result} hasNewSpots={hasNewSpots} />
@@ -91,6 +131,8 @@ export default function ScenicTimelineRow({
         {SHOW_MOCK_STEP_BUTTON ? (
           <MockStepButton onPress={refresh} disabled={loading} />
         ) : null}
+
+        {dialog}
       </View>
     </View>
   );
