@@ -77,12 +77,16 @@ export default function AutoBoarding() {
     //
     // scheduleIdx 가 다른 경우: 도착 시각이 지났거나 다음 구간으로 넘어감.
     if (session) {
-      if (
-        session.travelIdx !== travelIdx ||
-        active?.scheduleIdx !== session.scheduleIdx
-      ) {
+      if (session.travelIdx !== travelIdx) {
         stopRiding();
+        return;
       }
+      // detail 이 없으면 active 가 무조건 null 이라(58줄) "구간 없음"과 "아직 모름"이
+      // 구분되지 않는다. 그대로 두면 상세가 비어 있는 동안 멀쩡한 세션이 꺼진다.
+      // 판단을 미룰 뿐이므로 다른 여행의 세션 정리(위 분기)보다 뒤에 둔다 —
+      // 앞에 두면 계정 전환 직후 남의 세션을 종료하지 못한다.
+      if (!detail) return;
+      if (active?.scheduleIdx !== session.scheduleIdx) stopRiding();
       return;
     }
 
@@ -108,6 +112,7 @@ export default function AutoBoarding() {
   }, [
     travelIdx,
     travelResolved,
+    detail,
     active,
     session,
     skipAutoScheduleIdx,
