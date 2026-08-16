@@ -76,7 +76,10 @@ export default function CommentsSheet({
   const block = useBlockUser();
   const report = useReportUser();
   // 내 댓글이면 신고·차단 대신 수정·삭제 메뉴를 띄운다(자기 자신 차단은 서버도 400).
-  const { data: me } = useMyProfile();
+  // 아직 프로필을 못 받았으면 내 댓글인지 알 수 없다 — 그 사이엔 어느 메뉴도 띄우지
+  // 않는다. 조회에 실패한 경우(isLoading=false)는 막지 않는다. 계속 막으면 신고
+  // 자체가 불가능해지는데, 그건 자기 댓글 차단 400 보다 나쁘다.
+  const { data: me, isLoading: meLoading } = useMyProfile();
 
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
@@ -101,6 +104,13 @@ export default function CommentsSheet({
   ]);
 
   const startReply = (comment: ReelsComment, depth: number) => {
+    // 수정 중이었다면 먼저 끝낸다. editing 이 남아 있으면 submit 이 replyTo 를
+    // 보기도 전에 update 로 새어, 답글 내용이 원댓글 본문을 덮어쓴다.
+    // draft 도 같이 비운다 — 안 그러면 답글 입력창에 원댓글 본문이 남는다.
+    if (editing) {
+      setEditing(null);
+      setDraft("");
+    }
     setReplyTo({
       // depth 1 이면 부모(최상위)에 단다 — 답글의 답글은 서버가 400.
       parentIdx: depth === 0 ? comment.comment_idx : comment.parent_idx!,
@@ -112,6 +122,8 @@ export default function CommentsSheet({
   // 댓글 길게 누르기 → 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단 시트.
   const [moreFor, setMoreFor] = useState<ReelsComment | null>(null);
   const isMine = moreFor != null && me?.user_idx === moreFor.user_idx;
+  /** 메뉴를 띄워도 되는 시점인지 — 프로필이 오기 전엔 isMine 판정을 믿을 수 없다. */
+  const menuReady = moreFor != null && !meLoading;
   // 확인/결과는 OS 기본 Alert 대신 앱 UI 다이얼로그로 띄운다.
   const { dialog, ask, notify } = useConfirmDialog();
 
@@ -177,6 +189,15 @@ export default function CommentsSheet({
       danger: true,
       onConfirm: () =>
         remove.mutate(comment.comment_idx, {
+          // 수정 중이던 댓글이 사라졌으면 편집 모드도 닫는다. 안 닫으면 없는
+          // 댓글을 가리킨 채 "수정 중"으로 남아 새 댓글을 쓸 수 없다.
+          // 다른 댓글을 지운 경우엔 진행 중인 수정을 건드리지 않는다.
+          onSuccess: () => {
+            if (editing?.comment_idx === comment.comment_idx) cancelEdit();
+            setReplyTo((current) =>
+              current?.parentIdx === comment.comment_idx ? null : current,
+            );
+          },
           onError: (err) =>
             notify({ title: "삭제 실패", message: describeApiError(err) }),
         }),
@@ -464,7 +485,7 @@ export default function CommentsSheet({
 
     {/* 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단 */}
     <MyCommentSheet
-      visible={moreFor != null && isMine}
+      visible={menuReady && isMine}
       name={moreFor?.nickname ?? "내 댓글"}
       onClose={() => setMoreFor(null)}
       onEdit={() => moreFor && startEdit(moreFor)}
@@ -472,7 +493,7 @@ export default function CommentsSheet({
     />
 
     <ReportBlockSheet
-      visible={moreFor != null && !isMine}
+      visible={menuReady && !isMine}
       name={moreFor?.nickname ?? "이 사용자"}
       reportLabel="이 댓글 신고하기"
       onClose={() => setMoreFor(null)}

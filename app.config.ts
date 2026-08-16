@@ -17,9 +17,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.trailer.app",
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      // 브랜드 블루 — 로고 시안(Figma '로고' 프레임)의 배경색과 같은 값.
+      // 배경은 단색이라 이미지 대신 색만 준다(backgroundImage 없음).
+      backgroundColor: "#5E84F4",
+      // 흰 마크만 담긴 투명 PNG. 안드로이드가 원형/스퀘어클로 안쪽 66% 만 남기므로
+      // 마크를 캔버스의 45% 크기로 가운데 두어 어떤 마스크에서도 안 잘리게 했다.
       foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     googleServicesFile: "./google-services.json",
@@ -36,12 +39,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-splash-screen",
       {
-        // TR 로고(Entry.png) + '트레일러' 를 합쳐 만든 이미지.
-        // 네이티브 스플래시는 이미지 한 장만 그릴 수 있어(텍스트 렌더 불가) 미리 합쳐 둔다.
-        // 원본을 바꾸려면 Entry.png 로 다시 합성할 것.
+        // 로고 마크(흰색)만 담긴 투명 PNG. 배경은 아래 backgroundColor 가 칠한다.
+        // 예전에는 'TR' 워드마크를 썼지만 지금 로고는 가로로 길어서, 원형 마스크에
+        // 들어가는 마크 한 글자만 쓴다(Figma '로고' 프레임에서 추출).
         image: "./assets/images/splash-entry.png",
         // Android 12+ 는 스플래시 아이콘을 원형으로 마스킹한다(288dp 캔버스의 안쪽 2/3=192dp 만 보임).
-        // 200 이면 로고 오른쪽 끝이 안전선을 넘어 깎여서 190 으로 줄였다.
+        // 이미지 안에서 마크가 이미 70% 로 들어가 있어 여기서는 캔버스 크기만 맞춘다.
         imageWidth: 190,
         resizeMode: "contain",
         // 앱 진입 버퍼링 화면 색.
@@ -91,9 +94,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         android: {
           extraMavenRepos: ["https://devrepo.kakao.com/nexus/content/groups/public/"],
-          // 추천 API 응답의 place/lodging image_url 이 http:// 스킴으로 오는 경우가 많아
-          // 안드로이드 cleartext 차단을 풀어준다. 실패해도 RemoteImage 가 placeholder 로 대체.
-          usesCleartextTraffic: true,
         },
       },
     ],

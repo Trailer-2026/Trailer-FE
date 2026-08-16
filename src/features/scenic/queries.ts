@@ -6,6 +6,7 @@ import { describeScenicError } from "./errors";
 import { haversineMeters } from "./geo";
 import {
   MOCK_LOCATION,
+  MOCK_MANUAL,
   MOCK_STATIONS,
   ensureForegroundLocationPermission,
   getCurrentLatLng,
@@ -20,6 +21,19 @@ import { useScenicStore } from "./store";
  * ⚠️ 관광지가 잡히면 그때마다 푸시가 나가므로 목업 모드 밖으로 새어나가면 안 된다.
  */
 export const SCENIC_POLL_INTERVAL_MS = MOCK_LOCATION ? 2 * 1000 : 3 * 60 * 1000;
+
+/**
+ * 타이머가 도는 주기. **호출 주기가 아니다** — 매 틱마다 runTick 이 돌지만,
+ * 실제 호출은 아래 (4) 최소 간격 조건을 통과할 때만 나간다.
+ *
+ * 간격만큼 길게 잡으면 한 번 실패했을 때 다음 시도까지 3분을 기다리게 된다.
+ * 위치 획득 실패(GPS 미확보·터널)는 몇 초 뒤면 풀리는 일이 흔한데 화면에는
+ * 에러가 3분간 그대로 남는다. 그래서 틱은 짧게 돌리고 억제는 조건에 맡긴다.
+ *
+ * ⚠️ 이 값을 줄여도 호출 빈도는 늘지 않는다. 마지막 **성공** 시각(lastCalledAt)
+ *    으로 막기 때문에, 실패해서 lastCalledAt 이 안 찍혔을 때만 매 틱 재시도된다.
+ */
+const TICK_MS = MOCK_LOCATION ? (MOCK_MANUAL ? 60 * 60 * 1000 : 2 * 1000) : 10 * 1000;
 
 /**
  * 이 거리(m) 미만으로 움직였으면 호출을 건너뛴다(정차·미이동 시 알림 스팸 방지).
@@ -73,22 +87,33 @@ let appStateSub: ReturnType<typeof AppState.addEventListener> | null = null;
  *  1) 세션 없음(탑승 종료)
  *  2) 이미 조회 중
  *  3) 앱이 백그라운드 — 포그라운드 복귀 시 재개
- *  4) 직전 호출로부터 3분이 지나지 않음(화면 재진입·포그라운드 복귀 중복 방지)
+ *  4) 직전 **성공** 호출로부터 3분이 지나지 않음(화면 재진입·포그라운드 복귀 중복 방지).
+ *     실패했을 때는 이 조건이 비어 있어 TICK_MS(10초)마다 다시 시도한다.
  *  5) 직전 **호출 지점** 대비 이동이 500m 미만
  */
 async function runTick(force = false) {
   // 최신 상태를 렌더와 무관하게 읽는다.
-  const { session, lastPosition, lastCalledAt, markCalled, setResult, setStatus } =
-    useScenicStore.getState();
+  const {
+    session,
+    lastPosition,
+    lastCalledAt,
+    error,
+    markCalled,
+    setResult,
+    setStatus,
+  } = useScenicStore.getState();
 
   if (!session) return; // (1) 세션 종료
   if (inFlight) return; // (2)
   if (!force && AppState.currentState !== "active") return; // (3) 백그라운드
 
   const now = Date.now();
-  // (4) 최소 간격 — 화면 재진입/포그라운드 복귀로 인한 중복 호출 차단
+  // (4) 최소 간격 — 화면 재진입/포그라운드 복귀로 인한 중복 호출 차단.
+  //     lastCalledAt 은 **호출에 성공했을 때만** 찍히므로(markCalled), 위치 획득이나
+  //     조회가 실패한 동안에는 이 조건에 걸리지 않고 매 틱(TICK_MS) 재시도된다.
   if (
     !force &&
+    error === null &&
     lastCalledAt !== null &&
     now - lastCalledAt < SCENIC_POLL_INTERVAL_MS - CALL_GUARD_SLACK_MS
   ) {
@@ -108,16 +133,17 @@ async function runTick(force = false) {
     //     갱신해버리면 천천히 이동할 때 기준점이 따라와 영영 임계값을 못 넘긴다.
     if (
       !force &&
+      error === null &&
       lastPosition &&
       haversineMeters(lastPosition, here) < SCENIC_MIN_MOVE_METERS
     ) {
       return;
     }
 
-    // 목업 모드에선 구간도 덮어쓴다 — 목업 좌표(오송역 부근)와 맞는 구간이어야
-    // 결과가 나오므로, 실제 여행 일정이 어떤 구간이든 무시한다.
-    const fromStation = MOCK_LOCATION ? MOCK_STATIONS.from : session.fromStation;
-    const toStation = MOCK_LOCATION ? MOCK_STATIONS.to : session.toStation;
+    // 목업 노선이 역명까지 덮어쓰는 경우에만 세션 값을 무시한다(location.ts 의
+    // MOCK_ROUTE 참고). null 이면 실제 여행 구간 그대로 질의한다.
+    const fromStation = MOCK_STATIONS?.from ?? session.fromStation;
+    const toStation = MOCK_STATIONS?.to ?? session.toStation;
 
     const res = await getNearbyScenicSpots({
       lat: here.lat,
@@ -156,7 +182,8 @@ function startPolling() {
   // 탑승 시작 시에는 스토어가 초기화되어 lastCalledAt 이 null → 즉시 1회 호출된다.
   void runTick();
 
-  timer = setInterval(() => void runTick(), SCENIC_POLL_INTERVAL_MS);
+  // 틱은 짧게, 억제는 runTick 의 (4) 조건이 한다(TICK_MS 주석 참고).
+  timer = setInterval(() => void runTick(), TICK_MS);
   appStateSub = AppState.addEventListener("change", (state) => {
     if (state === "active") void runTick(); // 백그라운드 동안 건너뛴 주기 보충
   });

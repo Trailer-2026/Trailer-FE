@@ -34,7 +34,7 @@ import {
 } from "@/src/features/scenic/background";
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import { formatBasedAt, formatClockLabel } from "@/src/features/scenic/format";
-import { useMinuteTick, useScenicPolling } from "@/src/features/scenic/queries";
+import { useMinuteTick } from "@/src/features/scenic/queries";
 import {
   findCurrentScheduleItem,
   findNearestScheduleItem,
@@ -287,9 +287,10 @@ function SceneryPromoCard({
   // 열차를 타고 있지 않을 때 "지금 ○○ 일정 중" 을 띄우기 위한 진행 중 일정.
   // 여행중(ONGOING)이 아니면 조회하지 않는다.
   const { data: currentTravel } = useCurrentTravel();
-  const { data: detail } = useTravelDetail(
-    currentTravel?.status === "ONGOING" ? currentTravel.travel_idx : undefined,
-  );
+  // 진행 중인 여행만 대상 — PLANNED 여행은 일정 조회도, 사진 등록도 하지 않는다.
+  const ongoingTravelIdx =
+    currentTravel?.status === "ONGOING" ? currentTravel.travel_idx : undefined;
+  const { data: detail } = useTravelDetail(ongoingTravelIdx);
   const currentSchedule = useMemo(
     () => (detail && !session ? findCurrentScheduleItem(detail, now) : null),
     [detail, session, now],
@@ -308,13 +309,14 @@ function SceneryPromoCard({
     currentSchedule?.schedule_idx ??
     (detail ? (findNearestScheduleItem(detail, now)?.schedule_idx ?? null) : null);
 
-  // 카드가 결과 목록을 그리지 않아도 폴링은 여기서 계속 건다 — 이 호출이 곧 풍경
-  // 알림 푸시 발송이라, 멈추면 기능 자체가 죽는다. 세션이 없으면 훅이 알아서 쉰다.
-  useScenicPolling();
+  // 폴링은 AutoBoarding(앱 루트)이 건다 — 이 탭은 lazy mount 라 여기서 걸면
+  // 사용자가 알림 탭을 열지 않는 동안 푸시가 나가지 않는다.
 
   const scrim = collapsed ? SCENERY_SCRIM.collapsed : SCENERY_SCRIM.expanded;
   // 탑승 중이면 그 여행, 아니면 진행 중인 여행에 사진을 붙인다.
-  const photoTravelIdx = session?.travelIdx ?? currentTravel?.travel_idx ?? null;
+  // currentTravel 은 아직 시작 안 한 PLANNED 여행일 수도 있어 그대로 쓰면 안 된다
+  // (예전에는 출발 전 여행에 사진이 등록됐다).
+  const photoTravelIdx = session?.travelIdx ?? ongoingTravelIdx ?? null;
 
   const onPickPhoto = async (source: MediaSource) => {
     setSheetOpen(false);

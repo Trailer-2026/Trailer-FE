@@ -141,12 +141,16 @@ style={{
             value={consent === true}
             onChange={onConsentChange}
           />
-          <ToggleRow
-            title="기차역 풍경 알림"
-            subtitle="기차 이동 중 풍경을 알림으로 안내합니다"
-            value={settings.scenery_alarm}
-            onChange={(v) => onToggle({ scenery_alarm: v })}
-          />
+          {/*
+            '기차역 풍경 알림' 토글은 뺐다. 창밖 풍경은 더 이상 푸시로 나가지 않고
+            여행 상세 타임라인(승차 ↔ 하차 사이)에서만 보이므로, 끌 대상이 없다.
+            서버의 scenery_alarm 필드는 그대로 두고 앱에서 건드리지 않는다.
+
+            ⚠️ 이 화면에서 토글이 사라졌다는 건 사용자가 더 이상 끌 수 없다는 뜻이다.
+            서버가 GET /api/scenic-spots/nearby 에서 푸시 발송을 멈춘 뒤에만
+            이 상태가 맞다(scenic/api.ts 주석 참고). 아직 푸시가 나간다면 이 토글을
+            되살릴 것 — 못 끄는 알림이 안 오는 알림보다 나쁘다.
+          */}
         </ScrollView>
       )}
     </View>
