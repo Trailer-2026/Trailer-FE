@@ -1,5 +1,4 @@
 import Feather from "@expo/vector-icons/Feather";
-import { useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Alert, ImageBackground, Pressable, ScrollView, View } from "react-native";
@@ -37,19 +36,9 @@ type MenuRow = {
 export default function ProfileTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
+  // clear() 는 토큰 삭제와 react-query 캐시 비우기를 함께 한다(store.ts 주석 참고).
   const clear = useAuthStore((s) => s.clear);
   const { data: profile, isLoading } = useMyProfile();
-
-  /**
-   * 로컬 세션 종료 — 토큰 삭제 + 서버 응답 캐시 비우기.
-   * 캐시를 비우지 않으면 다른 계정으로 다시 로그인했을 때 이전 사용자의 프로필·여행이
-   * 잠깐 그대로 보인다(react-query 캐시는 토큰과 무관하게 남는다).
-   */
-  async function endSession() {
-    await clear();
-    queryClient.clear();
-  }
 
   async function handleLogout() {
     try {
@@ -58,7 +47,7 @@ export default function ProfileTab() {
     } catch {
       // 서버 로그아웃 실패해도 로컬 토큰은 삭제
     } finally {
-      await endSession();
+      await clear();
     }
   }
 
@@ -78,7 +67,7 @@ export default function ProfileTab() {
       return;
     }
     // 서버가 refresh·FCM 토큰을 이미 정리했으므로 로컬 세션만 끝내면 된다.
-    await endSession();
+    await clear();
   }
 
   function confirmWithdraw() {

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { queryClient } from "@/src/api/query-client";
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from "./storage";
 
 type AuthState = {
@@ -23,9 +24,18 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     set({ accessToken, isAuthenticated: true });
   },
 
+  /**
+   * 세션 종료 — 토큰 삭제 + 서버 응답 캐시 비우기.
+   *
+   * 캐시를 비우지 않으면 다른 계정으로 다시 로그인했을 때 이전 사용자의
+   * 프로필·여행·알림이 잠깐 그대로 보인다(react-query 캐시는 토큰과 무관하게 남는다).
+   * 캐시 삭제를 여기 두는 이유는 로그아웃 경로가 하나가 아니기 때문 —
+   * 프로필의 로그아웃·탈퇴뿐 아니라 client.ts 인터셉터의 강제 로그아웃도 이걸 탄다.
+   */
   clear: async () => {
     await clearTokens();
     set({ accessToken: null, isAuthenticated: false });
+    queryClient.clear();
   },
 
   bootstrap: async () => {
