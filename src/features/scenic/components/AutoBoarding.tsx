@@ -9,6 +9,7 @@ import {
   ensureForegroundLocationPermission,
   resetMockLocation,
 } from "../location";
+import { disableScenicPush } from "../push";
 import { useMinuteTick, useScenicPolling } from "../queries";
 import { collectTrainSegments, findActiveSegment } from "../segments";
 import { useScenicStore } from "../store";
@@ -103,6 +104,10 @@ export default function AutoBoarding() {
       const granted = await ensureForegroundLocationPermission();
       if (!granted) return; // permissionAskedFor 를 남겨 이 구간은 다시 묻지 않는다
       permissionAskedFor = null; // 허용됐으면 다음 구간도 정상 판단
+
+      // /nearby 를 처음 부르기 직전에 풍경 푸시를 꺼 둔다(push.ts 참고).
+      // 응답을 기다리지 않는다 — 늦어도 다음 폴링에는 반영된다.
+      void disableScenicPush();
 
       // 동의 창을 오래 띄워두는 동안 상황이 바뀔 수 있다 — 구간이 끝났거나,
       // 여행이 종료됐거나, 사용자가 탑승 종료를 눌렀거나. 아래 travelIdx·active 는
