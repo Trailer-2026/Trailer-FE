@@ -35,8 +35,8 @@ export type ReelsRecommendItem = {
   is_liked: boolean;
   nickname: string | null;
   profile_image: string | null;
-  /** 작성자 PK — 차단에 필요하다. 서버가 아직 내려주지 않아 보통 없다. */
-  user_idx?: number | null;
+  /** 작성자 PK — 차단과 내 릴스 판정에 쓴다. 작성자 없는 옛 릴스는 null. */
+  user_idx: number | null;
 };
 
 /**
@@ -62,8 +62,8 @@ export type ReelsAuthor = {
   name: string;
   avatar_url: string | null;
   /**
-   * 차단(POST /api/blocks/{user_idx})에 필요한 작성자 PK.
-   * 추천 API 응답에 아직 이 필드가 없어 대개 null 이다 — 없으면 차단 메뉴에서 안내한다.
+   * 작성자 PK. 차단(POST /api/blocks/{user_idx})과 내 릴스 판정에 쓴다.
+   * 작성자 없는 옛 릴스나 PK 를 안 싣는 목록 응답에서는 null — 없으면 차단 메뉴에서 안내한다.
    */
   user_idx: number | null;
 };
