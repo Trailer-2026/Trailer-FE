@@ -24,6 +24,7 @@ import {
   ChipSelect,
   Field,
   ModalShell,
+  StationField,
   TimeField,
   isValidTime,
   toApiTime,
@@ -303,19 +304,19 @@ function TrainForm({
       saving={saving}
       canSave={canSave}
     >
-      <Field
+      <StationField
         label="출발역"
         required
         value={depStation}
         onChangeText={setDepStation}
-        placeholder="서울"
+        excludeName={arrStation}
       />
-      <Field
+      <StationField
         label="도착역"
         required
         value={arrStation}
         onChangeText={setArrStation}
-        placeholder="부산"
+        excludeName={depStation}
       />
       <ChipSelect
         label="출발일"

@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
+import { StationPickerSheet } from "@/src/features/course/components/StationPickerModal";
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -39,6 +40,22 @@ type TimePickerRequest = {
  * → ModalShell 이 자기 최상위에서 하나만 렌더하도록 요청을 끌어올린다.
  */
 const TimePickerContext = createContext<(req: TimePickerRequest) => void>(
+  () => {},
+);
+
+/* ------------------------------------------------------------------ */
+/* 역 선택 시트 연결                                                     */
+/* ------------------------------------------------------------------ */
+
+type StationPickerRequest = {
+  value: string;
+  /** 반대편(출발/도착)에서 이미 고른 역 — 목록에서 숨긴다. */
+  excludeName?: string;
+  onConfirm: (stationName: string) => void;
+};
+
+/** 시각 시트와 같은 이유로 요청을 ModalShell 최상위까지 끌어올린다. */
+const StationPickerContext = createContext<(req: StationPickerRequest) => void>(
   () => {},
 );
 
@@ -84,7 +101,12 @@ export function ModalShell({
   const saveEnabled = canSave && !saving;
   const back = leading === "back";
   // 폼 안의 TimeField 들이 공유하는 단 하나의 시각 선택 시트.
-  const [timeRequest, setTimeRequest] = useState<TimePickerRequest | null>(null);
+  const [timeRequest, setTimeRequest] = useState<TimePickerRequest | null>(
+    null,
+  );
+  // StationField 들이 공유하는 단 하나의 역 선택 시트.
+  const [stationRequest, setStationRequest] =
+    useState<StationPickerRequest | null>(null);
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
@@ -121,11 +143,11 @@ export function ModalShell({
               </Pressable>
               <Text
                 className="text-gray-900"
-      style={{
-            fontSize: moderateScale(17),
-            marginLeft: scale(8),
-            fontWeight: 650 as never,
-          }}
+                style={{
+                  fontSize: moderateScale(17),
+                  marginLeft: scale(8),
+                  fontWeight: 650 as never,
+                }}
               >
                 {title}
               </Text>
@@ -186,11 +208,12 @@ export function ModalShell({
             }}
           >
             <TimePickerContext.Provider value={setTimeRequest}>
-              {children}
+              <StationPickerContext.Provider value={setStationRequest}>
+                {children}
+              </StationPickerContext.Provider>
             </TimePickerContext.Provider>
           </ScrollView>
         </KeyboardAvoidingView>
-
       </SafeAreaView>
 
       {/*
@@ -208,6 +231,16 @@ export function ModalShell({
             timeRequest.onConfirm(v);
             setTimeRequest(null);
           }}
+        />
+      ) : null}
+
+      {/* 역 선택 시트 — 시각 시트와 같은 이유로 여기(폼 ScrollView 밖)에서 렌더. */}
+      {stationRequest ? (
+        <StationPickerSheet
+          selectedName={stationRequest.value || null}
+          excludeName={stationRequest.excludeName ?? null}
+          onClose={() => setStationRequest(null)}
+          onSelect={(s) => stationRequest.onConfirm(s.station_name)}
         />
       ) : null}
     </Modal>
@@ -263,16 +296,15 @@ export function Field({
   );
 }
 
-/** "HH:MM"(24시) → "오전 9:30". 값이 없거나 이상하면 빈 문자열. */
+/** "HH:MM"(24시) → "09시 30분". 값이 없거나 이상하면 빈 문자열. */
 export function formatKoreanTime(hhmm: string): string {
   if (!isValidTime(hhmm)) return "";
-  const [h, m] = hhmm.split(":").map(Number);
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h < 12 ? "오전" : "오후"} ${h12}:${String(m).padStart(2, "0")}`;
+  const [h, m] = hhmm.split(":");
+  return `${h}시 ${m}분`;
 }
 
 /**
- * 시각 선택 — 누르면 하단에서 오전/오후·시·분 휠 시트가 올라온다.
+ * 시각 선택 — 누르면 하단에서 시(0~23)·분 휠 시트가 올라온다.
  * 외부로 오가는 값은 그대로 "HH:MM"(24시)이라 isValidTime/toApiTime 을 그대로 쓴다.
  */
 export function TimeField({
@@ -293,7 +325,9 @@ export function TimeField({
     <View style={{ marginBottom: verticalScale(16) }}>
       <FieldLabel label={label} required={required} />
       <Pressable
-        onPress={() => openTimePicker({ label, value, onConfirm: onChangeText })}
+        onPress={() =>
+          openTimePicker({ label, value, onConfirm: onChangeText })
+        }
         className="flex-row items-center justify-between active:opacity-70"
         style={{
           borderWidth: 1,
@@ -314,6 +348,57 @@ export function TimeField({
           {display || "시각을 선택하세요"}
         </Text>
         <Feather name="clock" size={moderateScale(16)} color="#9CA3AF" />
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * 역 선택 — 누르면 코스 추천에서 쓰는 역 목록 시트가 그대로 올라온다.
+ * 값은 역명 문자열이라 서버로 보내는 dep_station/arr_station 을 그대로 쓴다.
+ */
+export function StationField({
+  label,
+  value,
+  onChangeText,
+  required,
+  excludeName,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  required?: boolean;
+  excludeName?: string;
+}) {
+  const openStationPicker = useContext(StationPickerContext);
+
+  return (
+    <View style={{ marginBottom: verticalScale(16) }}>
+      <FieldLabel label={label} required={required} />
+      <Pressable
+        onPress={() =>
+          openStationPicker({ value, excludeName, onConfirm: onChangeText })
+        }
+        className="flex-row items-center justify-between active:opacity-70"
+        style={{
+          borderWidth: 1,
+          borderColor: BORDER,
+          borderRadius: scale(10),
+          paddingHorizontal: scale(14),
+          paddingVertical: verticalScale(12),
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} 선택`}
+      >
+        <Text
+          style={{
+            fontSize: moderateScale(14),
+            color: value ? "#111827" : "#9CA3AF",
+          }}
+        >
+          {value || "역을 선택하세요"}
+        </Text>
+        <Feather name="chevron-down" size={moderateScale(16)} color="#9CA3AF" />
       </Pressable>
     </View>
   );
