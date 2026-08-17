@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +8,8 @@ import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
+
+const APP_LOGO = require("../../../../assets/images/icon.png");
 
 export default function VersionScreen() {
   const router = useRouter();
@@ -62,13 +65,14 @@ style={{
           className="flex-row items-center"
           style={{ marginTop: verticalScale(24), gap: scale(16) }}
         >
-          {/* 앱 아이콘 자리 (파란 라운드 사각형) */}
-          <View
+          {/* 앱 로고 — 앱 아이콘과 같은 에셋(Figma 로고) */}
+          <Image
+            source={APP_LOGO}
+            contentFit="contain"
             style={{
               width: scale(56),
               height: scale(56),
               borderRadius: scale(12),
-              backgroundColor: "#5E84F4",
             }}
           />
 
