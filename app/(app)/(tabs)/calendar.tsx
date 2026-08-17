@@ -28,6 +28,7 @@ import {
   useUpdateTravelCover,
 } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
+import { useAiCourseGate } from "@/src/features/travel/use-ai-course-gate";
 import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -137,6 +138,8 @@ export default function CalendarTab() {
   const [ticketOpen, setTicketOpen] = useState(false);
   // '새 여행 일정 만들기' → AI 추천 / 직접 만들기 선택 시트.
   const [createOpen, setCreateOpen] = useState(false);
+  // 진행중·예정 여행이 있으면 AI 추천을 막고 안내 다이얼로그를 띄운다.
+  const { gateDialog, startAiCourse } = useAiCourseGate();
   const openTicket = () => {
     if (!current) {
       Alert.alert(
@@ -306,7 +309,7 @@ export default function CalendarTab() {
         onClose={() => setCreateOpen(false)}
         onRecommend={() => {
           setCreateOpen(false);
-          router.navigate("/course/intro");
+          startAiCourse();
         }}
         onManual={() => {
           setCreateOpen(false);
@@ -320,6 +323,8 @@ export default function CalendarTab() {
           onClose={() => setTicketOpen(false)}
         />
       ) : null}
+
+      {gateDialog}
     </SafeAreaView>
   );
 }

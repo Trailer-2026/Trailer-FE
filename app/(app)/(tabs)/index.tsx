@@ -37,6 +37,7 @@ import {
 import { travelKeys } from "@/src/features/travel/keys";
 import { useCurrentTravel } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
+import { useAiCourseGate } from "@/src/features/travel/use-ai-course-gate";
 import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 import { toHttps } from "@/src/utils/url";
@@ -160,6 +161,9 @@ export default function HomeScreen() {
 /* 헤더                                                                */
 /* ------------------------------------------------------------------ */
 function Header() {
+  // 진행중·예정 여행이 있으면 AI 일정 추천 진입을 막고 안내 다이얼로그를 띄운다.
+  const { gateDialog, startAiCourse } = useAiCourseGate();
+
   return (
     <View
       className="flex-row items-center justify-between"
@@ -179,7 +183,7 @@ function Header() {
       <View className="flex-row items-center" style={{ gap: scale(16) }}>
         {/* 일정(격자) 아이콘 → 일정(코스 추천) 만들기 */}
         <Pressable
-          onPress={() => router.push("/course/intro")}
+          onPress={startAiCourse}
           hitSlop={10}
           className="active:opacity-60"
           accessibilityRole="button"
@@ -203,6 +207,8 @@ function Header() {
           <AddCircleIcon width={moderateScale(30)} height={moderateScale(30)} />
         </Pressable>
       </View>
+
+      {gateDialog}
     </View>
   );
 }
