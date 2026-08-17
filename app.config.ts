@@ -25,7 +25,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: "./assets/images/android-icon-foreground.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    googleServicesFile: "./google-services.json",
+    // google-services.json 은 .gitignore 에 있어 EAS Build 로 올라가지 않는다
+    // (빌드 서버는 git 이 추적하는 파일만 받는다). EAS file 환경변수에 올려 두고
+    // 빌드 때 내려받은 경로를 쓴다. 로컬에서는 변수가 없어 저장소의 파일을 그대로 쓴다.
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
   },
