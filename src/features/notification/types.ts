@@ -3,12 +3,23 @@
  * FCM(수신·토큰 등)은 fcm.ts / handlers.ts 참조.
  */
 
-/** GET/PATCH /api/users/me/notifications */
+/**
+ * GET/PATCH /api/users/me/notifications
+ *
+ * 앞의 둘만 푸시 발송을 가른다. marketing_agree 는 알림 발송과 무관한 선택 동의라
+ * 기본값이 false 고(알림 두 항목만 true), 앱에서는 '이벤트 및 마케팅 알림' 을 켤 수
+ * 있는 전제로 쓴다.
+ */
 export type NotificationSettings = {
-  /** 이벤트 및 마케팅 알림(여행 담기·D-1 등 앱 이벤트 알림 수신) */
+  /**
+   * 이벤트 알림 — 일정 알림(여행 담기·출발 D-1·일정 삭제)과 열차 출발 10분 전
+   * 탑승 알림을 함께 켜고 끈다. 탑승 알림용 스위치가 따로 있지 않다.
+   */
   event_alarm: boolean;
   /** 기차역 풍경 알림(창밖 스팟 근접 시 푸시) */
   scenery_alarm: boolean;
+  /** 이벤트 및 마케팅 활용 동의 — 선택 동의라 한 번도 켠 적 없으면 false */
+  marketing_agree: boolean;
 };
 
 /**

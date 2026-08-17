@@ -5,7 +5,8 @@ import type { NotificationSettings, NotificationUpdateRequest } from "./types";
 
 /**
  * GET /api/users/me/notifications
- * 설정을 바꾼 적 없는 사용자는 서버가 기본값(둘 다 true)으로 생성해서 반환한다.
+ * 설정을 바꾼 적 없는 사용자는 서버가 기본값으로 생성해서 반환한다 —
+ * 알림 두 항목(event_alarm·scenery_alarm)은 true, marketing_agree 는 false.
  * 401: client.ts 인터셉터가 refresh/로그아웃 처리.
  */
 export async function getNotificationSettings(): Promise<NotificationSettings> {
