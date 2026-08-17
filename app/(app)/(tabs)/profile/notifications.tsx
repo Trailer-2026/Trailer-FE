@@ -148,8 +148,8 @@ style={{
             '기차역 풍경 알림'. 서버가 GET /api/scenic-spots/nearby 응답과 함께 푸시를
             쏘는데, 그 발송을 가르는 스위치가 이 값이다. 앱이 임의로 끄지 않고
             사용자 선택만 반영한다.
-            TODO: 자동 탑승(AutoBoarding)이 아직 이 값을 보지 않는다 — 꺼져 있으면
-                  세션을 시작하지 않도록 이어서 연결할 것.
+            이 값이 꺼져 있으면 자동 탑승(AutoBoarding)도 시작하지 않고, 위치 권한
+            안내(LocationPermissionPrompt)도 뜨지 않는다.
           */}
           <ToggleRow
             title="기차역 풍경 알림"
