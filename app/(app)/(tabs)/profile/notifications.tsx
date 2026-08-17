@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BackIcon from "@/src/components/icons/BackIcon";
 import { Text } from "@/src/components/Text";
-import { useMarketingConsent } from "@/src/features/notification/marketing-consent";
 import {
   useNotificationSettingsQuery,
   useUpdateNotificationSettings,
@@ -23,11 +22,12 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 const ACCENT = "#668DFF";
 
 /**
- * 알림 설정 화면.
- * - '이벤트 및 마케팅 알림' → event_alarm, '기차역 풍경 알림' → scenery_alarm 서버 연결.
- * - '이벤트 및 마케팅 활용동의' 는 대응 API 필드가 없어 기기 로컬에 저장한다(marketing-consent.ts).
- *   개인정보 마케팅 활용 동의는 광고성 정보 수신의 전제라, 이 동의가 꺼져 있으면
- *   '이벤트 및 마케팅 알림' 토글을 잠그고 동의를 내리면 알림도 함께 끈다.
+ * 알림 설정 화면. 세 항목 모두 GET/PATCH /api/users/me/notifications 에 직결된다 —
+ * '이벤트 및 마케팅 알림' → event_alarm, '이벤트 및 마케팅 활용동의' → marketing_agree,
+ * '기차역 풍경 알림' → scenery_alarm.
+ *
+ * 개인정보 마케팅 활용 동의는 광고성 정보 수신의 전제라, 이 동의가 꺼져 있으면
+ * '이벤트 및 마케팅 알림' 토글을 잠그고 동의를 내리면 알림도 함께 끈다.
  */
 export default function NotificationSettingsScreen() {
   const router = useRouter();
@@ -35,8 +35,6 @@ export default function NotificationSettingsScreen() {
 
   const { data: settings, isLoading } = useNotificationSettingsQuery();
   const update = useUpdateNotificationSettings();
-
-  const { consent, setConsent } = useMarketingConsent(settings?.event_alarm);
 
   /** 낙관적 토글 — 뒤집힌 항목 하나만 서버에 보낸다(다른 필드 덮어쓰기 방지). */
   const onToggle = (patch: NotificationUpdateRequest) => {
@@ -50,11 +48,17 @@ export default function NotificationSettingsScreen() {
 
   /**
    * 활용동의 전환. 동의를 철회하면 광고성 정보를 계속 보낼 근거가 사라지므로
-   * 이벤트 알림도 함께 끈다(서버에도 반영).
+   * 이벤트 알림도 함께 끈다.
+   *
+   * 두 필드를 한 번의 PATCH 로 보낸다 — 따로 부르면 앞 요청이 실패했을 때
+   * 동의는 꺼졌는데 알림은 켜진 채로 남는다.
    */
   const onConsentChange = (value: boolean) => {
-    setConsent(value);
-    if (!value && settings?.event_alarm) onToggle({ event_alarm: false });
+    onToggle(
+      !value && settings?.event_alarm
+        ? { marketing_agree: false, event_alarm: false }
+        : { marketing_agree: value },
+    );
   };
 
   return (
@@ -102,18 +106,17 @@ style={{
           <ToggleRow
             title="이벤트 및 마케팅 알림"
             subtitle={
-              consent
+              settings.marketing_agree
                 ? "새로운 이벤트 및 마케팅 알림을 드립니다"
                 : "아래 활용동의를 먼저 켜주세요"
             }
-            value={settings.event_alarm && consent === true}
-            disabled={!consent}
+            value={settings.event_alarm && settings.marketing_agree}
+            disabled={!settings.marketing_agree}
             onChange={(v) => onToggle({ event_alarm: v })}
           />
           {/*
             '이벤트 및 마케팅 활용동의' — 개인정보를 마케팅 목적으로 이용하는 데 대한 동의로,
-            광고성 정보 수신(위 항목)의 전제다. 서버에 대응 필드가 없어 기기 로컬에 저장한다.
-            TODO(backend): 알림 설정 API 에 필드가 추가되면 로컬 저장을 그쪽으로 옮길 것.
+            광고성 정보 수신(위 항목)의 전제다. 알림 수신과 달리 선택 동의라 기본값이 false.
           */}
           <ToggleRow
             title="이벤트 및 마케팅 활용동의"
@@ -138,19 +141,22 @@ style={{
                 </Text>
               </Pressable>
             }
-            value={consent === true}
+            value={settings.marketing_agree}
             onChange={onConsentChange}
           />
           {/*
-            '기차역 풍경 알림' 토글은 뺐다. 창밖 풍경은 더 이상 푸시로 나가지 않고
-            여행 상세 타임라인(승차 ↔ 하차 사이)에서만 보이므로, 끌 대상이 없다.
-            서버의 scenery_alarm 필드는 그대로 두고 앱에서 건드리지 않는다.
-
-            ⚠️ 이 화면에서 토글이 사라졌다는 건 사용자가 더 이상 끌 수 없다는 뜻이다.
-            서버가 GET /api/scenic-spots/nearby 에서 푸시 발송을 멈춘 뒤에만
-            이 상태가 맞다(scenic/api.ts 주석 참고). 아직 푸시가 나간다면 이 토글을
-            되살릴 것 — 못 끄는 알림이 안 오는 알림보다 나쁘다.
+            '기차역 풍경 알림'. 서버가 GET /api/scenic-spots/nearby 응답과 함께 푸시를
+            쏘는데, 그 발송을 가르는 스위치가 이 값이다. 앱이 임의로 끄지 않고
+            사용자 선택만 반영한다.
+            이 값이 꺼져 있으면 자동 탑승(AutoBoarding)도 시작하지 않고, 위치 권한
+            안내(LocationPermissionPrompt)도 뜨지 않는다.
           */}
+          <ToggleRow
+            title="기차역 풍경 알림"
+            subtitle="기차 이동 중 풍경을 알림으로 안내합니다"
+            value={settings.scenery_alarm}
+            onChange={(v) => onToggle({ scenery_alarm: v })}
+          />
         </ScrollView>
       )}
     </View>

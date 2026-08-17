@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { useConfirmDialog } from "@/src/components/ConfirmDialog";
+import { useNotificationSettingsQuery } from "@/src/features/notification/queries";
 
 import {
   ensureForegroundLocationPermission,
@@ -23,11 +24,18 @@ let promptedThisRun = false;
  *
  * 이미 허용돼 있으면 아무것도 하지 않는다. 목업 위치 모드(MOCK_LOCATION)에서도
  * 권한 확인이 항상 true 라 뜨지 않는다 — 실제 동작을 보려면 목업을 꺼야 한다.
+ *
+ * 알림 설정에서 '기차역 풍경 알림'을 꺼 둔 사용자에게는 묻지 않는다. 이 창의 명분이
+ * 풍경 알림 하나뿐이라, 꺼 둔 기능을 위해 위치 권한을 요구하는 꼴이 된다.
  */
 export default function LocationPermissionPrompt() {
   const { dialog, ask, notify } = useConfirmDialog();
+  const { data: notificationSettings } = useNotificationSettingsQuery();
+  const sceneryAlarm = notificationSettings?.scenery_alarm;
 
   useEffect(() => {
+    // 아직 조회 중이면(undefined) 미룬다 — 값이 도착하면 이 이펙트가 다시 돈다.
+    if (sceneryAlarm !== true) return;
     if (promptedThisRun) return;
     promptedThisRun = true;
 
@@ -50,7 +58,7 @@ export default function LocationPermissionPrompt() {
         },
       });
     })();
-  }, [ask, notify]);
+  }, [ask, notify, sceneryAlarm]);
 
   return dialog;
 }

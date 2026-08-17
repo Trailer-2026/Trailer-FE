@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 
+import { useNotificationSettingsQuery } from "@/src/features/notification/queries";
 import {
   useCurrentTravel,
   useTravelDetail,
@@ -9,7 +10,6 @@ import {
   ensureForegroundLocationPermission,
   resetMockLocation,
 } from "../location";
-import { disableScenicPush } from "../push";
 import { useMinuteTick, useScenicPolling } from "../queries";
 import { collectTrainSegments, findActiveSegment } from "../segments";
 import { useScenicStore } from "../store";
@@ -33,6 +33,10 @@ let permissionAskedFor: number | null = null;
  *
  * 사용자가 직접 '탑승 종료'를 누른 구간은 다시 켜지 않는다(store 의
  * skipAutoScheduleIdx). 도착 시각을 모르는 구간(end_time 없음)도 대상이 아니다.
+ *
+ * **켜지려면 두 가지 동의가 모두 있어야 한다** — 알림 설정의 '기차역 풍경 알림'
+ * (scenery_alarm)과 포그라운드 위치 권한. 둘 중 하나라도 없으면 세션을 열지 않는다.
+ * 탑승 중에 알림을 끄면 그 자리에서 종료한다.
  */
 export default function AutoBoarding() {
   const { data: current } = useCurrentTravel();
@@ -49,6 +53,16 @@ export default function AutoBoarding() {
    * 끊긴 사이에 멀쩡히 탑승 중인 세션을 꺼버린다.
    */
   const travelResolved = current !== undefined;
+
+  /**
+   * '기차역 풍경 알림'(알림 설정)을 켜 둔 사용자만 자동 탑승 대상이다.
+   *
+   * undefined 는 아직 조회 중이거나 조회에 실패했다는 뜻이라 "꺼짐"과 구분해서 다룬다 —
+   * 시작 판단에서는 미확인을 켜짐으로 보지 않는다. 동의를 확인하지 못한 채 세션을 열면
+   * GPS 를 계속 읽고 /nearby 호출마다 푸시가 나간다(api.ts 참고).
+   */
+  const { data: notificationSettings } = useNotificationSettingsQuery();
+  const sceneryAlarm = notificationSettings?.scenery_alarm;
 
   const now = useMinuteTick();
   const session = useScenicStore((s) => s.session);
@@ -85,6 +99,13 @@ export default function AutoBoarding() {
         stopRiding();
         return;
       }
+      // 탑승 중에 알림 설정에서 풍경 알림을 끈 경우. 그냥 두면 하차할 때까지
+      // 폴링(= 푸시)이 계속 나간다. 여기서는 false 일 때만 끈다 — undefined 로
+      // 끄면 네트워크가 잠깐 끊긴 사이 멀쩡한 세션이 죽는다.
+      if (sceneryAlarm === false) {
+        stopRiding();
+        return;
+      }
       // detail 이 없으면 active 가 무조건 null 이라(58줄) "구간 없음"과 "아직 모름"이
       // 구분되지 않는다. 그대로 두면 상세가 비어 있는 동안 멀쩡한 세션이 꺼진다.
       // 판단을 미룰 뿐이므로 다른 여행의 세션 정리(위 분기)보다 뒤에 둔다 —
@@ -94,6 +115,9 @@ export default function AutoBoarding() {
       return;
     }
 
+    // 꺼져 있거나(false) 아직 모르면(undefined) 시작하지 않는다. 조회가 늦어져도
+    // 값이 도착하면 이 이펙트가 다시 돌아 그때 시작되므로 한 번 놓치고 끝나지 않는다.
+    if (sceneryAlarm !== true) return;
     if (!active) return;
     if (skipAutoScheduleIdx === active.scheduleIdx) return; // 사용자가 직접 종료한 구간
     if (permissionAskedFor === active.scheduleIdx) return; // 이미 물어보고 거절당함
@@ -104,10 +128,6 @@ export default function AutoBoarding() {
       const granted = await ensureForegroundLocationPermission();
       if (!granted) return; // permissionAskedFor 를 남겨 이 구간은 다시 묻지 않는다
       permissionAskedFor = null; // 허용됐으면 다음 구간도 정상 판단
-
-      // /nearby 를 처음 부르기 직전에 풍경 푸시를 꺼 둔다(push.ts 참고).
-      // 응답을 기다리지 않는다 — 늦어도 다음 폴링에는 반영된다.
-      void disableScenicPush();
 
       // 동의 창을 오래 띄워두는 동안 상황이 바뀔 수 있다 — 구간이 끝났거나,
       // 여행이 종료됐거나, 사용자가 탑승 종료를 눌렀거나. 아래 travelIdx·active 는
@@ -135,6 +155,7 @@ export default function AutoBoarding() {
     detail,
     active,
     session,
+    sceneryAlarm,
     skipAutoScheduleIdx,
     startRiding,
     stopRiding,

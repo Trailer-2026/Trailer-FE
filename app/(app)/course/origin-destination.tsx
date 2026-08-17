@@ -30,16 +30,10 @@ export default function OriginDestinationScreen() {
     t === "origin" ? origin : t === "destination" ? destination : viaStation;
 
   // 같은 역 중복 선택 방지용 — 픽커별로 반대편(주요) 역 하나를 숨긴다.
-  const excludeFor = (t: StationTarget): number | null =>
+  const excludeFor = (t: StationTarget): string | null =>
     t === "origin"
-      ? destination?.station_idx ?? null
-      : origin?.station_idx ?? null;
-
-  const titleFor: Record<StationTarget, string> = {
-    origin: "출발지",
-    destination: "도착지",
-    via: "경유지",
-  };
+      ? destination?.station_name ?? null
+      : origin?.station_name ?? null;
 
   const onSelectStation = (s: SelectedStation) => {
     if (pickerFor === "origin") setOrigin(s);
@@ -100,9 +94,10 @@ export default function OriginDestinationScreen() {
 
       <StationPickerModal
         visible={pickerFor !== null}
-        title={pickerFor ? titleFor[pickerFor] : ""}
-        selectedIdx={pickerFor ? selectedFor(pickerFor)?.station_idx ?? null : null}
-        excludeIdx={pickerFor ? excludeFor(pickerFor) : null}
+        selectedName={
+          pickerFor ? selectedFor(pickerFor)?.station_name ?? null : null
+        }
+        excludeName={pickerFor ? excludeFor(pickerFor) : null}
         onClose={() => setPickerFor(null)}
         onSelect={onSelectStation}
       />

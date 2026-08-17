@@ -16,6 +16,7 @@ import {
   Field,
   FieldLabel,
   ModalShell,
+  StationField,
   TimeField,
   isValidTime,
   toApiTime,
@@ -173,17 +174,19 @@ export default function EditScheduleModal({
             value={trainNo}
             onChangeText={setTrainNo}
           />
-          <Field
+          <StationField
             label="출발역"
             required
             value={depStation}
             onChangeText={setDepStation}
+            excludeName={arrStation}
           />
-          <Field
+          <StationField
             label="도착역"
             required
             value={arrStation}
             onChangeText={setArrStation}
+            excludeName={depStation}
           />
           <TimeField
             label="출발 시각"

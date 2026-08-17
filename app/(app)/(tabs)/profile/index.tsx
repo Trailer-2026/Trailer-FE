@@ -149,14 +149,6 @@ export default function ProfileTab() {
       ),
       onPress: confirmLogout,
     },
-    {
-      key: "withdraw",
-      label: "회원 탈퇴",
-      icon: (
-        <Feather name="user-x" size={moderateScale(22)} color={MENU_ICON} />
-      ),
-      onPress: confirmWithdraw,
-    },
   ];
 
   return (
@@ -275,6 +267,21 @@ export default function ProfileTab() {
             <MenuItem key={row.key} row={row} />
           ))}
         </View>
+
+        {/* 회원탈퇴 — 피그마 '내정보' 하단 회색 텍스트 버튼 */}
+        <Pressable
+          onPress={confirmWithdraw}
+          hitSlop={10}
+          className="items-center"
+          style={{
+            marginTop: verticalScale(40),
+            marginBottom: verticalScale(28) + insets.bottom,
+          }}
+        >
+          <Text style={{ fontSize: moderateScale(12), fontWeight: 500, color: "#B4B4B4" }}>
+            회원탈퇴하기
+          </Text>
+        </Pressable>
       </ScrollView>
     </View>
   );

@@ -19,8 +19,11 @@ const LINE = "#D9DCE1";
 const ITEM_H = verticalScale(46);
 const VISIBLE_ROWS = 3;
 
-const MERIDIEMS = ["오전", "오후"] as const;
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
+/**
+ * 0시~23시. 오전/오후 열을 없애고 24시간제로 돌린다 —
+ * 12시간제에서는 오전 12시(자정)·오후 12시(정오)가 어느 쪽인지 헷갈린다.
+ */
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 /** 분은 5분 단위. 기존 값이 5의 배수가 아니면 가장 가까운 칸으로 맞춰진다. */
 const MINUTE_STEP = 5;
 const MINUTES = Array.from(
@@ -28,17 +31,17 @@ const MINUTES = Array.from(
   (_, i) => i * MINUTE_STEP,
 );
 
-type Parsed = { meridiemIdx: number; hourIdx: number; minuteIdx: number };
+type Parsed = { hourIdx: number; minuteIdx: number };
 
-/** "HH:MM"(24시) → 휠 인덱스. 값이 없거나 이상하면 오전 9:00. */
+/** "HH:MM"(24시) → 휠 인덱스. 값이 없거나 이상하면 9:00. */
 function parseValue(hhmm: string): Parsed {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
   const h24 = m ? Number(m[1]) : 9;
   const min = m ? Number(m[2]) : 0;
-  if (!m || h24 > 23 || min > 59) return { meridiemIdx: 0, hourIdx: 8, minuteIdx: 0 };
+  if (!m || h24 > 23 || min > 59) return { hourIdx: 9, minuteIdx: 0 };
   return {
-    meridiemIdx: h24 < 12 ? 0 : 1,
-    hourIdx: (h24 % 12 === 0 ? 12 : h24 % 12) - 1,
+    // HOURS 가 0부터라 시각이 곧 인덱스.
+    hourIdx: h24,
     // 5분 단위로 반올림. 57분 → 60분이 되면 마지막 칸(55분)으로 눌러 담는다.
     minuteIdx: Math.min(
       MINUTES.length - 1,
@@ -48,9 +51,8 @@ function parseValue(hhmm: string): Parsed {
 }
 
 /** 휠 인덱스 → "HH:MM"(24시). */
-function toHhmm({ meridiemIdx, hourIdx, minuteIdx }: Parsed): string {
-  const h12 = HOURS[hourIdx];
-  const h24 = meridiemIdx === 0 ? h12 % 12 : (h12 % 12) + 12;
+function toHhmm({ hourIdx, minuteIdx }: Parsed): string {
+  const h24 = HOURS[hourIdx];
   const min = MINUTES[minuteIdx];
   return `${String(h24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
@@ -126,20 +128,14 @@ export default function TimeWheelSheet({
             style={{ height: ITEM_H * VISIBLE_ROWS, gap: scale(16) }}
           >
             <Wheel
-              width={scale(80)}
-              labels={MERIDIEMS as unknown as string[]}
-              initialIndex={sel.meridiemIdx}
-              onIndexChange={(i) => setSel((s) => ({ ...s, meridiemIdx: i }))}
-            />
-            <Wheel
-              width={scale(70)}
-              labels={HOURS.map(String)}
+              width={scale(90)}
+              labels={HOURS.map((h) => `${String(h).padStart(2, "0")}시`)}
               initialIndex={sel.hourIdx}
               onIndexChange={(i) => setSel((s) => ({ ...s, hourIdx: i }))}
             />
             <Wheel
-              width={scale(70)}
-              labels={MINUTES.map((m) => String(m).padStart(2, "0"))}
+              width={scale(90)}
+              labels={MINUTES.map((m) => `${String(m).padStart(2, "0")}분`)}
               initialIndex={sel.minuteIdx}
               onIndexChange={(i) => setSel((s) => ({ ...s, minuteIdx: i }))}
             />
