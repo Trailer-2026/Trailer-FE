@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Animated, BackHandler, Pressable, StyleSheet, View } from "react-native";
+import {
+  Animated,
+  BackHandler,
+  Keyboard,
+  KeyboardAvoidingView,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "@/src/components/Text";
@@ -11,6 +19,10 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
  *   화면 내부 절대위치 오버레이 → 부모 최상위 View 바로 밑 형제로 둘 것.
  * - 열림 애니메이션 동안 배경(딤)을 disabled 로 둬, 시트를 여는 탭이 배경으로
  *   재전달돼도 닫힘이 발생하지 않게 한다. ready 후에만 배경 탭으로 닫힌다.
+ * - 키보드: Modal 이 아니라 메인 창 안에 있고, 메인 창은 edge-to-edge 라
+ *   adjustResize 로 줄어들지 않는다(댓글 시트는 Modal 이라 줄어든다). 그래서
+ *   패널을 KeyboardAvoidingView(padding) 로 감싸 겹치는 높이만큼 위로 올린다.
+ *   창이 줄어드는 기기에서는 겹침이 0 으로 계산돼 이중으로 밀리지 않는다.
  */
 const READY_MS = 350;
 
@@ -45,6 +57,8 @@ export function AuthBottomSheet({
       return () => clearTimeout(t);
     }
     setReady(false);
+    // 입력 중 배경 탭/뒤로가기로 닫히면 키보드가 남지 않게 함께 내린다.
+    Keyboard.dismiss();
     Animated.timing(anim, {
       toValue: 0,
       duration: 200,
@@ -104,13 +118,15 @@ export function AuthBottomSheet({
         />
       </Pressable>
 
-      {/* 하단 패널 */}
+      {/* 하단 패널 — KAV 가 키보드와 겹치는 만큼 paddingBottom 을 줘서 패널을 올린다 */}
+      <KeyboardAvoidingView
+        behavior="padding"
+        enabled={visible}
+        pointerEvents="box-none"
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
+      >
       <Animated.View
         style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
           backgroundColor: "#FFFFFF",
           borderTopLeftRadius: scale(24),
           borderTopRightRadius: scale(24),
@@ -137,6 +153,7 @@ export function AuthBottomSheet({
 
         <View style={{ marginTop: verticalScale(24) }}>{children}</View>
       </Animated.View>
+      </KeyboardAvoidingView>
     </View>
   );
 }

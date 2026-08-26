@@ -8,7 +8,7 @@ export type MyProfile = {
   nickname: string;
   email: string | null;
   profile_image: string | null;
-  provider: "google" | "kakao";
+  provider: "google" | "kakao" | "demo";
 };
 
 /**
