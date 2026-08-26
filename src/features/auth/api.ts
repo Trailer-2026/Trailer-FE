@@ -36,6 +36,30 @@ export async function loginGoogle(googleIdToken: string): Promise<TokenResponse>
   return res.data.data;
 }
 
+/**
+ * POST /api/auth/login/demo — Play 스토어 심사용 데모 로그인.
+ * 소셜 제공자를 거치지 않는 심사 전용 경로. 자격증명이 맞으면 소셜 로그인과 동일한
+ * 토큰을, 틀리면 401 을 준다. 401 은 "세션 만료"가 아니라 "잘못된 자격증명"이므로
+ * 토큰 재발급 인터셉터를 타지 않게 우회한다.
+ * ⚠️ 심사가 끝나면 서버 엔드포인트와 함께 제거할 것.
+ */
+export async function loginDemo(
+  username: string,
+  password: string,
+): Promise<TokenResponse> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 400));
+    return MOCK_TOKENS;
+  }
+  const res = await api.post<CommonResponse<TokenResponse>>(
+    "/api/auth/login/demo",
+    { username, password },
+    { _skipAuthRefresh: true },
+  );
+  if (!res.data.data) throw new Error(res.data.message);
+  return res.data.data;
+}
+
 export async function refreshTokens(refreshToken: string): Promise<TokenResponse> {
   if (USE_MOCK) {
     return MOCK_TOKENS;

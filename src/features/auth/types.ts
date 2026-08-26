@@ -6,6 +6,6 @@ export type TokenResponse = {
 
 export type UserProfile = {
   user_idx: number;
-  provider: "google" | "kakao";
+  provider: "google" | "kakao" | "demo";
   email?: string | null;
 };
