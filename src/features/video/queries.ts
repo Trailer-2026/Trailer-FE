@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
 import { reelsKeys } from "@/src/features/reels/keys";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { userKeys } from "@/src/features/user/keys";
@@ -24,8 +25,20 @@ export function useBgmTracks() {
   return useQuery({
     queryKey: videoKeys.bgm(),
     queryFn: getBgmTracks,
-    staleTime: 1000 * 60 * 30, // 30분
+    ...CACHE_POLICY.STATIC,
   });
+}
+
+/**
+ * 릴스가 생기거나 바뀌거나 지워졌을 때 무효화할 목록들.
+ *
+ * - 내 릴스 목록: `exact` 를 붙여야 한다 — myReels 키가 likedReels 키의 접두사라
+ *   그냥 넘기면 좋아요 목록까지 같이 다시 받는다.
+ * - 추천: recommend() 접두사로 피드와 홈 카드만 걸린다(댓글 캐시는 그대로).
+ */
+function invalidateMyReelsLists(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: userKeys.myReels(), exact: true });
+  queryClient.invalidateQueries({ queryKey: reelsKeys.recommend() });
 }
 
 /**
@@ -125,10 +138,7 @@ export function useUploadReelsVideo() {
       /** 0~100 — 호출부가 버튼에 진행률을 그린다. */
       onProgress?: (percent: number) => void;
     }) => uploadReelsVideo(vars.video, vars.title, vars.onProgress),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
-      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
-    },
+    onSuccess: () => invalidateMyReelsLists(queryClient),
   });
 }
 
@@ -141,10 +151,7 @@ export function useUpdateReelsTitle() {
   return useMutation({
     mutationFn: (vars: { reelsIdx: number; title: string | null }) =>
       updateReelsTitle(vars.reelsIdx, vars.title),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
-      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
-    },
+    onSuccess: () => invalidateMyReelsLists(queryClient),
   });
 }
 
@@ -159,9 +166,8 @@ export function useDeleteReels() {
   return useMutation({
     mutationFn: (reelsIdx: number) => deleteReels(reelsIdx),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.myReels() });
+      invalidateMyReelsLists(queryClient);
       queryClient.invalidateQueries({ queryKey: userKeys.likedReels() });
-      queryClient.invalidateQueries({ queryKey: reelsKeys.all });
     },
   });
 }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
 import type { Theme } from "@/src/features/course/types";
 import { useDebouncedValue } from "@/src/utils/useDebouncedValue";
 
@@ -7,11 +8,9 @@ import { getPlaceDetail, getThemedPlaces, searchPlaces } from "./api";
 import { placeKeys } from "./keys";
 import { NATURE_SEED } from "./seed";
 
-const FIXED_STALE_MS = 1000 * 60 * 5; // 고정 theme: 5분 캐시
-
 /**
  * 테마별 관광지 조회.
- * - 고정 theme (예: NATURE): 5분 캐시 → 같은 화면 재진입 시 즉시.
+ * - 고정 theme (예: NATURE): LOOKUP 정책(5분) → 같은 화면 재진입 시 즉시.
  * - 랜덤 (theme 미지정): staleTime 0 + refetch() 로 매번 새 결과 보장.
  *   ('다른 테마' 버튼이 refetch 를 트리거하는 UX 라 캐시 재사용 X)
  *
@@ -24,7 +23,8 @@ export function useThemedPlaces(theme?: Theme) {
   return useQuery({
     queryKey: placeKeys.themed(theme),
     queryFn: () => getThemedPlaces(theme),
-    staleTime: theme ? FIXED_STALE_MS : 0,
+    ...CACHE_POLICY.LOOKUP,
+    ...(theme ? null : { staleTime: 0 }),
     initialData: isNature ? NATURE_SEED : undefined,
     initialDataUpdatedAt: isNature ? 0 : undefined,
   });
@@ -42,19 +42,19 @@ export function usePlaceSearch(query: string) {
     queryKey: placeKeys.search(debounced),
     queryFn: () => searchPlaces(debounced),
     enabled: debounced.length >= 1,
-    staleTime: 1000 * 60,
+    ...CACHE_POLICY.LOOKUP,
   });
 }
 
 /**
  * 여행지 상세.
- * TourAPI 실시간 조회라 응답이 느린 편 → 한 번 받아온 건 5분간 재사용한다.
+ * TourAPI 실시간 조회라 응답이 느린 편 → 한 번 받아온 건 재사용한다(LOOKUP).
  */
 export function usePlaceDetail(contentId?: string) {
   return useQuery({
     queryKey: placeKeys.detail(contentId ?? ""),
     queryFn: () => getPlaceDetail(contentId!),
     enabled: !!contentId,
-    staleTime: FIXED_STALE_MS,
+    ...CACHE_POLICY.LOOKUP,
   });
 }

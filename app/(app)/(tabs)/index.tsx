@@ -45,23 +45,23 @@ import { toHttps } from "@/src/utils/url";
 // Figma 내보내기 아이콘 에셋 (Metro 는 대소문자 구분 — 실제 파일명 케이스와 정확히 일치시킬 것)
 const ICONS = {
   ticket: require("../../../assets/images/Ticket.png"),
-  main: require("../../../assets/images/Main1.png"),
+  main: require("../../../assets/images/Main1.webp"),
 };
 
-/** 메인 배너 슬라이드 3장 — 좌우로 넘겨 본다. */
+/** 메인 배너 슬라이드 3장 — 좌우로 넘겨 본다. 배너는 번들 크기 때문에 WebP 로 둔다. */
 const HERO_SLIDES = [
   {
-    image: require("../../../assets/images/Main1.png"),
+    image: require("../../../assets/images/Main1.webp"),
     tag: "AI 일정추천",
     lines: ["취향만 고르면", "일정은 AI가 짜드려요"],
   },
   {
-    image: require("../../../assets/images/Main2.png"),
+    image: require("../../../assets/images/Main2.webp"),
     tag: "여행 영상 제작",
     lines: ["천천히 가는 만큼,", "더 많이 담아갑니다"],
   },
   {
-    image: require("../../../assets/images/Main3.png"),
+    image: require("../../../assets/images/Main3.webp"),
     tag: "내일로패스",
     lines: ["우리의 청춘을 연결하는", "한 장의 패스"],
   },

@@ -49,8 +49,6 @@ export const SCENIC_MIN_MOVE_METERS = MOCK_LOCATION ? 0 : 500;
 const CALL_GUARD_SLACK_MS = MOCK_LOCATION ? 0 : 10 * 1000;
 
 export type ScenicPolling = {
-  loading: boolean;
-  error: string | null;
   /** 사용자가 직접 누르는 새로고침 — 간격·이동거리 조건을 무시하고 즉시 호출 */
   refresh: () => void;
 };
@@ -205,12 +203,13 @@ function stopPolling() {
  * 여러 화면에서 동시에 호출해도 안전하다 — 타이머는 모듈에 하나뿐이고,
  * 마지막 화면이 언마운트될 때만 멈춘다. 세션 자체는 스토어에 남아 있어
  * 화면에 다시 들어오면 이어서 폴링한다.
+ *
+ * loading/error 는 여기서 돌려주지 않는다 — 스토어에 있으니 보여줄 컴포넌트가 직접
+ * 구독한다. 이 훅이 구독하면 세션 유무만 필요한 AutoBoarding(앱 루트)까지 폴링 한 번에
+ * loading true/false 로 두 번씩 다시 그려진다.
  */
 export function useScenicPolling(): ScenicPolling {
   const scheduleIdx = useScenicStore((s) => s.session?.scheduleIdx ?? null);
-  // 로딩·에러는 스토어에 있다 — 폴링을 실제로 돌리는 화면이 어디든 두 화면이 같은 상태를 본다.
-  const loading = useScenicStore((s) => s.loading);
-  const error = useScenicStore((s) => s.error);
 
   // 이 화면을 구독자 집합에서 식별하는 토큰. 값 자체는 쓰지 않는다.
   const token = useRef({});
@@ -233,7 +232,7 @@ export function useScenicPolling(): ScenicPolling {
     void runTick(true);
   }, []);
 
-  return { loading, error, refresh };
+  return { refresh };
 }
 
 /**

@@ -5,6 +5,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
+
 import { notificationKeys } from "./keys";
 import {
   getNotifications,
@@ -28,7 +30,7 @@ export function useNotificationSettingsQuery() {
   return useQuery({
     queryKey: notificationKeys.settings(),
     queryFn: getNotificationSettings,
-    staleTime: 1000 * 60, // 1분
+    ...CACHE_POLICY.OWNED,
   });
 }
 
@@ -86,7 +88,7 @@ export function useNotifications() {
       getNotifications({ limit: PAGE_SIZE, cursor: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
-    staleTime: 1000 * 30,
+    ...CACHE_POLICY.LIVE,
   });
 }
 
@@ -103,7 +105,7 @@ export function useUnreadNotificationCount(): number {
       getNotifications({ limit: PAGE_SIZE, cursor: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
-    staleTime: 1000 * 30,
+    ...CACHE_POLICY.LIVE,
     select: (d) => d.pages[0]?.unread_count ?? 0,
   });
   return data ?? 0;

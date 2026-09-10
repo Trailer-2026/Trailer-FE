@@ -5,6 +5,9 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
+import { userKeys } from "@/src/features/user/keys";
+
 import {
   deleteReelsComment,
   getReelsComments,
@@ -16,17 +19,19 @@ import {
   unlikeReels,
   updateReelsComment,
 } from "./api";
-import { userKeys } from "@/src/features/user/keys";
-
 import { reelsKeys } from "./keys";
 import type { Reels, ReelsComment, ReelsRecommendItem } from "./types";
 
-/** 릴스 댓글 목록. 시트를 열었을 때만(reelsIdx 가 있을 때만) 요청한다. */
+/**
+ * 릴스 댓글 목록. 시트를 열었을 때만(reelsIdx 가 있을 때만) 요청한다.
+ * 닫았다 바로 다시 열면 캐시를 보여주고, 내 댓글 작성/삭제는 mutation 이 무효화한다.
+ */
 export function useReelsComments(reelsIdx: number | null) {
   return useQuery({
     queryKey: reelsKeys.comments(reelsIdx ?? -1),
     queryFn: () => getReelsComments(reelsIdx!),
     enabled: reelsIdx != null,
+    ...CACHE_POLICY.LIVE,
   });
 }
 
@@ -209,7 +214,9 @@ export function useReelsPreview(limit: number) {
       lastPreviewIdx = items.map((item) => item.reels_idx);
       return items.map(toReels);
     },
-    staleTime: 1000 * 60, // 1분 — 홈을 오갈 때마다 다시 받지 않게
+    // 홈을 오갈 때마다 다시 받지 않게 1분. 당겨서 새로고침이 명시적 갱신 경로다.
+    staleTime: 1000 * 60,
+    gcTime: CACHE_POLICY.FEED.gcTime,
   });
 }
 
@@ -237,8 +244,10 @@ export function useRecommendedReels() {
       const seen = allPages.flatMap((page) => page.map((r) => r.reels_idx));
       return seen.slice(-EXCLUDE_LIMIT);
     },
-    // 스크롤 도중 목록이 뒤바뀌지 않도록 자동 갱신은 하지 않는다.
-    staleTime: Infinity,
+    // 스크롤 도중 목록이 뒤바뀌면 안 된다 — 피드 탭은 언마운트되지 않으므로 staleTime 은
+    // 여기서 재요청을 일으키지 않는다. 오래 비웠다 돌아왔을 때의 갱신은 feed.tsx 가
+    // 탭 포커스 시점에 이 staleTime 과 dataUpdatedAt 을 비교해 첫 페이지부터 다시 받는다.
+    ...CACHE_POLICY.FEED,
     select: (data) => data.pages.flat().map(toReels),
   });
 }

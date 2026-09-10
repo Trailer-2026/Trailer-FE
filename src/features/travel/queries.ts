@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 import { notificationKeys } from "../notification/keys";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { preparePhotoForUpload } from "@/src/features/video/photo-upload";
 
@@ -156,7 +157,7 @@ export function useCurrentTravel() {
     queryFn: getCurrentTravel,
     // 목업 모드에선 응답을 어차피 버리므로 요청 자체를 보내지 않는다(로그인 전 401 소음 방지).
     enabled: !MOCK_TRAVEL_COMPLETED,
-    staleTime: 1000 * 60, // 1분
+    ...CACHE_POLICY.OWNED,
   });
   // 여행이 끝나면 서버가 data=null 을 주므로, 목업도 null 로 맞춘다.
   if (MOCK_TRAVEL_COMPLETED) return { ...query, data: null };
@@ -173,7 +174,7 @@ export function usePastTravels() {
     queryFn: getPastTravels,
     // 목업 모드에선 서버를 보지 않는다 — 목록을 목업으로 통째 대체하므로 요청이 무의미하다.
     enabled: !MOCK_TRAVEL_COMPLETED,
-    staleTime: 1000 * 60, // 1분
+    ...CACHE_POLICY.OWNED,
   });
 
   // 목업: '다녀온 여행' 을 완료된 여행 1건으로 대체한다.
@@ -245,7 +246,7 @@ export function useTravelDetail(travelIdx?: number) {
     queryFn: () => getTravelDetail(travelIdx!),
     // 목업 여행은 서버에 없다 — 요청을 보내지 않고 아래에서 목업으로 응답한다.
     enabled: travelIdx != null && !mocked,
-    staleTime: 1000 * 60, // 1분
+    ...CACHE_POLICY.OWNED,
   });
   if (mocked) {
     return {
@@ -272,7 +273,7 @@ export function usePrefetchTravelDetail(travelIdx?: number) {
     queryClient.prefetchQuery({
       queryKey: travelKeys.detail(travelIdx),
       queryFn: () => getTravelDetail(travelIdx),
-      staleTime: 1000 * 60, // 1분 — useTravelDetail 과 동일
+      ...CACHE_POLICY.OWNED, // useTravelDetail 과 동일
     });
   }, [queryClient, travelIdx]);
 }
@@ -288,7 +289,7 @@ export function useTravelTickets(travelIdx?: number) {
     queryKey: travelKeys.tickets(travelIdx ?? -1),
     queryFn: () => getTravelTickets(travelIdx!),
     enabled: travelIdx != null,
-    staleTime: 1000 * 60, // 1분
+    ...CACHE_POLICY.OWNED,
   });
 }
 

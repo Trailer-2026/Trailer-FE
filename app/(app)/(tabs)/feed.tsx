@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
 import { describeApiError } from "@/src/api/errors";
 import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import AddCircleIcon from "@/src/components/icons/AddCircleIcon";
@@ -55,6 +56,7 @@ export default function FeedTab() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    dataUpdatedAt,
   } = useRecommendedReels();
 
   // 홈 '지금 사람들이 떠나는 여행' 카드로 들어온 경우 그 릴스를 맨 앞에 세운다.
@@ -243,6 +245,28 @@ export default function FeedTab() {
   ).current;
   // 카드가 화면 대부분을 덮었을 때만 "보이는" 것으로 친다(전환 중 두 장 동시 재생 방지).
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+
+  /**
+   * 오래 비웠다 돌아오면 피드를 처음부터 다시 받는다.
+   *
+   * 이 탭은 한 번 열리면 언마운트되지 않아 staleTime 만으로는 재요청이 일어나지 않고,
+   * 몇 시간 전에 받은 목록이 그대로 남는다. 그렇다고 refetch 를 하면 지금까지 받은
+   * 페이지를 전부 다시 받아오므로(무한 쿼리의 refetch 동작), 포커스가 돌아온 시점에
+   * 마지막 응답이 FEED.staleTime 보다 오래됐을 때만 첫 페이지부터 다시 시작한다.
+   * 보고 있는 동안에는 dataUpdatedAt 이 바뀌지 않아 이 이펙트가 다시 돌지 않는다
+   * — 스크롤 중에 목록이 뒤바뀌는 일은 없다.
+   */
+  useEffect(() => {
+    if (!isFocused) return;
+    if (dataUpdatedAt === 0) return; // 아직 첫 응답 전
+    if (Date.now() - dataUpdatedAt < CACHE_POLICY.FEED.staleTime) return;
+    setPinned(null);
+    setVisiblePosition(0);
+    void queryClient.resetQueries({
+      queryKey: reelsKeys.recommend(),
+      exact: true,
+    });
+  }, [isFocused, dataUpdatedAt, queryClient]);
 
   // 플레이어는 피드 전체에서 1개만. 카드마다 만들면 ExoPlayer 버퍼가 쌓여 힙(192MB)이 터진다.
   const player = useVideoPlayer(null, (p) => {
