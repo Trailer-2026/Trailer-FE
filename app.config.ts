@@ -97,6 +97,33 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         android: {
           extraMavenRepos: ["https://devrepo.kakao.com/nexus/content/groups/public/"],
+          // Play 콘솔 "앱 최적화 낮음" 대응. 릴리즈 빌드에서 R8(코드 축소·난독화·최적화)과
+          // 리소스 축소를 켠다. RN/Hermes/Expo 모듈/Firebase/GMS 는 자체 consumer keep 규칙을
+          // AAR 에 싣고 있어 별도 규칙이 필요 없고, 카카오 SDK 는 아래 규칙으로 보강한다.
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          extraProguardRules: [
+            "# Kakao SDK v2: response models are deserialized by Gson reflection, keep field names",
+            "-keep class com.kakao.sdk.**.model.* { <fields>; }",
+            "-keep class * extends com.google.gson.TypeAdapter",
+            "-keepattributes Signature",
+            "-keepattributes *Annotation*",
+            "",
+            "# Retrofit 2.9.0 (pulled in by Kakao SDK) ships rules that predate R8 full mode.",
+            "# Full mode strips generic signatures from unkept classes, so Call<T>/Response<T>",
+            "# lose their type args and Retrofit throws 'Call return type must be parameterized'",
+            "# (crashed in com.kakao.sdk.user.AppLifecycleObserver). These are the rules Retrofit",
+            "# 2.10+ bundles; see https://github.com/square/retrofit/blob/trunk/retrofit/src/main/resources/META-INF/proguard/retrofit2.pro",
+            "-keepattributes Exceptions, AnnotationDefault",
+            "-keep,allowobfuscation,allowshrinking interface retrofit2.Call",
+            "-keep,allowobfuscation,allowshrinking class retrofit2.Response",
+            "-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation",
+            "-if interface * { @retrofit2.http.* <methods>; }",
+            "-keep,allowobfuscation interface * extends <1>",
+            "# Full mode also strips generic signatures from return types (<3> = the *** return type)",
+            "-if interface * { @retrofit2.http.* public *** *(...); }",
+            "-keep,allowoptimization,allowshrinking,allowobfuscation class <3>",
+          ].join("\n"),
         },
       },
     ],

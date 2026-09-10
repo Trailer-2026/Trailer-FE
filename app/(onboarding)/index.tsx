@@ -124,6 +124,8 @@ export default function OnboardingScreen() {
       if (error.type === "invalid_credentials") {
         Alert.alert("로그인 실패", "아이디 또는 비밀번호가 올바르지 않습니다.");
       } else {
+        // 원인 추적용. type/message 만 남기고 자격증명·토큰은 절대 로그에 넣지 않는다.
+        console.warn("[auth] demo sign-in failed:", error.type, error.message);
         Alert.alert("오류", "로그인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
       }
     } finally {
@@ -143,6 +145,8 @@ export default function OnboardingScreen() {
       if (error.type === "invalid_token") {
         Alert.alert("로그인 실패", "카카오 인증이 만료되었습니다. 다시 시도해주세요.");
       } else {
+        // 원인 추적용. type/message 만 남기고 토큰은 절대 로그에 넣지 않는다.
+        console.warn("[auth] kakao sign-in failed:", error.type, error.message);
         Alert.alert("오류", "로그인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
       }
     } finally {
@@ -163,6 +167,8 @@ export default function OnboardingScreen() {
       } else if (error.type === "invalid_token") {
         Alert.alert("로그인 실패", "구글 인증이 만료되었습니다. 다시 시도해주세요.");
       } else {
+        // 원인 추적용. type/message 만 남기고 idToken 은 절대 로그에 넣지 않는다.
+        console.warn("[auth] google sign-in failed:", error.type, error.message);
         Alert.alert("오류", "로그인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
       }
     } finally {
