@@ -24,12 +24,15 @@ const SHOW_MOCK_STEP_BUTTON = __DEV__ && MOCK_LOCATION && MOCK_MANUAL;
  * 이 컴포넌트는 폴링을 걸지 않는다. 조회는 앱 루트의 AutoBoarding 이
  * useScenicPolling 으로 한 곳에서만 돌리고, 여기서는 결과만 읽는다
  * (여기서 또 구독하면 호출이 늘고, 호출 1건이 곧 알림 1건이다).
+ *
+ * 바깥 컴포넌트는 "내 구간인가"만 구독한다. 일정표의 모든 열차 행에 하나씩 붙는데,
+ * 여기서 loading/lastResponse 까지 구독하면 폴링 한 번에 타지도 않는 행들까지
+ * 전부 다시 그려진다(loading 이 true/false 로 두 번 바뀐다). 실시간 상태는
+ * 탑승 중인 그 한 행(RidingRow)만 본다.
  */
 export default function ScenicTimelineRow({
   scheduleIdx,
-  railWidth,
-  railGap,
-  railColor,
+  ...rail
 }: {
   /** 이 행이 붙는 승차 항목. 탑승 중인 구간과 같을 때만 그린다. */
   scheduleIdx: number;
@@ -38,6 +41,20 @@ export default function ScenicTimelineRow({
   railColor: string;
 }) {
   const riding = useScenicStore((s) => s.session?.scheduleIdx === scheduleIdx);
+  if (!riding) return null;
+  return <RidingRow {...rail} />;
+}
+
+/** 탑승 중인 구간의 실제 내용 — 여기서만 폴링 상태를 구독한다. */
+function RidingRow({
+  railWidth,
+  railGap,
+  railColor,
+}: {
+  railWidth: number;
+  railGap: number;
+  railColor: string;
+}) {
   const result = useScenicStore((s) => s.lastResponse);
   const loading = useScenicStore((s) => s.loading);
   const error = useScenicStore((s) => s.error);
@@ -48,8 +65,6 @@ export default function ScenicTimelineRow({
   const { refresh } = useScenicPolling();
   // OS 기본 Alert 대신 앱 UI 다이얼로그 — 신고·차단·삭제와 같은 톤을 쓴다.
   const { dialog, ask } = useConfirmDialog();
-
-  if (!riding) return null;
 
   // 직접 끈 구간은 도착 시각 전이라도 자동으로 다시 켜지지 않는다(skipAuto).
   const onStop = () =>

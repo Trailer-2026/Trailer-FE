@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
+
 import { recommendCourses } from "./api";
 import { recommendKeys } from "./keys";
 import { RECOMMEND_MAX_PAGE, type RecommendCriteria } from "./types";
-
-const STALE_MS = 1000 * 60 * 5; // 5분
 
 /**
  * "일정 생성" / "다시받기" 트리거 시에만 호출되는 조건부 훅.
@@ -18,7 +18,7 @@ export function useRecommendCourses(criteria: RecommendCriteria | null) {
     queryKey: criteria ? recommendKeys.detail(criteria) : recommendKeys.all,
     queryFn: () => recommendCourses(criteria!),
     enabled: !!criteria && criteria.themes.length > 0,
-    staleTime: STALE_MS,
+    ...CACHE_POLICY.LOOKUP,
     retry: 0,
   });
 }
@@ -39,7 +39,7 @@ export function usePrefetchNextRecommendPage() {
       queryClient.prefetchQuery({
         queryKey: recommendKeys.detail(nextCriteria),
         queryFn: () => recommendCourses(nextCriteria),
-        staleTime: STALE_MS,
+        ...CACHE_POLICY.LOOKUP,
         retry: 0,
       });
     },

@@ -43,7 +43,7 @@ import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 import { toHttps } from "@/src/utils/url";
 
 // http:// 이미지가 안드로이드 cleartext 로 막히거나 서버가 null 로 줄 때의 대체 이미지.
-const PLACEHOLDER_IMAGE = require("../../../assets/images/Main1.png");
+const PLACEHOLDER_IMAGE = require("../../../assets/images/Main1.webp");
 
 // 플랜 요약 아이콘 (PNG 에셋).
 const ICON_TRAVEL_TIME = require("../../../assets/images/style/Train.png");

@@ -279,7 +279,9 @@ function SceneryPromoCard({
   const profileImage = profile?.profile_image ?? null;
 
   const session = useScenicStore((s) => s.session);
-  const result = useScenicStore((s) => s.lastResponse);
+  // 이 카드가 응답에서 쓰는 건 기준 시각뿐이다 — 응답 객체 전체를 구독하면 관광지 목록만
+  // 바뀐 폴링에도 카드가 다시 그려진다. 문자열 하나로 좁혀 값이 같으면 건너뛴다.
+  const basedAt = useScenicStore((s) => s.lastResponse?.based_at ?? null);
   // 배경 시간대를 정하는 현재 시각 — 1분마다 갱신돼 시간대가 저절로 넘어간다.
   const now = useMinuteTick();
   const bg = SCENERY_BACKGROUNDS[sceneryTimeSlot(now)];
@@ -476,7 +478,7 @@ function SceneryPromoCard({
           </Text>
           {/* 탑승 중이면 서버 조회 시각, 아니면 지금 시각(1분마다 갱신).
               탑승 직후 아직 조회 전이면 이 줄을 아예 그리지 않는다. */}
-          {!session || result?.based_at ? (
+          {!session || basedAt ? (
             <Text
               style={{
                 fontSize: moderateScale(12),
@@ -485,8 +487,8 @@ function SceneryPromoCard({
                 color: bg.subText,
               }}
             >
-              {session && result?.based_at
-                ? `${formatBasedAt(result.based_at)} 기준`
+              {session && basedAt
+                ? `${formatBasedAt(basedAt)} 기준`
                 : `${formatClockLabel(now)} 기준`}
             </Text>
           ) : null}

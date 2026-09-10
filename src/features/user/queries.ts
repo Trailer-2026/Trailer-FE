@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+import { CACHE_POLICY } from "@/src/api/cache-policy";
 import { reelsKeys } from "@/src/features/reels/keys";
 
 import {
@@ -26,7 +27,7 @@ export function useMyProfile() {
   return useQuery({
     queryKey: userKeys.profile(),
     queryFn: getMyProfile,
-    staleTime: 1000 * 60, // 1분
+    ...CACHE_POLICY.OWNED,
   });
 }
 
@@ -41,7 +42,7 @@ export function useMyReels(enabled = true) {
     initialPageParam: null as number | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled,
-    staleTime: 1000 * 30,
+    ...CACHE_POLICY.LIVE,
     select: (data) => data.pages.flatMap((page) => page.items),
   });
 }
@@ -54,7 +55,7 @@ export function useLikedReels(enabled = true) {
     initialPageParam: null as number | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled,
-    staleTime: 1000 * 30,
+    ...CACHE_POLICY.LIVE,
     select: (data) => data.pages.flatMap((page) => page.items),
   });
 }
@@ -94,7 +95,7 @@ export function useBlockedUsers() {
   return useQuery({
     queryKey: userKeys.blocks(),
     queryFn: getBlockedUsers,
-    staleTime: 1000 * 30,
+    ...CACHE_POLICY.LIVE,
   });
 }
 
