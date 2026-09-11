@@ -25,10 +25,7 @@ import { StaticTabBar } from "@/src/components/StaticTabBar";
 import { Text } from "@/src/components/Text";
 import { addDays } from "@/src/features/course/date";
 import { formatMinutes, kstHourMinute } from "@/src/features/course/format";
-import {
-  usePrefetchNextRecommendPage,
-  useRecommendCourses,
-} from "@/src/features/course/queries";
+import { useRecommendCourses } from "@/src/features/course/queries";
 import { buildRecommendCriteria, useCourseStore } from "@/src/features/course/store";
 import {
   RECOMMEND_MAX_PAGE,
@@ -100,13 +97,7 @@ export default function ResultScreen() {
   );
 
   const { data, error, isLoading, isError, refetch } = useRecommendCourses(criteria);
-  const prefetchNext = usePrefetchNextRecommendPage();
   const createTravel = useCreateTravel();
-
-  // 응답이 오면 다음 page 를 백그라운드에서 미리 가져와둔다.
-  useEffect(() => {
-    if (data && criteria) prefetchNext(criteria);
-  }, [data, criteria, prefetchNext]);
 
   // 목적지 구분 없이 모든 코스(플랜)를 한 줄로 펼친다. 각 카드 = 하나의 일정.
   const plans = useMemo<Itinerary[]>(
