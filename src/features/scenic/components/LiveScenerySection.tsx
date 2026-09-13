@@ -47,7 +47,8 @@ export default function LiveScenerySection({
         className="text-gray-400"
         style={{ fontSize: moderateScale(12), lineHeight: moderateScale(18) }}
       >
-        열차 출발 시각이 되면 창밖으로 보이는 관광지를 일정 사이에 보여드려요.
+        열차 출발 시각이 되면 지나갈 창밖 풍경과 시각을 일정 사이에 보여드리고, 시각이
+        되면 알림으로 알려드려요.
       </Text>
     </View>
   );

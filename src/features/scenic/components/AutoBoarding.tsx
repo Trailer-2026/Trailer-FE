@@ -10,7 +10,7 @@ import {
   ensureForegroundLocationPermission,
   resetMockLocation,
 } from "../location";
-import { useMinuteTick, useScenicPolling } from "../queries";
+import { useMinuteTick, useScenicCalibration } from "../queries";
 import { collectTrainSegments, findActiveSegment } from "../segments";
 import { useScenicStore } from "../store";
 
@@ -21,22 +21,24 @@ import { useScenicStore } from "../store";
 let permissionAskedFor: number | null = null;
 
 /**
- * 자동 탑승 — 일정에 등록된 열차 **출발 시각이 되면** 풍경 알림을 켜고,
- * **도착 시각이 지나면** 끈다. '탑승 시작' 버튼을 누르지 않아도 된다.
+ * 자동 탑승 — 일정에 등록된 열차 **출발 시각이 되면** 탑승 세션을 열고,
+ * **도착 시각이 지나면** 닫는다. '탑승 시작' 버튼을 누르지 않아도 된다.
+ *
+ * 세션은 화면용이다 — 일정표의 승차 ↔ 하차 사이에 풍경 시각표를 끼우고, 포그라운드로
+ * 올라올 때 GPS 로 지연을 보정한다(useScenicCalibration). **풍경 푸시 자체는 서버가
+ * 열차 시간표로 직접 보내므로** 세션이 없어도, 앱이 꺼져 있어도 알림은 온다.
  *
  * 화면이 아니라 앱 루트에 붙는 감시자다(렌더 결과 없음). 어느 탭을 보고 있든
  * 출발 시각이 되면 세션이 시작되고, 알림 탭의 풍경 카드가 그대로 이어받는다.
+ * 출발 시각에 앱이 꺼져 있었다면 다음에 앱을 열었을 때 아직 도착 전이면 그때 시작된다.
  *
- * **한계:** 앱이 켜져 있을 때만 동작한다. 출발 시각에 앱이 꺼져 있었다면
- * 다음에 앱을 열었을 때 아직 도착 전이면 그 시점에 시작된다.
- * (백그라운드 시작은 expo-notifications·백그라운드 위치가 필요 — 이번 범위 밖)
- *
- * 사용자가 직접 '탑승 종료'를 누른 구간은 다시 켜지 않는다(store 의
+ * 사용자가 직접 '안내 끄기'를 누른 구간은 다시 켜지 않는다(store 의
  * skipAutoScheduleIdx). 도착 시각을 모르는 구간(end_time 없음)도 대상이 아니다.
  *
- * **켜지려면 두 가지 동의가 모두 있어야 한다** — 알림 설정의 '기차역 풍경 알림'
- * (scenery_alarm)과 포그라운드 위치 권한. 둘 중 하나라도 없으면 세션을 열지 않는다.
- * 탑승 중에 알림을 끄면 그 자리에서 종료한다.
+ * 알림 설정의 '기차역 풍경 알림'(scenery_alarm)을 켜 둔 사용자만 대상이다 — 꺼 둔
+ * 기능의 시각표를 일정표에 끼우면 "끈 게 아니었나" 하게 된다. 탑승 중에 끄면 그 자리에서
+ * 닫는다. 위치 권한은 **필수가 아니다** — 없으면 보정만 건너뛰고 예정 시각대로 안내한다.
+ * (예전에는 세션 = GPS 폴링이라 위치 권한이 없으면 아예 열지 않았다.)
  */
 export default function AutoBoarding() {
   const { data: current } = useCurrentTravel();
@@ -58,8 +60,7 @@ export default function AutoBoarding() {
    * '기차역 풍경 알림'(알림 설정)을 켜 둔 사용자만 자동 탑승 대상이다.
    *
    * undefined 는 아직 조회 중이거나 조회에 실패했다는 뜻이라 "꺼짐"과 구분해서 다룬다 —
-   * 시작 판단에서는 미확인을 켜짐으로 보지 않는다. 동의를 확인하지 못한 채 세션을 열면
-   * GPS 를 계속 읽고 /nearby 호출마다 푸시가 나간다(api.ts 참고).
+   * 시작 판단에서는 미확인을 켜짐으로 보지 않는다.
    */
   const { data: notificationSettings } = useNotificationSettingsQuery();
   const sceneryAlarm = notificationSettings?.scenery_alarm;
@@ -99,9 +100,8 @@ export default function AutoBoarding() {
         stopRiding();
         return;
       }
-      // 탑승 중에 알림 설정에서 풍경 알림을 끈 경우. 그냥 두면 하차할 때까지
-      // 폴링(= 푸시)이 계속 나간다. 여기서는 false 일 때만 끈다 — undefined 로
-      // 끄면 네트워크가 잠깐 끊긴 사이 멀쩡한 세션이 죽는다.
+      // 탑승 중에 알림 설정에서 풍경 알림을 끈 경우. 여기서는 false 일 때만 끈다 —
+      // undefined 로 끄면 네트워크가 잠깐 끊긴 사이 멀쩡한 세션이 죽는다.
       if (sceneryAlarm === false) {
         stopRiding();
         return;
@@ -124,16 +124,19 @@ export default function AutoBoarding() {
 
     permissionAskedFor = active.scheduleIdx;
     void (async () => {
-      // 권한이 있으면 묻지 않고 통과, 없으면 여기서 동의 창이 뜬다.
+      // 위치 권한은 GPS 보정(지연 반영)에만 쓴다. 있으면 묻지 않고 통과, 없으면 여기서
+      // 동의 창이 뜬다. 거절해도 세션은 연다 — 시각표와 알림은 예정 시각대로 동작하고,
+      // 보정만 빠진다(calibrateNow 가 권한 없으면 조용히 건너뛴다).
       const granted = await ensureForegroundLocationPermission();
-      if (!granted) return; // permissionAskedFor 를 남겨 이 구간은 다시 묻지 않는다
-      permissionAskedFor = null; // 허용됐으면 다음 구간도 정상 판단
+      // 허용됐으면 다음 구간도 정상 판단. 거절이면 남겨 두어 이 구간은 다시 묻지 않는다.
+      if (granted) permissionAskedFor = null;
 
       // 동의 창을 오래 띄워두는 동안 상황이 바뀔 수 있다 — 구간이 끝났거나,
-      // 여행이 종료됐거나, 사용자가 탑승 종료를 눌렀거나. 아래 travelIdx·active 는
+      // 여행이 종료됐거나, 사용자가 안내 끄기를 눌렀거나. 아래 travelIdx·active 는
       // 창이 뜨던 시점의 값이라 그대로 쓰면 이미 지난 구간으로 세션이 시작된다.
       // 그 사이 값이 하나라도 바뀌었으면 이 이펙트는 정리되고 새 값으로 다시 도니
-      // 여기서는 조용히 빠지면 된다(권한은 이미 받았으므로 다음 회차는 창 없이 통과).
+      // 여기서는 조용히 빠지면 된다(다음 회차는 permissionAskedFor 가 막지 않는 한
+      // 창 없이 통과).
       if (cancelled) return;
 
       resetMockLocation();
@@ -161,11 +164,10 @@ export default function AutoBoarding() {
     stopRiding,
   ]);
 
-  // 세션을 켜는 쪽이 폴링도 책임진다. 알림 탭에 두면 탭이 lazy mount 라
-  // 사용자가 그 탭을 한 번도 열지 않는 동안 타이머가 아예 안 돌아 푸시가 0건이 된다.
-  // 이 컴포넌트는 앱 루트에 항상 마운트돼 있어 어느 화면을 보든 폴링이 유지된다.
+  // 세션을 켜는 쪽이 GPS 보정도 책임진다 — 세션 시작 1회 + 포그라운드 복귀 1회.
+  // 앱 루트에 항상 마운트돼 있어 어느 화면을 보든 한 곳에서만 나간다.
   // (세션이 없으면 훅이 알아서 쉰다)
-  useScenicPolling();
+  useScenicCalibration();
 
   return null;
 }

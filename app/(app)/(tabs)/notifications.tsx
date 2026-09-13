@@ -34,7 +34,7 @@ import {
 } from "@/src/features/scenic/background";
 import { pickScenicPhoto } from "@/src/features/scenic/capture";
 import { formatBasedAt, formatClockLabel } from "@/src/features/scenic/format";
-import { useMinuteTick } from "@/src/features/scenic/queries";
+import { useMinuteTick, useScenicPlanQuery } from "@/src/features/scenic/queries";
 import {
   findCurrentScheduleItem,
   findNearestScheduleItem,
@@ -279,9 +279,9 @@ function SceneryPromoCard({
   const profileImage = profile?.profile_image ?? null;
 
   const session = useScenicStore((s) => s.session);
-  // 이 카드가 응답에서 쓰는 건 기준 시각뿐이다 — 응답 객체 전체를 구독하면 관광지 목록만
-  // 바뀐 폴링에도 카드가 다시 그려진다. 문자열 하나로 좁혀 값이 같으면 건너뛴다.
-  const basedAt = useScenicStore((s) => s.lastResponse?.based_at ?? null);
+  // 탑승 중일 때 "○○ 기준" 에 쓰는 서버 응답 시각. 시각표 쿼리는 세션이 있을 때만
+  // 돌고(queries.ts), 캐시는 일정표의 탑승 행과 공유된다.
+  const basedAt = useScenicPlanQuery().data?.based_at ?? null;
   // 배경 시간대를 정하는 현재 시각 — 1분마다 갱신돼 시간대가 저절로 넘어간다.
   const now = useMinuteTick();
   const bg = SCENERY_BACKGROUNDS[sceneryTimeSlot(now)];
@@ -310,9 +310,6 @@ function SceneryPromoCard({
     session?.scheduleIdx ??
     currentSchedule?.schedule_idx ??
     (detail ? (findNearestScheduleItem(detail, now)?.schedule_idx ?? null) : null);
-
-  // 폴링은 AutoBoarding(앱 루트)이 건다 — 이 탭은 lazy mount 라 여기서 걸면
-  // 사용자가 알림 탭을 열지 않는 동안 푸시가 나가지 않는다.
 
   const scrim = collapsed ? SCENERY_SCRIM.collapsed : SCENERY_SCRIM.expanded;
   // 탑승 중이면 그 여행, 아니면 진행 중인 여행에 사진을 붙인다.

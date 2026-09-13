@@ -4,31 +4,31 @@ import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import { Text } from "@/src/components/Text";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-import { formatBasedAt } from "../format";
+import { describeScenicError } from "../errors";
+import { formatBasedAt, parseWallClock } from "../format";
 import { MOCK_LOCATION, MOCK_MANUAL } from "../location";
-import { useScenicPolling } from "../queries";
+import { calibrateNow, useMinuteTick, useScenicPlanQuery } from "../queries";
 import { useScenicStore } from "../store";
-import SpotCard from "./SpotCard";
+import type { ScenicPlanItem, ScenicPlanResponse } from "../types";
+import PlanSpotCard from "./PlanSpotCard";
 
 const SIDE_ACCENT = "#668DFF";
 
-/** 목업 좌표를 손으로 한 칸씩 밀어보는 개발용 버튼을 그릴지. */
+/** 목업 좌표를 손으로 한 칸씩 밀어 보정을 확인하는 개발용 버튼을 그릴지. */
 const SHOW_MOCK_STEP_BUTTON = __DEV__ && MOCK_LOCATION && MOCK_MANUAL;
 
 /**
- * 여행 상세 타임라인의 승차 ↔ 하차 사이에 끼는 실시간 창밖 풍경 목록.
+ * 여행 상세 타임라인의 승차 ↔ 하차 사이에 끼는 창밖 풍경 시각표.
  *
  * **탑승 중인 그 구간에만 나타난다.** 세션은 메모리 스토어(persist 없음)라
  * 탑승 종료·도착·앱 재시작이면 저절로 사라진다 — 따로 지울 것이 없다.
  *
- * 이 컴포넌트는 폴링을 걸지 않는다. 조회는 앱 루트의 AutoBoarding 이
- * useScenicPolling 으로 한 곳에서만 돌리고, 여기서는 결과만 읽는다
- * (여기서 또 구독하면 호출이 늘고, 호출 1건이 곧 알림 1건이다).
+ * 알림 자체는 서버가 시각표대로 보낸다. 이 행은 "앞으로 무엇을 언제 지나는지"를
+ * 보여주는 안내판이고, 여기서 무엇을 하든 알림 발송에는 영향이 없다.
  *
  * 바깥 컴포넌트는 "내 구간인가"만 구독한다. 일정표의 모든 열차 행에 하나씩 붙는데,
- * 여기서 loading/lastResponse 까지 구독하면 폴링 한 번에 타지도 않는 행들까지
- * 전부 다시 그려진다(loading 이 true/false 로 두 번 바뀐다). 실시간 상태는
- * 탑승 중인 그 한 행(RidingRow)만 본다.
+ * 여기서 시각표까지 구독하면 갱신 한 번에 타지도 않는 행들까지 전부 다시 그려진다.
+ * 실시간 상태는 탑승 중인 그 한 행(RidingRow)만 본다.
  */
 export default function ScenicTimelineRow({
   scheduleIdx,
@@ -45,7 +45,7 @@ export default function ScenicTimelineRow({
   return <RidingRow {...rail} />;
 }
 
-/** 탑승 중인 구간의 실제 내용 — 여기서만 폴링 상태를 구독한다. */
+/** 탑승 중인 구간의 실제 내용 — 여기서만 시각표를 구독한다. */
 function RidingRow({
   railWidth,
   railGap,
@@ -55,21 +55,21 @@ function RidingRow({
   railGap: number;
   railColor: string;
 }) {
-  const result = useScenicStore((s) => s.lastResponse);
-  const loading = useScenicStore((s) => s.loading);
-  const error = useScenicStore((s) => s.error);
-  const hasNewSpots = useScenicStore((s) => s.hasNewSpots);
+  const label = useScenicStore((s) => s.session?.label ?? "");
   const stopRiding = useScenicStore((s) => s.stopRiding);
-  // 이미 AutoBoarding 이 구독 중이라 여기서 훅을 써도 타이머는 하나뿐이다
-  // (queries.ts 의 subscribers). refresh 는 간격·이동거리 조건을 무시하고 즉시 호출한다.
-  const { refresh } = useScenicPolling();
+  const { data: plan, error, isPending, isFetching } = useScenicPlanQuery();
+  const now = useMinuteTick();
   // OS 기본 Alert 대신 앱 UI 다이얼로그 — 신고·차단·삭제와 같은 톤을 쓴다.
   const { dialog, ask } = useConfirmDialog();
+
+  // 코레일 열차운행정보에 SRT 가 없어 서버가 정차역을 모른다 → 시각표도 알림도 없다.
+  // 빈 시각표를 "풍경이 없다"로 보여주면 오해라, 이유를 그대로 알린다.
+  const isSrt = label.toUpperCase().includes("SRT");
 
   // 직접 끈 구간은 도착 시각 전이라도 자동으로 다시 켜지지 않는다(skipAuto).
   const onStop = () =>
     ask({
-      title: "창밖 풍경 알림을 끌까요?",
+      title: "창밖 풍경 안내를 끌까요?",
       message: "이 구간에서는 다시 자동으로 켜지지 않아요.",
       confirmLabel: "끄기",
       danger: true,
@@ -103,16 +103,17 @@ function RidingRow({
           >
             창밖 풍경
           </Text>
-          {/* 서버 조회 시각. 첫 조회 전에는 보여줄 시각이 없어 생략한다. */}
-          {result?.based_at ? (
+          {/* 서버 응답 시각. 첫 조회 전에는 보여줄 시각이 없어 생략한다. */}
+          {plan?.based_at ? (
             <Text
               className="text-gray-400"
               style={{ fontSize: moderateScale(11) }}
             >
-              · {formatBasedAt(result.based_at)} 기준
+              · {formatBasedAt(plan.based_at)} 기준
             </Text>
           ) : null}
-          {loading ? <ActivityIndicator size="small" color={SIDE_ACCENT} /> : null}
+          {plan ? <DelayChip minutes={plan.delay_minutes} /> : null}
+          {isFetching ? <ActivityIndicator size="small" color={SIDE_ACCENT} /> : null}
 
           {/* 끄는 버튼은 지금 타고 있는 그 열차 옆에만 둔다 — 어느 구간을 끄는지
               헷갈릴 여지가 없고, 안 타는 동안에는 화면에 남지 않는다. */}
@@ -130,21 +131,30 @@ function RidingRow({
               backgroundColor: "#FFFFFF",
             }}
             accessibilityRole="button"
-            accessibilityLabel="창밖 풍경 알림 끄기"
+            accessibilityLabel="창밖 풍경 안내 끄기"
           >
             <Text
               className="font-semibold text-gray-500"
               style={{ fontSize: moderateScale(11) }}
             >
-              알림 끄기
+              안내 끄기
             </Text>
           </Pressable>
         </View>
 
-        <Body error={error} result={result} hasNewSpots={hasNewSpots} />
+        <Body
+          isSrt={isSrt}
+          error={error}
+          pending={isPending}
+          plan={plan}
+          now={now}
+        />
 
         {SHOW_MOCK_STEP_BUTTON ? (
-          <MockStepButton onPress={refresh} disabled={loading} />
+          <MockStepButton
+            onPress={() => void calibrateNow({ force: true })}
+            disabled={isFetching}
+          />
         ) : null}
 
         {dialog}
@@ -153,43 +163,87 @@ function RidingRow({
   );
 }
 
-function Body({
-  error,
-  result,
-  hasNewSpots,
-}: {
-  error: string | null;
-  result: ReturnType<typeof useScenicStore.getState>["lastResponse"];
-  hasNewSpots: boolean;
-}) {
-  // 실패 사유를 감추면 위치 권한 문제인지 서버 문제인지 알 수 없다 — 그대로 노출한다.
-  if (error) return <Hint text={error} />;
-  // 탑승 직후, 첫 조회가 아직 안 끝난 상태.
-  if (!result) return <Hint text="주변 관광지를 찾는 중이에요." />;
-  if (result.items.length === 0) {
-    return <Hint text="지금 구간에는 알려드릴 관광지가 없어요." />;
-  }
-
+/** "지연 12분" / "3분 빠름". 0 이면 그리지 않는다. */
+function DelayChip({ minutes }: { minutes: number }) {
+  if (!minutes) return null;
+  const late = minutes > 0;
   return (
-    <View style={{ gap: verticalScale(8) }}>
-      {result.items.map((item, i) => (
-        <SpotCard
-          key={`${item.name}-${item.distance_m}`}
-          item={item}
-          // 직전 조회에 없던 곳이 있을 때만 강조한다(같은 곳 반복이면 조용히).
-          highlight={hasNewSpots}
-          // 서버가 거리순으로 주므로 첫 장이 가장 가까운 곳이다.
-          primary={i === 0}
-        />
-      ))}
+    <View
+      style={{
+        paddingHorizontal: scale(6),
+        paddingVertical: verticalScale(2),
+        borderRadius: scale(4),
+        backgroundColor: late ? "#FEF3C7" : "#DCFCE7",
+      }}
+    >
+      <Text
+        className="font-bold"
+        style={{
+          fontSize: moderateScale(10),
+          color: late ? "#B45309" : "#15803D",
+        }}
+      >
+        {late ? `지연 ${minutes}분` : `${-minutes}분 빠름`}
+      </Text>
     </View>
   );
 }
 
+function Body({
+  isSrt,
+  error,
+  pending,
+  plan,
+  now,
+}: {
+  isSrt: boolean;
+  error: unknown;
+  pending: boolean;
+  plan: ScenicPlanResponse | undefined;
+  now: Date;
+}) {
+  if (isSrt) {
+    return (
+      <Hint text="SRT는 정차역 정보가 제공되지 않아 창밖 풍경 안내를 지원하지 않아요." />
+    );
+  }
+  // 실패 사유를 감추면 인증 문제인지 서버 문제인지 알 수 없다 — 그대로 노출한다.
+  if (error) return <Hint text={describeScenicError(error)} />;
+  // 탑승 직후, 첫 조회가 아직 안 끝난 상태.
+  if (pending || !plan) return <Hint text="창밖 풍경 시각표를 불러오는 중이에요." />;
+  if (!plan.ride || plan.items.length === 0) {
+    return <Hint text="이 구간에는 알려드릴 풍경이 없어요." />;
+  }
+
+  // "지나갔는지"는 eta 와 지금 시각으로 판단한다. is_sent 는 서버가 푸시를 보냈다는
+  // 표시라 12분 묶음·중복 방지로 안 보낸 곳은 eta 가 지나도 false 로 남는다.
+  const passed = plan.items.map((item) => hasPassed(item, now));
+  const nextIdx = passed.indexOf(false);
+
+  return (
+    <View style={{ gap: verticalScale(8) }}>
+      {plan.items.map((item, i) => (
+        <PlanSpotCard
+          key={item.scenic_spot_idx}
+          item={item}
+          passed={passed[i]}
+          primary={i === nextIdx}
+        />
+      ))}
+      <Hint text="통과 시각은 열차 시간표로 계산한 예상이에요. 시각이 되면 알림으로 알려드려요." />
+    </View>
+  );
+}
+
+function hasPassed(item: ScenicPlanItem, now: Date): boolean {
+  const eta = parseWallClock(item.eta);
+  return eta !== null && eta.getTime() <= now.getTime();
+}
+
 /**
- * 개발용 — 누를 때마다 목업 좌표가 노선을 따라 한 칸(약 1km) 전진하고 즉시 재조회한다.
- * 좌표를 미는 주체는 location.ts 의 getCurrentLatLng 이라, 여기서는 조회만 시키면 된다.
- * 릴리스 빌드에는 __DEV__ 가드로 아예 포함되지 않는다.
+ * 개발용 — 누를 때마다 목업 좌표가 노선을 따라 한 칸(약 1km) 전진하고 그 좌표로
+ * 보정을 보낸다. 좌표를 미는 주체는 location.ts 의 getCurrentLatLng 이라, 여기서는
+ * 보정만 시키면 된다. 릴리스 빌드에는 __DEV__ 가드로 아예 포함되지 않는다.
  */
 function MockStepButton({
   onPress,
@@ -214,13 +268,13 @@ function MockStepButton({
         opacity: disabled ? 0.5 : 1,
       }}
       accessibilityRole="button"
-      accessibilityLabel="목업 위치 한 칸 이동"
+      accessibilityLabel="목업 위치 한 칸 이동 후 보정"
     >
       <Text
         className="font-semibold"
         style={{ fontSize: moderateScale(11), color: SIDE_ACCENT }}
       >
-        [DEV] 다음 위치로 이동
+        [DEV] 다음 위치로 보정
       </Text>
     </Pressable>
   );
