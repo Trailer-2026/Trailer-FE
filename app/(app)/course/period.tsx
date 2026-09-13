@@ -59,22 +59,29 @@ export default function PeriodScreen() {
         </Text>
 
         {/* 출발 날짜 (현재 날짜 기반 가로 스트립) */}
-        <Text
-          className="text-gray-800"
-          style={{
-            fontSize: moderateScale(14),
-            marginTop: verticalScale(28),
-            fontWeight: 650 as never,
-          }}
+        <View
+          className="flex-row items-baseline"
+          style={{ gap: scale(6), marginTop: verticalScale(28) }}
         >
-          출발 날짜
-        </Text>
+          <Text
+            className="text-gray-800"
+            style={{ fontSize: moderateScale(14), fontWeight: 650 as never }}
+          >
+            출발 날짜
+          </Text>
+          {/* 선택된 출발일이 몇 월인지 — 라벨보다 살짝 더 진하게 바로 옆에 표시. */}
+          <Text
+            className="text-gray-900"
+            style={{ fontSize: moderateScale(14), fontWeight: 800 as never }}
+          >
+            {departDate.getMonth() + 1}월
+          </Text>
+        </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: scale(10), paddingVertical: verticalScale(4) }}
           // 가로 ScrollView 가 세로로 부풀어 남은 공간을 다 먹지 않도록 콘텐츠 높이로 고정.
-          // (요일 텍스트 + 6 + 원 40 + 상하패딩 8 ≈ 70dp)
           style={{ marginTop: verticalScale(4), height: verticalScale(74), flexGrow: 0 }}
         >
           {dates.map((d) => {

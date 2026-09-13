@@ -53,6 +53,8 @@ export default function FeedTab() {
   const {
     data: recommended = [],
     isLoading,
+    isError,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -340,6 +342,27 @@ export default function FeedTab() {
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#FFFFFF" />
+        </View>
+      ) : isError ? (
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-white" style={{ fontSize: moderateScale(14) }}>
+            릴스를 불러오지 못했어요
+          </Text>
+          <Pressable
+            onPress={() => refetch()}
+            className="active:opacity-60"
+            style={{ marginTop: verticalScale(10) }}
+          >
+            <Text style={{ color: "#FFFFFF", fontSize: moderateScale(13), opacity: 0.7 }}>
+              다시 시도
+            </Text>
+          </Pressable>
+        </View>
+      ) : reels.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-white" style={{ fontSize: moderateScale(14), opacity: 0.7 }}>
+            아직 볼 릴스가 없어요
+          </Text>
         </View>
       ) : viewportHeight > 0 ? (
         <FlatList

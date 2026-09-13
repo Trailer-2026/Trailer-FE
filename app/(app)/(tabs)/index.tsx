@@ -430,7 +430,7 @@ function SectionHeader() {
           fontWeight: 650 as never,
         }}
       >
-        지금 사람들이 떠나는 여행 보기
+        사람들이 떠나는 기차여행 보기
       </Text>
     </View>
   );

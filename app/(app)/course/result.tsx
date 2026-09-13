@@ -151,9 +151,11 @@ export default function ResultScreen() {
         router.replace("/"); // 메인(홈)으로
       },
       onError: (err) => {
-        // 400: plan_id 캐시 만료 → 다시 추천받기 유도
+        // 400 은 plan_id 캐시 만료 외에 다른 이유(예: 이미 예정된 여행이 있음)일
+        // 수도 있어 문구를 짐작해서 보여주지 않고 서버 메시지를 그대로 노출한다.
+        // "다시 추천받기"는 만료가 진짜 이유일 때를 위한 복구 동작으로 남겨둔다.
         if (isAxiosError(err) && err.response?.status === 400) {
-          Alert.alert("추천이 만료됐어요", "다시 추천받아 주세요.", [
+          Alert.alert("여행을 담을 수 없어요", describeApiError(err), [
             { text: "취소", style: "cancel" },
             { text: "다시 추천받기", onPress: () => refetch() },
           ]);
@@ -221,8 +223,15 @@ export default function ResultScreen() {
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center px-10">
           <ActivityIndicator color="#5E84F4" />
+          <Text
+            className="text-gray-400 text-center"
+            style={{ fontSize: moderateScale(13), marginTop: verticalScale(14) }}
+          >
+            {page > 0 ? "새 일정을 다시 준비하고 있어요" : "일정을 준비하고 있어요"}
+            {"\n"}최대 2분 정도 걸릴 수 있어요
+          </Text>
         </View>
       ) : isError || !data ? (
         <ErrorView
@@ -257,6 +266,23 @@ export default function ResultScreen() {
               >
                 원하는 플랜을 선택하면 일정이 추가돼요.
               </Text>
+              {/* 서버가 조건에 대해 남긴 안내(예: 일부 조건 완화 사유 등)가 있으면 그대로 보여준다. */}
+              {data.note ? (
+                <View
+                  className="bg-gray-50 rounded-xl"
+                  style={{
+                    marginTop: verticalScale(12),
+                    padding: scale(12),
+                  }}
+                >
+                  <Text
+                    className="text-gray-500"
+                    style={{ fontSize: moderateScale(12.5), lineHeight: moderateScale(18) }}
+                  >
+                    {data.note}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {plans.length === 0 ? (
@@ -269,6 +295,40 @@ export default function ResultScreen() {
                 >
                   추천된 일정이 없어요
                 </Text>
+                <Pressable
+                  onPress={() => canRetry && setPage((p) => p + 1)}
+                  disabled={!canRetry}
+                  className="flex-row items-center rounded-full border"
+                  style={{
+                    marginTop: verticalScale(16),
+                    height: verticalScale(36),
+                    paddingHorizontal: scale(16),
+                    gap: scale(6),
+                    borderColor: canRetry ? "#E5E7EB" : "#F3F4F6",
+                  }}
+                >
+                  <RefreshIcon
+                    width={moderateScale(15)}
+                    height={moderateScale(15)}
+                    color={canRetry ? "#4B5563" : "#C4C9D2"}
+                  />
+                  <Text
+                    style={{
+                      fontSize: moderateScale(13),
+                      color: canRetry ? "#4B5563" : "#C4C9D2",
+                      fontWeight: 650 as never,
+                    }}
+                  >
+                    {canRetry ? "조건 바꿔서 다시 받기" : "더 이상 추천이 없어요"}
+                  </Text>
+                </Pressable>
+                {canRetry ? (
+                  <Pressable onPress={() => router.replace("/")} hitSlop={8} style={{ marginTop: verticalScale(10) }}>
+                    <Text className="text-gray-400" style={{ fontSize: moderateScale(12) }}>
+                      처음부터 다시 설정할래요
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : (
               <>
@@ -569,9 +629,12 @@ function DateStrip({
         gap: scale(18),
       }}
     >
-      {dayNos.map((dayNo) => {
+      {dayNos.map((dayNo, i) => {
         const date = addDays(tripStart, dayNo - 1);
         const on = dayNo === activeDay;
+        // 여행이 월을 넘기면 날짜만으론 헷갈리므로, 첫 칩과 월이 바뀌는 지점에 "M월"을 얹는다.
+        const prevDate = i > 0 ? addDays(tripStart, dayNos[i - 1] - 1) : null;
+        const showMonth = !prevDate || prevDate.getMonth() !== date.getMonth();
         return (
           <Pressable
             key={dayNo}
@@ -579,6 +642,17 @@ function DateStrip({
             className="items-center"
             style={{ gap: verticalScale(6) }}
           >
+            {/* 월 표시 없는 칩도 높이를 맞춰 요일 줄이 가로로 나란히 오도록 고정 높이로 예약. */}
+            <View style={{ height: verticalScale(14), justifyContent: "flex-end" }}>
+              {showMonth ? (
+                <Text
+                  className="font-semibold"
+                  style={{ fontSize: moderateScale(11), color: "#C4C9D2" }}
+                >
+                  {date.getMonth() + 1}월
+                </Text>
+              ) : null}
+            </View>
             <Text
               className="font-semibold"
               style={{
@@ -674,6 +748,37 @@ function PlanSummary({
           value={themeText}
         />
       </View>
+
+      {/* 출발지로 다시 돌아오는 왕복 코스인 경우, 마지막 기차가 왜 출발지로 향하는지 미리 설명. */}
+      {itinerary.is_round_trip_closed ? (
+        <View
+          className="flex-row items-start bg-blue-50 rounded-xl"
+          style={{ marginTop: verticalScale(16), padding: scale(12), gap: scale(6) }}
+        >
+          <Feather name="info" size={moderateScale(14)} color="#5E84F4" style={{ marginTop: 1 }} />
+          <Text
+            className="flex-1"
+            style={{ fontSize: moderateScale(12.5), color: "#4B5563", lineHeight: moderateScale(18) }}
+          >
+            왕복 일정이에요. 마지막 날 기차는 여행을 마치고 출발지로 돌아오는 열차예요.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* 서버가 이 플랜에 대해 남긴 안내(대체 경로 사용 등 사유)가 있으면 그대로 보여준다. */}
+      {itinerary.note ? (
+        <View
+          className="bg-gray-50 rounded-xl"
+          style={{ marginTop: verticalScale(10), padding: scale(12) }}
+        >
+          <Text
+            className="text-gray-500"
+            style={{ fontSize: moderateScale(12.5), lineHeight: moderateScale(18) }}
+          >
+            {itinerary.note}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -870,7 +975,7 @@ function TimelineRow({ row, isLast }: { row: Row; isLast: boolean }) {
         ) : row.t === "place" ? (
           <PlaceBody place={row.place} />
         ) : (
-          <LodgingBody name={row.name} imageUrl={row.imageUrl} />
+          <LodgingBody name={row.name} lodgingType={row.lodgingType} imageUrl={row.imageUrl} />
         )}
         {/* 항목 사이 구분선 (마지막 제외). 아래쪽에 둬서 다음 노드가
             제목 옆에 자연스럽게 정렬되고, 레일 연결선을 쪼개지 않는다. */}
@@ -1147,8 +1252,13 @@ function AlightBody({ train }: { train: TrainInfo }) {
 
 function PlaceBody({ place }: { place: PlaceInfo }) {
   const openHours = formatOpenHours(place.open_time, place.close_time);
+  const isFood = place.themes.includes("FOOD");
   return (
     <View>
+      <CategoryTag
+        label={isFood ? "맛집" : "관광"}
+        color={isFood ? "#F4A15E" : "#B0E6DB"}
+      />
       <Text
         className="font-bold"
         style={{ fontSize: moderateScale(16), color: DARK_TEXT }}
@@ -1189,13 +1299,16 @@ function PlaceBody({ place }: { place: PlaceInfo }) {
 
 function LodgingBody({
   name,
+  lodgingType,
   imageUrl,
 }: {
   name: string;
+  lodgingType: string;
   imageUrl: string | null;
 }) {
   return (
     <View>
+      <CategoryTag label={lodgingType ? `숙소 · ${lodgingType}` : "숙소"} color="#C9B6FF" />
       <Text
         className="font-bold"
         style={{ fontSize: moderateScale(16), color: DARK_TEXT }}
@@ -1207,6 +1320,28 @@ function LodgingBody({
         style={{ width: "100%", height: verticalScale(130) }}
         rounded
       />
+    </View>
+  );
+}
+
+/** 타임라인 행 위에 붙는 작은 구분 뱃지 (맛집 / 관광 / 숙소). */
+function CategoryTag({ label, color }: { label: string; color: string }) {
+  return (
+    <View
+      className="self-start rounded-md"
+      style={{
+        backgroundColor: color,
+        paddingHorizontal: scale(7),
+        paddingVertical: verticalScale(2),
+        marginBottom: verticalScale(6),
+      }}
+    >
+      <Text
+        className="font-bold"
+        style={{ fontSize: moderateScale(10.5), color: "#1A1A1A" }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }

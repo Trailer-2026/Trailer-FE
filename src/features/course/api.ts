@@ -5,13 +5,15 @@ import type { RecommendCriteria, RecommendResponse } from "./types";
 
 /**
  * AI 추천 응답이 오래 걸리는 편이라 클라이언트 전역 timeout(10s) 대신
- * 이 요청만 넉넉히 잡는다.
+ * 이 요청만 넉넉히 잡는다. 화면 안내 문구는 여전히 "최대 2분" 이지만, 드물게
+ * 그보다 오래 걸려 실패하는 사례가 있어 여유를 180초로 늘렸다.
  *
- * 서버 앞단 nginx 의 proxy_read_timeout 도 2분으로 맞춘다 — 로딩 화면의
- * "최대 2분" 안내와 같은 값이라, 이보다 짧으면 안내보다 먼저 504(HTML)로 끊긴다.
- * (nginx 가 60초였을 때 실제로 60.9초에 504 로 끝나는 것을 확인했다.)
+ * 주의: 서버 앞단 nginx 의 proxy_read_timeout 이 이보다 짧으면(예: 이전의 2분)
+ * 클라이언트가 기다려도 그 전에 nginx 가 먼저 504(HTML)로 끊는다 — 이 값을
+ * 올린 만큼 nginx proxy_read_timeout 도 180초 이상으로 같이 맞춰야 실제로
+ * 효과가 있다. (nginx 가 60초였을 때 실제로 60.9초에 504 로 끝나는 것을 확인했다.)
  */
-const RECOMMEND_TIMEOUT_MS = 120_000;
+const RECOMMEND_TIMEOUT_MS = 180_000;
 
 /**
  * POST /api/recommend/courses

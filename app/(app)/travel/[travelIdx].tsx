@@ -11,9 +11,10 @@ import { moderateScale } from "@/src/utils/responsive";
  * '예정된 여행'(일정 탭)은 같은 TravelDetailView 를 인라인으로 재사용한다.
  */
 export default function TravelDetailScreen() {
-  const { travelIdx, cover } = useLocalSearchParams<{
+  const { travelIdx, cover, openTicket } = useLocalSearchParams<{
     travelIdx?: string;
     cover?: string;
+    openTicket?: string;
   }>();
   const idx = Number(travelIdx);
   const valid = Number.isFinite(idx);
@@ -25,6 +26,7 @@ export default function TravelDetailScreen() {
           travelIdx={idx}
           coverImageUrl={cover || null}
           onBack={() => router.back()}
+          autoOpenTicket={openTicket === "1"}
         />
       ) : (
         <View className="flex-1 items-center justify-center">

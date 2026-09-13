@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { VideoView, type VideoPlayer } from "expo-video";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 import CommentIcon from "@/src/components/icons/CommentIcon";
 import DownloadIcon from "@/src/components/icons/DownloadIcon";
@@ -86,13 +86,19 @@ export default function ReelsCard({
   return (
     <View className="w-full bg-black" style={{ height }}>
       {reels.video_url && active ? (
-        <Pressable onPress={togglePlay} style={{ width: "100%", height: "100%" }}>
+        <View style={{ width: "100%", height: "100%" }}>
           <VideoView
             player={player}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             nativeControls={false}
           />
+          {/* 영상 위에 별도로 얹은 투명 터치 캐처.
+              Pressable 이 VideoView 를 자식으로 감싸면, 안드로이드에서 가끔
+              네이티브 영상 뷰가 터치를 먼저 가로채 부모 Pressable 까지 안 올라가는
+              경우가 있었다(탭이 불규칙하게 안 먹힘). 캐처를 영상보다 위(형제)에
+              따로 올려서 터치가 항상 이 뷰에서 먼저 잡히게 한다. */}
+          <Pressable onPress={togglePlay} style={StyleSheet.absoluteFillObject} />
           {/* 일시정지 표시 — 탭으로 멈춘 상태임을 알린다 */}
           {paused ? (
             <View
@@ -116,7 +122,7 @@ export default function ReelsCard({
               </View>
             </View>
           ) : null}
-        </Pressable>
+        </View>
       ) : reels.thumbnail_url ? (
         <Image
           source={{ uri: reels.thumbnail_url }}

@@ -119,17 +119,20 @@ export default function TravelDetailView({
   travelIdx,
   coverImageUrl,
   onBack,
+  autoOpenTicket,
 }: {
   travelIdx: number;
   coverImageUrl?: string | null;
   onBack?: () => void;
+  /** true 면 진입하자마자 승차권 화면을 연다(승차권 0장이면 곧장 입력 폼으로 간다). */
+  autoOpenTicket?: boolean;
 }) {
   const { data, isLoading, error, refetch } = useTravelDetail(travelIdx);
   const insets = useSafeAreaInsets();
   const focus = useFocusScroll(data);
 
   // 히어로의 'KTX 티켓 정보 추가하기' → 승차권 화면(저장된 게 있으면 목록, 없으면 폼).
-  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketOpen, setTicketOpen] = useState(!!autoOpenTicket);
 
   if (isLoading) {
     return (

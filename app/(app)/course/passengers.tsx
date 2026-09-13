@@ -34,6 +34,16 @@ export default function PassengersScreen() {
         >
           여행인원
         </Text>
+        <Text
+          className="font-semibold"
+          style={{
+            fontSize: moderateScale(13),
+            color: "#ADADAD",
+            marginTop: verticalScale(6),
+          }}
+        >
+연령대에 맞는 여행지를 추천해드려요
+        </Text>
 
         <View style={{ marginTop: verticalScale(24), gap: verticalScale(16) }}>
           {ROWS.map((row) => (

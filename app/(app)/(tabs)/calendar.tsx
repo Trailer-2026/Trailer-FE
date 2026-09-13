@@ -29,7 +29,6 @@ import {
 } from "@/src/features/travel/queries";
 import type { HomeTravelCard } from "@/src/features/travel/types";
 import { useAiCourseGate } from "@/src/features/travel/use-ai-course-gate";
-import { NAEILRO_PASS_URL, openExternalUrl } from "@/src/utils/links";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
@@ -140,15 +139,25 @@ export default function CalendarTab() {
   const [createOpen, setCreateOpen] = useState(false);
   // 진행중·예정 여행이 있으면 AI 추천을 막고 안내 다이얼로그를 띄운다.
   const { gateDialog, startAiCourse } = useAiCourseGate();
+  // 예정된 여행이 없으면 승차권을 등록할 곳이 없다 — 안내만 하고 끝내지 않고
+  // 바로 "새 여행 일정 만들기" 시트로 이어서, 여행을 만든 뒤 다시 승차권을 등록하게 한다.
   const openTicket = () => {
     if (!current) {
-      Alert.alert(
-        "예정된 여행이 없어요",
-        "여행 일정을 먼저 만들면 승차권을 등록할 수 있어요.",
-      );
+      setCreateOpen(true);
       return;
     }
     setTicketOpen(true);
+  };
+
+  // 내일로 패스 배너 — "패스 등록하고 여행 시작" 문구 그대로, 예정된 여행이 있으면
+  // 곧장 승차권 등록으로, 없으면 (AI/직접 선택 없이) 바로 직접 만들기로 이어서
+  // 만들자마자 승차권 입력 폼까지 한 번에 들어가게 한다.
+  const openNaeilroFlow = () => {
+    if (current) {
+      setTicketOpen(true);
+      return;
+    }
+    router.push("/travel/manual?ticketFirst=1");
   };
 
   const confirmDelete = (travel: MenuTarget) => {
@@ -203,7 +212,7 @@ export default function CalendarTab() {
         </Pressable>
       </View>
 
-      <PromoBanner />
+      <PromoBanner onPress={openNaeilroFlow} />
 
       {/* 알약 서브탭 */}
       <View
@@ -332,12 +341,12 @@ export default function CalendarTab() {
 /* ------------------------------------------------------------------ */
 /* 프로모 배너                                                          */
 /* ------------------------------------------------------------------ */
-function PromoBanner() {
+function PromoBanner({ onPress }: { onPress: () => void }) {
   return (
     <View style={{ paddingHorizontal: scale(20), paddingTop: verticalScale(18) }}>
-      {/* 배너 전체가 코레일 내일로 패스 안내 페이지(웹)로 가는 링크 */}
+      {/* 배너 전체가 앱 안에서 여행 만들기/승차권 등록으로 이어진다(외부 구매 페이지 아님). */}
       <Pressable
-        onPress={() => openExternalUrl(NAEILRO_PASS_URL)}
+        onPress={onPress}
         className="flex-row items-center active:opacity-80"
         style={{
           backgroundColor: "#DCE6FB",
@@ -346,7 +355,7 @@ function PromoBanner() {
           paddingVertical: verticalScale(18),
           gap: scale(12),
         }}
-        accessibilityRole="link"
+        accessibilityRole="button"
         accessibilityLabel="내일로 패스 정보 등록하기"
       >
         <View style={{ flex: 1 }}>

@@ -21,10 +21,6 @@ import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import EditPencilIcon from "@/src/components/icons/EditPencilIcon";
 import { Text } from "@/src/components/Text";
-import { captureFromCamera } from "@/src/features/reels/capture";
-import MediaSourceSheet, {
-  type MediaSource,
-} from "@/src/features/reels/components/MediaSourceSheet";
 import VideoTimeline from "@/src/features/reels/components/VideoTimeline";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import { formatClock, toReelsMediaAsset } from "@/src/features/reels/media";
@@ -99,7 +95,6 @@ export default function ReelsStudioScreen() {
   // 구간 선택 모드 — 켜면 타임라인에 좌우로 늘리는 선택 영역이 나온다.
   const [editing, setEditing] = useState(false);
   const [range, setRange] = useState({ start: 0, end: 0 });
-  const [sheetOpen, setSheetOpen] = useState(false);
   // 타임라인 필름스트립용(성긴 프레임) / 스크럽 미리보기용(촘촘한 프레임)을 나눠 캐시한다.
   const [filmstrip, setFilmstrip] = useState<VideoThumbnail[]>([]);
   const [previews, setPreviews] = useState<VideoThumbnail[]>([]);
@@ -360,11 +355,7 @@ export default function ReelsStudioScreen() {
     );
   };
 
-  const pickPhoto = async (mediaSource: MediaSource): Promise<ReelsMediaAsset | null> => {
-    if (mediaSource === "camera") {
-      const media = await captureFromCamera();
-      return media?.[0] ?? null;
-    }
+  const pickPhoto = async (): Promise<ReelsMediaAsset | null> => {
     // 삽입용 사진은 GPS·촬영시각이 필요 없어 시스템 피커로 충분하다.
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -379,10 +370,9 @@ export default function ReelsStudioScreen() {
     return toReelsMediaAsset(result.assets[0]);
   };
 
-  const onInsert = async (mediaSource: MediaSource) => {
-    setSheetOpen(false);
+  const onInsert = async () => {
     if (reelsIdx == null) return;
-    const photo = await pickPhoto(mediaSource);
+    const photo = await pickPhoto();
     if (!photo) return;
     const at = position;
     Alert.alert(
@@ -650,18 +640,12 @@ export default function ReelsStudioScreen() {
                 color={ACCENT}
                 disabled={busy || !source}
                 loading={insert.isPending}
-                onPress={() => setSheetOpen(true)}
+                onPress={onInsert}
               />
             </View>
           </View>
         )}
       </ScrollView>
-
-      <MediaSourceSheet
-        visible={sheetOpen}
-        onSelect={onInsert}
-        onClose={() => setSheetOpen(false)}
-      />
 
       <TitleInputCard
         visible={titleOpen}
