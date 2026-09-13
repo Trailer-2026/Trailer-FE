@@ -4,8 +4,10 @@ import * as Location from "expo-location";
  * ⚠️ 개발용 임시 스위치 — 실제 GPS 대신 하드코딩 좌표를 쓴다.
  *
  * 실기기가 서울에 있어도 "지금 조치원 부근을 달리는 중"인 것처럼 흉내 내서
- * 풍경 알림(GET /api/scenic-spots/nearby)을 확인하기 위한 것. 켜면 위치 권한도
- * 묻지 않고 통과한다(기기 GPS 를 꺼둬도 됨).
+ * GPS 보정(POST /api/scenic-spots/plan/calibrate)이 지연·eta 를 어떻게 미는지
+ * 확인하기 위한 것. 켜면 위치 권한도 묻지 않고 통과한다(기기 GPS 를 꺼둬도 됨).
+ * 서버는 좌표가 경로에서 20km 넘게 벗어나면 보정을 무시하므로, 테스트 여행의 구간과
+ * 짝이 맞는 노선을 골라야 한다.
  * 확인이 끝나면 false 로 되돌릴 것. (__DEV__ 라 릴리스 빌드에는 영향 없음)
  */
 export const MOCK_LOCATION = __DEV__ && false;
@@ -30,9 +32,9 @@ export const MOCK_LOCATION = __DEV__ && false;
 const MOCK_ROUTE: "osong" | "gangneung" | "gorae" = "osong";
 
 /**
- * 수동 모드 — 타이머가 알아서 좌표를 밀지 않고, 화면의 '다음 위치' 버튼을 누를 때만
- * 한 칸 전진한다. 자동(2초)으로 두면 눈으로 좇기 전에 노선을 지나쳐 버려서,
- * 한 지점씩 확인할 때는 이쪽이 편하다. MOCK_LOCATION 이 켜져 있을 때만 의미가 있다.
+ * 수동 모드 — 화면의 '[DEV] 다음 위치로 보정' 버튼을 누를 때만 한 칸 전진해 보정을
+ * 보낸다(ScenicTimelineRow). 끄면 포그라운드 복귀 때마다 한 칸씩 밀린다.
+ * MOCK_LOCATION 이 켜져 있을 때만 의미가 있다.
  */
 export const MOCK_MANUAL = true;
 
@@ -88,7 +90,7 @@ export function resetMockLocation() {
 
 /**
  * 포그라운드 위치 권한 확보. 이미 허용돼 있으면 요청 없이 true.
- * 백그라운드 위치는 이번 범위 밖 — 앱이 화면에 떠 있을 때만 폴링한다.
+ * 백그라운드 위치는 필요 없다 — 보정은 앱이 화면에 올라올 때 1회만 보낸다.
  */
 export async function ensureForegroundLocationPermission(): Promise<boolean> {
   if (MOCK_LOCATION) return true; // 목업 좌표를 쓰므로 기기 권한이 필요 없다.
@@ -104,7 +106,8 @@ export async function ensureForegroundLocationPermission(): Promise<boolean> {
 
 /**
  * 지금 권한이 있는지만 확인한다 — **요청 창을 띄우지 않는다.**
- * 알림 탭의 "실제 위치 켜기" 버튼이 이미 켜진 상태인지 그리려고 쓴다.
+ * 포그라운드 복귀 때의 GPS 보정(queries.ts 의 calibrateNow)이 권한 없으면 조용히
+ * 건너뛰기 위해 쓴다. 권한을 묻는 건 탑승 시작 때(AutoBoarding) 한 번뿐이다.
  */
 export async function hasForegroundLocationPermission(): Promise<boolean> {
   if (MOCK_LOCATION) return true;

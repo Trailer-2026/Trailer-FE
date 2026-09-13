@@ -1,243 +1,159 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 
-import { getNearbyScenicSpots, normalizeStationName } from "./api";
-import { describeScenicError } from "./errors";
-import { haversineMeters } from "./geo";
+import { CACHE_POLICY } from "@/src/api/cache-policy";
+import { queryClient } from "@/src/api/query-client";
+
+import { calibrateScenicPlan, getScenicPlan } from "./api";
+import { scenicKeys } from "./keys";
 import {
   MOCK_LOCATION,
-  MOCK_MANUAL,
-  MOCK_STATIONS,
-  ensureForegroundLocationPermission,
   getCurrentLatLng,
+  hasForegroundLocationPermission,
 } from "./location";
 import { useScenicStore } from "./store";
+import type { ScenicPlanResponse } from "./types";
 
 /**
- * 폴링 간격. 호출 = 푸시 1건이라 넉넉히 잡는다.
+ * 풍경 알림은 **서버가 보낸다.** 예전에는 앱이 3분마다 GET /nearby 를 부르고 서버가
+ * 호출마다 푸시를 쐈기 때문에, 이 파일이 타이머·이동거리·최소 간격으로 발송 빈도를
+ * 조절하는 폴링 엔진이었다. 지금은 서버가 열차 시간표로 통과 시각을 계산해 직접
+ * 발송하므로 앱이 폴링할 이유가 없다 — 남은 일은 둘뿐이다.
  *
- * 목업 위치 모드(location.ts 의 MOCK_LOCATION)에서는 2초 — 손으로 새로고침을
- * 연타하지 않아도 노선을 따라 쭉 훑으며 관광지가 잡히는 구간을 찾기 위한 값이다.
- * ⚠️ 관광지가 잡히면 그때마다 푸시가 나가므로 목업 모드 밖으로 새어나가면 안 된다.
+ *  1) 시각표(GET /plan)를 받아 화면에 그린다.          → useScenicPlanQuery
+ *  2) 포그라운드에 올라올 때 GPS 로 지연을 보정한다.     → useScenicCalibration
  */
-export const SCENIC_POLL_INTERVAL_MS = MOCK_LOCATION ? 2 * 1000 : 3 * 60 * 1000;
-
-/**
- * 타이머가 도는 주기. **호출 주기가 아니다** — 매 틱마다 runTick 이 돌지만,
- * 실제 호출은 아래 (4) 최소 간격 조건을 통과할 때만 나간다.
- *
- * 간격만큼 길게 잡으면 한 번 실패했을 때 다음 시도까지 3분을 기다리게 된다.
- * 위치 획득 실패(GPS 미확보·터널)는 몇 초 뒤면 풀리는 일이 흔한데 화면에는
- * 에러가 3분간 그대로 남는다. 그래서 틱은 짧게 돌리고 억제는 조건에 맡긴다.
- *
- * ⚠️ 이 값을 줄여도 호출 빈도는 늘지 않는다. 마지막 **성공** 시각(lastCalledAt)
- *    으로 막기 때문에, 실패해서 lastCalledAt 이 안 찍혔을 때만 매 틱 재시도된다.
- */
-const TICK_MS = MOCK_LOCATION ? (MOCK_MANUAL ? 60 * 60 * 1000 : 2 * 1000) : 10 * 1000;
-
-/**
- * 이 거리(m) 미만으로 움직였으면 호출을 건너뛴다(정차·미이동 시 알림 스팸 방지).
- * 목업 모드에선 한 틱 이동량이 이 값에 걸려 조용히 스킵되는 일이 없도록 0 으로 둔다.
- */
-export const SCENIC_MIN_MOVE_METERS = MOCK_LOCATION ? 0 : 500;
-
-/**
- * 간격 직전에 앱이 포그라운드로 돌아오는 등으로 호출이 겹치지 않도록 두는 여유.
- * (예: 2분 59초 시점 복귀 → 1초 뒤 정기 호출 → 사실상 연속 2건)
- * 목업 모드에선 간격 자체가 2초라 여유를 두면 매 틱이 막힌다.
- */
-const CALL_GUARD_SLACK_MS = MOCK_LOCATION ? 0 : 10 * 1000;
-
-export type ScenicPolling = {
-  /** 사용자가 직접 누르는 새로고침 — 간격·이동거리 조건을 무시하고 즉시 호출 */
-  refresh: () => void;
-};
 
 /* ------------------------------------------------------------------ */
-/* 폴링 엔진 — 화면이 아니라 모듈이 소유한다                              */
+/* 시각표 조회                                                          */
 /* ------------------------------------------------------------------ */
 
 /**
- * 동시 실행 방지. 위치 획득이 느린 동안 타이머가 또 돌 수 있다.
- * 훅 로컬(useRef)이 아니라 모듈 스코프인 이유는 아래 subscribers 주석 참고.
- */
-let inFlight = false;
-
-/**
- * 이 훅을 쓰는 화면들. **여행 상세와 알림 탭이 동시에 마운트돼 있을 수 있다**
- * (탭은 한 번 방문하면 계속 살아 있고, 그 위로 상세 화면이 쌓인다).
- * 화면마다 타이머를 돌리면 호출이 2배 = 푸시가 2배로 나가므로,
- * 타이머는 모듈에 하나만 두고 화면들은 여기에 구독만 한다.
- */
-const subscribers = new Set<object>();
-let timer: ReturnType<typeof setInterval> | null = null;
-let appStateSub: ReturnType<typeof AppState.addEventListener> | null = null;
-
-/**
- * 주변 풍경 1회 조회.
+ * 탑승 구간의 풍경 시각표. 세션이 있는 동안만 조회한다.
  *
- * **react-query 를 쓰지 않는 이유**: 이 API 는 호출할 때마다 푸시를 발송한다.
- * useQuery 는 마운트·포커스·네트워크 복구 등에서 자동 refetch 하므로 사용자가
- * 화면을 드나들 때마다 알림이 나간다. 호출 시점을 완전히 통제하려고 명시적
- * 타이머 + 스토어 캐시로 구현했다.
+ * 부작용이 없는 순수 조회라 react-query 에 맡긴다(마운트·재진입 refetch 가 늘어도
+ * 알림이 늘지 않는다). 갱신 시점:
+ *  - 세션 시작 / 화면 진입: staleTime 지나면 자동
+ *  - 포그라운드 복귀: useScenicCalibration 이 보정 응답으로 캐시를 덮어쓴다
+ *  - 풍경 푸시 수신: notification/handlers.ts 가 refreshScenicPlan 을 부른다
  *
- * 호출을 건너뛰는 경우:
- *  1) 세션 없음(탑승 종료)
- *  2) 이미 조회 중
- *  3) 앱이 백그라운드 — 포그라운드 복귀 시 재개
- *  4) 직전 **성공** 호출로부터 3분이 지나지 않음(화면 재진입·포그라운드 복귀 중복 방지).
- *     실패했을 때는 이 조건이 비어 있어 TICK_MS(10초)마다 다시 시도한다.
- *  5) 직전 **호출 지점** 대비 이동이 500m 미만
+ * "지나갔는지"는 화면이 eta 와 현재 시각으로 직접 판단한다(useMinuteTick). is_sent 는
+ * 서버가 푸시를 보냈다는 표시라 12분 묶음 등으로 eta 가 지나도 false 일 수 있다.
  */
-async function runTick(force = false) {
-  // 최신 상태를 렌더와 무관하게 읽는다.
-  const {
-    session,
-    lastPosition,
-    lastCalledAt,
-    error,
-    markCalled,
-    setResult,
-    setStatus,
-  } = useScenicStore.getState();
-
-  if (!session) return; // (1) 세션 종료
-  if (inFlight) return; // (2)
-  if (!force && AppState.currentState !== "active") return; // (3) 백그라운드
-
-  const now = Date.now();
-  // (4) 최소 간격 — 화면 재진입/포그라운드 복귀로 인한 중복 호출 차단.
-  //     lastCalledAt 은 **호출에 성공했을 때만** 찍히므로(markCalled), 위치 획득이나
-  //     조회가 실패한 동안에는 이 조건에 걸리지 않고 매 틱(TICK_MS) 재시도된다.
-  if (
-    !force &&
-    error === null &&
-    lastCalledAt !== null &&
-    now - lastCalledAt < SCENIC_POLL_INTERVAL_MS - CALL_GUARD_SLACK_MS
-  ) {
-    return;
-  }
-
-  inFlight = true;
-  setStatus({ loading: true });
-  try {
-    const granted = await ensureForegroundLocationPermission();
-    if (!granted) throw new Error("위치 권한이 필요해요.");
-
-    const here = await getCurrentLatLng();
-    if (!here) throw new Error("현재 위치를 확인하지 못했어요.");
-
-    // (5) 미이동 스킵 — lastPosition 은 '마지막 호출 지점'이라 여기서 갱신하지 않는다.
-    //     갱신해버리면 천천히 이동할 때 기준점이 따라와 영영 임계값을 못 넘긴다.
-    if (
-      !force &&
-      error === null &&
-      lastPosition &&
-      haversineMeters(lastPosition, here) < SCENIC_MIN_MOVE_METERS
-    ) {
-      return;
-    }
-
-    // 목업 노선이 역명까지 덮어쓰는 경우에만 세션 값을 무시한다(location.ts 의
-    // MOCK_ROUTE 참고). null 이면 실제 여행 구간 그대로 질의한다.
-    const fromStation = MOCK_STATIONS?.from ?? session.fromStation;
-    const toStation = MOCK_STATIONS?.to ?? session.toStation;
-
-    const res = await getNearbyScenicSpots({
-      lat: here.lat,
-      lng: here.lng,
-      from_station: fromStation,
-      to_station: toStation,
-    });
-
-    if (MOCK_LOCATION) {
-      // 0건일 때 좌표가 문제인지 구간이 문제인지 콘솔에서 바로 가리기 위한 로그.
-      // 정규화된 이름으로 찍어야 실제로 나간 요청과 일치한다.
-      console.log(
-        `[scenic] ${normalizeStationName(fromStation)}→${normalizeStationName(toStation)}` +
-          ` @ ${here.lat.toFixed(5)},${here.lng.toFixed(5)}`,
-        `→ ${res.feature_count}건`,
-        res.items.map((i) => `${i.name}(${i.side},${i.distance_m}m)`),
-      );
-    }
-
-    markCalled(here, Date.now());
-    setResult(res);
-    setStatus({ error: null });
-  } catch (e) {
-    setStatus({ error: describeScenicError(e) });
-  } finally {
-    inFlight = false;
-    setStatus({ loading: false });
-  }
-}
-
-/** 모듈 타이머 기동. 이미 돌고 있으면 아무것도 하지 않는다(중복 호출 방지). */
-function startPolling() {
-  if (timer) return;
-
-  // 기동 직후 1회. force 가 아니므로 방금 호출했다면 (4)에 걸려 조용히 넘어간다.
-  // 탑승 시작 시에는 스토어가 초기화되어 lastCalledAt 이 null → 즉시 1회 호출된다.
-  void runTick();
-
-  // 틱은 짧게, 억제는 runTick 의 (4) 조건이 한다(TICK_MS 주석 참고).
-  timer = setInterval(() => void runTick(), TICK_MS);
-  appStateSub = AppState.addEventListener("change", (state) => {
-    if (state === "active") void runTick(); // 백그라운드 동안 건너뛴 주기 보충
+export function useScenicPlanQuery() {
+  const riding = useScenicStore((s) => s.session !== null);
+  return useQuery({
+    queryKey: scenicKeys.plan(),
+    queryFn: getScenicPlan,
+    enabled: riding,
+    ...CACHE_POLICY.LIVE,
   });
 }
 
-/** 구독자가 모두 사라졌을 때 타이머 정리. */
-function stopPolling() {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
+/** 시각표를 다시 받게 한다. 풍경 푸시가 도착했을 때(is_sent 갱신) 부른다. */
+export function refreshScenicPlan(): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: scenicKeys.plan() });
+}
+
+/* ------------------------------------------------------------------ */
+/* GPS 보정                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 같은 이유로 연달아 보정하지 않는 최소 간격. 포그라운드 복귀가 짧게 반복될 때
+ * (알림창 열었다 닫기 등) 좌표 획득 + 요청이 그때마다 나가지 않게 한다.
+ * 목업 모드에선 버튼으로 한 칸씩 밀며 확인하므로 간격을 두지 않는다.
+ */
+const CALIBRATE_MIN_INTERVAL_MS = MOCK_LOCATION ? 0 : 60 * 1000;
+
+let lastCalibratedAt = 0;
+let calibrating = false;
+
+/**
+ * 현재 좌표로 시각표를 보정하고 캐시를 덮어쓴다.
+ *
+ * 건너뛰는 경우: 세션 없음 / 이미 진행 중 / 최소 간격 미만(force 면 무시) /
+ * 위치 권한 없음(**권한 창을 띄우지 않는다** — 권한은 AutoBoarding 이 탑승 시작 때
+ * 한 번 묻는다) / 좌표 획득 실패.
+ *
+ * 서버는 좌표가 경로에서 20km 넘게 벗어나거나 차이가 90분을 넘으면 보정 없이 그대로
+ * 돌려주므로(api.ts) 응답은 항상 캐시에 넣어도 안전하다.
+ *
+ * @returns 보정 요청이 실제로 나갔으면 true
+ */
+export async function calibrateNow({ force = false } = {}): Promise<boolean> {
+  if (!useScenicStore.getState().session) return false;
+  if (calibrating) return false;
+  if (!force && Date.now() - lastCalibratedAt < CALIBRATE_MIN_INTERVAL_MS) {
+    return false;
   }
-  appStateSub?.remove();
-  appStateSub = null;
+  if (!(await hasForegroundLocationPermission())) return false;
+
+  calibrating = true;
+  try {
+    const here = await getCurrentLatLng();
+    if (!here) return false;
+
+    const plan = await calibrateScenicPlan(here);
+    lastCalibratedAt = Date.now();
+    queryClient.setQueryData<ScenicPlanResponse>(scenicKeys.plan(), plan);
+
+    if (MOCK_LOCATION) {
+      // 목업 좌표를 밀 때마다 지연·eta 가 어떻게 움직이는지 콘솔에서 바로 본다.
+      console.log(
+        `[scenic] calibrate @ ${here.lat.toFixed(5)},${here.lng.toFixed(5)}`,
+        `→ delay ${plan.delay_minutes}분,`,
+        plan.items.map((i) => `${i.name ?? i.category}@${i.eta.slice(11, 16)}`),
+      );
+    }
+    return true;
+  } catch (e) {
+    // 보정은 있으면 좋은 것이지 필수가 아니다 — 실패해도 예정 시각대로 알림은 온다.
+    if (__DEV__) console.log("[scenic] 보정 실패:", e);
+    return false;
+  } finally {
+    calibrating = false;
+  }
 }
 
 /**
- * 탑승 세션이 있는 동안 주변 풍경을 주기적으로 조회한다.
+ * 세션이 있는 동안 GPS 보정을 돌린다 — 세션 시작 때 1회, 포그라운드 복귀 때 1회.
+ * 문서 권장("포그라운드로 올라올 때 한 번")과 같고, 주기적으로 보내지 않는다.
  *
- * 여러 화면에서 동시에 호출해도 안전하다 — 타이머는 모듈에 하나뿐이고,
- * 마지막 화면이 언마운트될 때만 멈춘다. 세션 자체는 스토어에 남아 있어
- * 화면에 다시 들어오면 이어서 폴링한다.
+ * 앱 루트(AutoBoarding)에서 한 번만 쓴다. 화면마다 걸면 복귀 한 번에 여러 번 나간다.
  *
- * loading/error 는 여기서 돌려주지 않는다 — 스토어에 있으니 보여줄 컴포넌트가 직접
- * 구독한다. 이 훅이 구독하면 세션 유무만 필요한 AutoBoarding(앱 루트)까지 폴링 한 번에
- * loading true/false 로 두 번씩 다시 그려진다.
+ * 보정을 건너뛴 복귀(위치 권한 없음 등)에는 시각표만 다시 받는다 — 백그라운드에 있던
+ * 동안 서버가 보낸 푸시(is_sent)와 지연이 화면에 반영되도록.
  */
-export function useScenicPolling(): ScenicPolling {
+export function useScenicCalibration(): void {
   const scheduleIdx = useScenicStore((s) => s.session?.scheduleIdx ?? null);
-
-  // 이 화면을 구독자 집합에서 식별하는 토큰. 값 자체는 쓰지 않는다.
-  const token = useRef({});
 
   useEffect(() => {
     if (scheduleIdx === null) return;
 
-    const self = token.current;
-    subscribers.add(self);
-    startPolling();
+    // 새 구간은 직전 구간의 간격 제한과 무관하게 바로 보정한다.
+    lastCalibratedAt = 0;
+    void calibrateNow();
 
-    return () => {
-      subscribers.delete(self);
-      // 다른 화면이 아직 보고 있으면 계속 돌린다.
-      if (subscribers.size === 0) stopPolling();
-    };
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      void calibrateNow().then((sent) => {
+        if (!sent) void refreshScenicPlan();
+      });
+    });
+    return () => sub.remove();
   }, [scheduleIdx]);
-
-  const refresh = useCallback(() => {
-    void runTick(true);
-  }, []);
-
-  return { refresh };
 }
+
+/* ------------------------------------------------------------------ */
+/* 시계                                                                */
+/* ------------------------------------------------------------------ */
 
 /**
  * 1분마다 갱신되는 현재 시각.
- * 출발 시각 ±30분 배너가 시간이 흐르면 저절로 뜨고 사라지게 하는 용도.
+ * 출발 시각 ±30분 배너, 시각표의 "지나감" 판정, 카드 배경 시간대처럼
+ * 시간이 흐르면 저절로 바뀌어야 하는 표시에 쓴다.
  */
 export function useMinuteTick(): Date {
   const [now, setNow] = useState(() => new Date());

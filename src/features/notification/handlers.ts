@@ -6,6 +6,9 @@ import {
   onNotificationOpenedApp,
 } from "@react-native-firebase/messaging";
 
+import { refreshScenicPlan } from "@/src/features/scenic/queries";
+
+import { showPushBanner } from "./banner-store";
 import { openNotificationTarget, targetFromFcmData } from "./routing";
 
 /**
@@ -26,14 +29,30 @@ function devLog(...args: unknown[]) {
 
 /**
  * 포그라운드(앱이 화면에 켜져 있는 상태) 메시지 수신.
- * Android는 포그라운드일 때 시스템 알림이 자동으로 뜨지 않으므로,
- * 필요하면 여기서 인앱 배너/토스트를 직접 띄운다.
+ *
+ * 안드로이드는 포그라운드일 때 시스템 알림이 자동으로 뜨지 않는다. 그래서 여기서
+ * 상단 인앱 배너(PushBanner)를 직접 띄운다 — 풍경 알림은 "지금 창밖을 보라"는
+ * 뜻이라 이게 없으면 열차 안에서 앱을 보고 있는 사용자가 오히려 못 받는다.
+ *
+ * 풍경 알림(type=SCENERY)이면 시각표도 다시 받는다. 서버가 보냈다는 표시(is_sent)가
+ * 바뀌었으니 탑승 카드의 "지나감" 상태를 맞춘다.
+ *
  * @returns 구독 해제 함수
  */
 export function setupForegroundHandler(): () => void {
   return onMessage(getMessaging(getApp()), async (remoteMessage) => {
     devLog("[fcm] 포그라운드 수신:", JSON.stringify(remoteMessage));
-    // TODO: 인앱 알림 배너/토스트 표시 (notifee 등으로 추후 확장)
+
+    const target = targetFromFcmData(remoteMessage.data);
+    if ((target.type ?? "").toUpperCase().includes("SCENERY")) {
+      void refreshScenicPlan();
+    }
+
+    const title = remoteMessage.notification?.title?.trim();
+    const body = remoteMessage.notification?.body?.trim();
+    // data-only 메시지(표시할 문구 없음)는 배너를 띄우지 않는다.
+    if (!title && !body) return;
+    showPushBanner({ title: title || "알림", body: body ?? "", target });
   });
 }
 
@@ -81,4 +100,5 @@ export function setupNotificationOpenHandlers(): () => void {
  *   });
  *
  * 현재는 알림(notification) 페이로드만 사용하므로 별도 등록하지 않는다.
+ * 풍경 알림도 notification 메시지라 백그라운드·종료 상태에서는 시스템이 알아서 띄운다.
  */

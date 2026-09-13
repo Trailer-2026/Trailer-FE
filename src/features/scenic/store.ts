@@ -1,11 +1,12 @@
 import { create } from "zustand";
 
-import type { LatLng } from "./geo";
-import type { ScenicNearbyResponse } from "./types";
-
 /**
- * 탑승 세션 — 사용자가 "탑승 시작"을 누른 열차 구간 1개.
+ * 탑승 세션 — 사용자가 타고 있는 열차 구간 1개.
  * 이번 범위에서는 동시에 1개 구간만 다룬다(경유 자동 전환 없음).
+ *
+ * 세션은 **화면용**이다. 어느 구간의 풍경 시각표를 일정표에 끼울지, 언제 GPS 보정을
+ * 보낼지 정하는 기준일 뿐 알림 발송과는 무관하다 — 풍경 푸시는 서버가 열차 시간표로
+ * 직접 보내므로 세션이 없어도(앱이 꺼져 있어도) 온다.
  */
 export type ScenicSession = {
   travelIdx: number;
@@ -22,28 +23,7 @@ export type ScenicSession = {
 type ScenicState = {
   session: ScenicSession | null;
   /**
-   * **마지막으로 API 를 실제 호출한 지점**의 좌표. 폴링 때마다 갱신하지 않는다.
-   * (스킵할 때도 갱신하면 조금씩 움직이는 동안 기준점이 따라와 영영 임계값을
-   *  못 넘긴다. 호출 시점만 기록해야 누적 이동이 정상 판정된다.)
-   */
-  lastPosition: LatLng | null;
-  /** 마지막 실제 호출 시각(epoch ms). 화면 재진입 시 중복 호출을 막는 기준. */
-  lastCalledAt: number | null;
-  lastResponse: ScenicNearbyResponse | null;
-  /** 직전 응답의 관광지 이름들 — 같은 곳만 반복되는지 판단용 */
-  lastItemNames: string[];
-  /** 마지막 갱신에서 새로 등장한 관광지가 있었는지(반복이면 false → 강조 안 함) */
-  hasNewSpots: boolean;
-  /**
-   * 조회 진행 중 여부. 여행 상세와 알림 탭이 **동시에 떠 있을 수 있어서**
-   * 훅 로컬 state 로 두면 폴링을 실제로 돌리는 쪽에서만 스피너가 돈다.
-   * 두 화면이 같은 상태를 보도록 스토어에 둔다(error 도 같은 이유).
-   */
-  loading: boolean;
-  /** 마지막 조회 실패 메시지. 성공하면 null 로 지운다. */
-  error: string | null;
-  /**
-   * 사용자가 직접 '탑승 종료'를 누른 구간의 scheduleIdx.
+   * 사용자가 직접 '알림 끄기'를 누른 구간의 scheduleIdx.
    * 자동 탑승(AutoBoarding)이 도착 시각 전이라는 이유로 곧바로 다시 켜버리면
    * 종료 버튼이 무의미해지므로, 이 구간만 자동 시작에서 제외한다.
    */
@@ -59,27 +39,18 @@ type ScenicActions = {
    * 그 구간이 자동으로 다시 켜지지 않게 한다(자동 종료는 옵션 없이 호출).
    */
   stopRiding: (options?: { skipAuto?: boolean }) => void;
-  /** 실제 API 호출에 성공했을 때의 좌표·시각 기록 */
-  markCalled: (position: LatLng, at: number) => void;
-  setResult: (res: ScenicNearbyResponse) => void;
-  /** 조회 진행 상태 갱신. 넘긴 필드만 바꾼다. */
-  setStatus: (next: { loading?: boolean; error?: string | null }) => void;
 };
 
 const initialState: ScenicState = {
   session: null,
-  lastPosition: null,
-  lastCalledAt: null,
-  lastResponse: null,
-  lastItemNames: [],
-  hasNewSpots: false,
-  loading: false,
-  error: null,
   skipAutoScheduleIdx: null,
 };
 
 /**
  * 탑승 세션 스토어.
+ *
+ * 시각표·지연·조회 상태는 여기 두지 않는다 — react-query 캐시(queries.ts 의
+ * useScenicPlanQuery)가 들고 있고, 화면은 그쪽을 구독한다.
  *
  * 지금은 메모리 유지(앱 재시작 시 세션 사라짐). 앱을 껐다 켜도 유지하려면
  * 이 create 를 zustand/middleware 의 persist 로 감싸기만 하면 되도록,
@@ -90,7 +61,6 @@ export const useScenicStore = create<ScenicState & ScenicActions>((set, get) => 
 
   startRiding: (session) =>
     set({
-      // 세션 시작 시 직전 구간의 위치·결과가 남지 않도록 전부 초기화한다.
       ...initialState,
       session: { ...session, startedAt: session.startedAt ?? Date.now() },
     }),
@@ -102,21 +72,6 @@ export const useScenicStore = create<ScenicState & ScenicActions>((set, get) => 
         ? get().session?.scheduleIdx ?? null
         : null,
     }),
-
-  markCalled: (position, at) => set({ lastPosition: position, lastCalledAt: at }),
-
-  setStatus: (next) => set(next),
-
-  setResult: (res) => {
-    const prevNames = get().lastItemNames;
-    const names = res.items.map((i) => i.name);
-    set({
-      lastResponse: res,
-      lastItemNames: names,
-      // 직전에 없던 이름이 하나라도 있으면 "새로 보이는 곳"으로 강조한다.
-      hasNewSpots: names.some((n) => !prevNames.includes(n)),
-    });
-  },
 }));
 
 /** 이 여행에서 탑승 중인지. 다른 여행의 세션이면 false. */
