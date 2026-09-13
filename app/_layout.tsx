@@ -9,6 +9,8 @@ import 'react-native-reanimated';
 import "../global.css";
 
 import { queryClient } from "@/src/api/query-client";
+import ErrorBoundary from "@/src/components/ErrorBoundary";
+import OfflineToast from "@/src/components/OfflineToast";
 import { useAuthStore } from "@/src/features/auth/store";
 import {
   setupForegroundHandler,
@@ -89,18 +91,21 @@ export default function RootLayout() {
     // 드래그 정렬(react-native-reorderable-list)이 gesture-handler 를 쓰므로
     // 안드로이드에서는 루트를 GestureHandlerRootView 로 감싸야 제스처가 전달된다.
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Protected guard={!isAuthenticated}>
-            <Stack.Screen name="(onboarding)" />
-          </Stack.Protected>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Protected guard={!isAuthenticated}>
+              <Stack.Screen name="(onboarding)" />
+            </Stack.Protected>
 
-          <Stack.Protected guard={isAuthenticated}>
-            <Stack.Screen name="(app)" />
-          </Stack.Protected>
-        </Stack>
-        <StatusBar style="auto" />
-      </QueryClientProvider>
+            <Stack.Protected guard={isAuthenticated}>
+              <Stack.Screen name="(app)" />
+            </Stack.Protected>
+          </Stack>
+          <OfflineToast />
+          <StatusBar style="auto" />
+        </QueryClientProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

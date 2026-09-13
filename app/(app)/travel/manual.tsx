@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,6 +35,9 @@ const DURATIONS: { nights: number; label: string }[] = [
  * 예정 여행은 1개만 가질 수 있어, 이미 있으면 서버가 400 으로 막는다.
  */
 export default function ManualTravelScreen() {
+  // 내일로 패스 배너에서 "바로 티켓추가"로 들어온 경우 — 여행을 만들자마자
+  // 승차권 입력 폼까지 이어서 연다(TicketWalletModal 이 승차권 0장이면 폼으로 바로 감).
+  const { ticketFirst } = useLocalSearchParams<{ ticketFirst?: string }>();
   const [title, setTitle] = useState("");
   const [region, setRegion] = useState("");
   const [nights, setNights] = useState<number | null>(null);
@@ -61,10 +64,15 @@ export default function ManualTravelScreen() {
       },
       {
         // 만든 여행의 일정표로 바로 이동(뒤로 누르면 일정 탭). 여기서 항목을 채운다.
+        // ticketFirst 로 들어왔으면 승차권 화면까지 자동으로 이어서 연다.
         onSuccess: (travel) =>
           router.replace({
             pathname: "/travel/[travelIdx]",
-            params: { travelIdx: travel.travel_idx, cover: "" },
+            params: {
+              travelIdx: travel.travel_idx,
+              cover: "",
+              ...(ticketFirst ? { openTicket: "1" } : {}),
+            },
           }),
         onError: (e) => Alert.alert("생성 실패", describeScheduleError(e)),
       },
@@ -99,9 +107,22 @@ style={{
             fontWeight: 650 as never,
           }}
         >
-          직접 일정 만들기
+          {ticketFirst ? "여행 만들고 승차권 등록하기" : "직접 일정 만들기"}
         </Text>
       </View>
+
+      {ticketFirst ? (
+        <Text
+          className="text-gray-400"
+          style={{
+            fontSize: moderateScale(12),
+            marginTop: verticalScale(4),
+            paddingHorizontal: scale(20),
+          }}
+        >
+          여행 날짜부터 정하면, 바로 이어서 승차권을 등록할 수 있어요.
+        </Text>
+      ) : null}
 
       <ScrollView
         className="flex-1"

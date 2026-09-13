@@ -1,6 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -17,9 +16,12 @@ import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#4FD1C5";
-
-/** 업로드하기 알약 높이 = 우측 원형 화살표 지름(끝단을 딱 맞춘다). */
-const BUTTON_H = verticalScale(56);
+/** 알약 배경(반투명) — ACCENT 를 영상 만들기 화면의 PILL_BG 와 같은 방식(63% 알파)으로. */
+const PILL_BG = "rgba(79, 209, 197, 0.63)";
+const KNOB_BG = "#3FBFB4";
+/** 영상 만들기 첫 화면(create.tsx)과 같은 크기·위치로 맞춘다. */
+const PILL_W = scale(220);
+const BUTTON_H = verticalScale(64);
 
 type PickedVideo = {
   uri: string;
@@ -129,57 +131,53 @@ export default function ReelsUploadScreen() {
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <StatusBar style="light" />
 
-      {/* 닫기 */}
+      {/* 닫기 — 영상 만들기 첫 화면과 같은 크기·위치. */}
       <View
         className="flex-row items-center"
-        style={{ paddingHorizontal: scale(20), ...headerBarStyle() }}
+        style={{ paddingHorizontal: scale(21), ...headerBarStyle() }}
       >
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
           disabled={busy}
-          style={{
-            width: scale(28),
-            height: scale(28),
-            justifyContent: "center",
-          }}
           accessibilityRole="button"
           accessibilityLabel="닫기"
         >
-          <Feather name="x" size={moderateScale(24)} color="#FFFFFF" />
+          <Feather name="x" size={moderateScale(20)} color="#FFFFFF" />
         </Pressable>
       </View>
 
       <View className="flex-1 items-center" style={{ paddingHorizontal: scale(20) }}>
-        <Text
-          className="text-center text-white"
-          style={{
-            marginTop: verticalScale(70),
-            fontSize: moderateScale(24),
-            lineHeight: moderateScale(34),
-            fontWeight: 650 as never,
-          }}
-        >
-          {/* '영상 업로드'만 강조색, 나머지는 바깥 굵기를 물려받는다. */}
-          <Text className="font-bold" style={{ color: ACCENT }}>
-            영상 업로드
+        {/* 안내 문구 — 영상 만들기 첫 화면(create.tsx)과 같은 폰트 크기·굵기·줄간격·여백. */}
+        <View style={{ paddingHorizontal: scale(28), marginTop: verticalScale(80) }}>
+          <Text
+            className="text-center text-white"
+            style={{
+              fontSize: moderateScale(24),
+              lineHeight: moderateScale(34),
+              fontWeight: 650 as never,
+            }}
+          >
+            {/* '영상 업로드'만 강조색, 나머지는 바깥 굵기를 물려받는다. */}
+            <Text className="font-bold" style={{ color: ACCENT }}>
+              영상 업로드
+            </Text>
+            에{"\n"}
+            오신 것을 환영합니다.
           </Text>
-          에{"\n"}
-          오신 것을 환영합니다.
-        </Text>
 
-        <Text
-          className="text-center font-medium"
-          style={{
-            color: "#9CA3AF",
-            fontSize: moderateScale(13),
-            lineHeight: moderateScale(21),
-            marginTop: verticalScale(20),
-          }}
-        >
-          직접 만든 영상도 릴스로 올릴 수 있어요.{"\n"}
-          원하는 영상을 업로드해보세요.
-        </Text>
+          <Text
+            className="text-center font-medium text-white"
+            style={{
+              fontSize: moderateScale(13),
+              lineHeight: moderateScale(21),
+              marginTop: verticalScale(20),
+            }}
+          >
+            직접 만든 영상도 릴스로 올릴 수 있어요.{"\n"}
+            원하는 영상을 업로드해보세요.
+          </Text>
+        </View>
 
         {/* 일러스트 — 남는 공간 가운데. PlayIcon 이 라운드 프레임까지 그린다. */}
         <View className="flex-1 items-center justify-center">
@@ -203,57 +201,63 @@ export default function ReelsUploadScreen() {
           </Text>
         ) : null}
 
-        {/* 업로드하기 — 알약 버튼 + 우측 원형 화살표 */}
+        {/* 업로드하기 — 영상 만들기 첫 화면과 같은 크기(220x64)·위치(하단에서 80),
+            반투명 알약 + 진한 원형 버튼(그라데이션 대신 단색). */}
+        <View
+          className="items-center"
+          style={{ paddingBottom: verticalScale(80) }}
+        >
         <Pressable
           onPress={onPickVideo}
           disabled={busy}
           className="active:opacity-80"
           style={{
-            width: scale(220),
+            width: PILL_W,
             height: BUTTON_H,
-            marginBottom: verticalScale(70),
             opacity: busy ? 0.6 : 1,
           }}
           accessibilityRole="button"
           accessibilityLabel="업로드하기"
         >
-          <LinearGradient
-            colors={["#8FE3DA", "#4FD1C5"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            className="justify-center"
-            style={{ flex: 1, borderRadius: 999 }}
+          <View
+            className="items-center justify-center"
+            style={{
+              width: PILL_W,
+              height: BUTTON_H,
+              borderRadius: 999,
+              backgroundColor: PILL_BG,
+            }}
           >
-            {/* 우측 원형 화살표가 알약 위에 겹쳐 있으므로, 그 폭만큼 빼고 가운데를 잡는다
-                (전체 폭 기준으로 잡으면 글씨가 화살표 쪽으로 밀려 보인다). */}
+            {/* 알약 전체 폭(화면 기준 정중앙) 기준으로 가운데 맞춘다. */}
             <Text
               className="text-center font-bold text-white"
-              style={{ fontSize: moderateScale(17), paddingRight: BUTTON_H }}
+              style={{ fontSize: moderateScale(17) }}
             >
               {busy ? `업로드 중 ${percent}%` : "업로드하기"}
             </Text>
-            {/* 알약 높이와 지름을 같게 두고 오른쪽 끝에 붙인다 → 둥근 끝단이 정확히 겹친다. */}
-            <View
-              className="absolute items-center justify-center rounded-full"
-              style={{
-                right: 0,
-                width: BUTTON_H,
-                height: BUTTON_H,
-                backgroundColor: "#3FBFB4",
-              }}
-            >
-              {busy ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Feather
-                  name="chevron-right"
-                  size={moderateScale(22)}
-                  color="#FFFFFF"
-                />
-              )}
-            </View>
-          </LinearGradient>
+          </View>
+          {/* 알약 높이와 지름을 같게 두고 오른쪽 끝에 붙인다 → 둥근 끝단이 정확히 겹친다. */}
+          <View
+            className="absolute items-center justify-center rounded-full"
+            style={{
+              right: 0,
+              width: BUTTON_H,
+              height: BUTTON_H,
+              backgroundColor: KNOB_BG,
+            }}
+          >
+            {busy ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Feather
+                name="chevron-right"
+                size={moderateScale(22)}
+                color="#FFFFFF"
+              />
+            )}
+          </View>
         </Pressable>
+        </View>
       </View>
 
       <TitleInputCard

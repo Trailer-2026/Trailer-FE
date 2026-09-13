@@ -1,10 +1,11 @@
 import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Alert, ImageBackground, Pressable, ScrollView, View } from "react-native";
+import { ImageBackground, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AlarmIcon from "@/src/components/icons/AlarmIcon";
+import { useConfirmDialog } from "@/src/components/ConfirmDialog";
 import ForwardIcon from "@/src/components/icons/ForwardIcon";
 import InfoIcon from "@/src/components/icons/InfoIcon";
 import LogoutIcon from "@/src/components/icons/LogoutIcon";
@@ -39,6 +40,9 @@ export default function ProfileTab() {
   // clear() 는 토큰 삭제와 react-query 캐시 비우기를 함께 한다(store.ts 주석 참고).
   const clear = useAuthStore((s) => s.clear);
   const { data: profile, isLoading } = useMyProfile();
+  // Alert.alert 는 안드로이드 시스템 테마를 그대로 써서 앱 팝업들과 스타일이 달랐다 —
+  // 다른 화면(피드 신고/차단 등)과 같은 ConfirmDialog 로 통일한다.
+  const { dialog, ask, notify } = useConfirmDialog();
 
   async function handleLogout() {
     try {
@@ -52,10 +56,13 @@ export default function ProfileTab() {
   }
 
   function confirmLogout() {
-    Alert.alert("로그아웃", "계정에서 로그아웃할까요?", [
-      { text: "취소", style: "cancel" },
-      { text: "로그아웃", style: "destructive", onPress: handleLogout },
-    ]);
+    ask({
+      title: "로그아웃",
+      message: "계정에서 로그아웃할까요?",
+      confirmLabel: "로그아웃",
+      danger: true,
+      onConfirm: handleLogout,
+    });
   }
 
   async function handleWithdraw() {
@@ -63,7 +70,7 @@ export default function ProfileTab() {
       await deleteAccount();
     } catch (e) {
       // 탈퇴가 실패했으면 로그인 상태를 유지해야 한다(로컬만 지우면 유령 계정이 남는다).
-      Alert.alert("탈퇴 실패", describeAuthError(e));
+      notify({ title: "탈퇴 실패", message: describeAuthError(e) });
       return;
     }
     // 서버가 refresh·FCM 토큰을 이미 정리했으므로 로컬 세션만 끝내면 된다.
@@ -71,14 +78,14 @@ export default function ProfileTab() {
   }
 
   function confirmWithdraw() {
-    Alert.alert(
-      "정말 탈퇴할까요?",
-      "여행 일정, 사진, 알림 설정이 모두 삭제되고 되돌릴 수 없어요.\n같은 계정으로 다시 가입하면 새 계정으로 시작돼요.",
-      [
-        { text: "취소", style: "cancel" },
-        { text: "탈퇴하기", style: "destructive", onPress: handleWithdraw },
-      ],
-    );
+    ask({
+      title: "정말 탈퇴할까요?",
+      message:
+        "여행 일정, 사진, 알림 설정이 모두 삭제되고 되돌릴 수 없어요.\n같은 계정으로 다시 가입하면 새 계정으로 시작돼요.",
+      confirmLabel: "탈퇴하기",
+      danger: true,
+      onConfirm: handleWithdraw,
+    });
   }
 
   const nickname = profile?.nickname ?? (isLoading ? "불러오는 중…" : "게스트");
@@ -283,6 +290,7 @@ export default function ProfileTab() {
           </Text>
         </Pressable>
       </ScrollView>
+      {dialog}
     </View>
   );
 }

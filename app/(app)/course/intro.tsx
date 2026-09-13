@@ -106,8 +106,7 @@ export default function CourseIntroScreen() {
             className="justify-center"
             style={{ flex: 1, borderRadius: 999 }}
           >
-            {/* 문구는 알약 전체 폭 기준 가운데. 원형 화살표는 그 위에 겹쳐 놓아
-                문구 위치에 영향을 주지 않는다. */}
+            {/* 알약 전체 폭(화면 기준 정중앙) 기준으로 가운데 맞춘다. */}
             <Text
               className="text-white font-bold text-center"
               style={{ fontSize: moderateScale(17) }}

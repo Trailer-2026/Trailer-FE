@@ -22,7 +22,7 @@ import {
 } from "@/src/features/travel/queries";
 import type { PastTravelCard } from "@/src/features/travel/types";
 import { useMyStamps } from "@/src/features/stamp/queries";
-import { useMyProfile } from "@/src/features/user/queries";
+import { useMyProfile, useMyReels } from "@/src/features/user/queries";
 import { HEADER_HEIGHT } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
@@ -34,9 +34,6 @@ const MY_BG = require("../../../../assets/images/style/my_background.png");
 const STAMP_ICON = require("../../../../assets/images/style/stamp.png");
 const VIDEO_ICON = require("../../../../assets/images/style/video.png");
 
-// TODO(stats): 내 영상 개수는 아직 대응 API 가 없다.
-const VIDEO_COUNT = 0;
-
 export default function TravelsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -45,6 +42,7 @@ export default function TravelsScreen() {
   const { data: stamps } = useMyStamps();
   const current = useCurrentTravel();
   const past = usePastTravels();
+  const myReels = useMyReels();
 
   const toggleLike = useToggleTravelLike();
 
@@ -52,12 +50,23 @@ export default function TravelsScreen() {
   const currentTravel = current.data;
   const pastTravels = past.data?.travels ?? [];
   const nickname = profile?.nickname ?? "여행자";
+  // 서버에 전체 개수 필드가 없어 로드된 페이지 수로만 안다 — 더 있으면 "n+"로 표시.
+  const videoCount = myReels.data?.length ?? 0;
+  const videoCountLabel = myReels.hasNextPage ? `${videoCount}+` : `${videoCount}`;
 
   function handleToggleLike(t: PastTravelCard) {
     toggleLike.mutate(
       { travelIdx: t.travel_idx, currentlyLiked: t.liked },
       { onError: () => Alert.alert("오류", "잠시 후 다시 시도해 주세요.") },
     );
+  }
+
+  /** 여행 카드 → 일정표 상세로 이동. 일정 탭(calendar.tsx)의 goDetail과 동일한 라우트. */
+  function goDetail(travel: { travel_idx: number; cover_image_url: string | null }) {
+    router.push({
+      pathname: "/travel/[travelIdx]",
+      params: { travelIdx: travel.travel_idx, cover: travel.cover_image_url ?? "" },
+    });
   }
 
   return (
@@ -115,7 +124,7 @@ export default function TravelsScreen() {
               />
             }
             label="내영상"
-            value={VIDEO_COUNT}
+            value={videoCountLabel}
           />
         </View>
       </ImageBackground>
@@ -123,6 +132,24 @@ export default function TravelsScreen() {
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={ACCENT} />
+        </View>
+      ) : current.isError || past.isError ? (
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-gray-400" style={{ fontSize: moderateScale(14) }}>
+            여행 정보를 불러오지 못했어요
+          </Text>
+          <Pressable
+            onPress={() => {
+              current.refetch();
+              past.refetch();
+            }}
+            className="active:opacity-60"
+            style={{ marginTop: verticalScale(10) }}
+          >
+            <Text style={{ color: ACCENT, fontSize: moderateScale(13) }}>
+              다시 시도
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView
@@ -135,7 +162,7 @@ export default function TravelsScreen() {
         >
           {/* 현재 여행 있으면 카드, 없으면 새 일정 만들기 카드 */}
           {currentTravel ? (
-            <TravelListCard travel={currentTravel} />
+            <TravelListCard travel={currentTravel} onPress={() => goDetail(currentTravel)} />
           ) : (
             <NewTravelCard onPress={() => router.push("/course/intro")} />
           )}
@@ -144,6 +171,7 @@ export default function TravelsScreen() {
           <PastTravelSections
             travels={pastTravels}
             onToggleLike={handleToggleLike}
+            onPressItem={goDetail}
           />
         </ScrollView>
       )}
@@ -162,7 +190,7 @@ function StatPill({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | string;
   /** 없으면 눌리지 않는 표시 전용 칩. */
   onPress?: () => void;
 }) {

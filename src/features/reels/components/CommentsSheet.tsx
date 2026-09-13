@@ -3,13 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   Keyboard,
-  Modal,
+  KeyboardAvoidingView,
   Pressable,
+  StyleSheet,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
 import { useConfirmDialog } from "@/src/components/ConfirmDialog";
@@ -67,6 +70,8 @@ export default function CommentsSheet({
   reelsIdx: number | null;
   onClose: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+
   const { data: comments, isLoading, isError, error, refetch, isFetching } =
     useReelsComments(reelsIdx);
   const create = useCreateReelsComment(reelsIdx);
@@ -95,6 +100,17 @@ export default function CommentsSheet({
       setEditing(null);
     }
   }, [reelsIdx]);
+
+  // RN Modal 을 안 쓰므로(아래 이유), 화면 전체를 덮는 이 오버레이가 열려 있는 동안
+  // 안드로이드 뒤로가기가 원래 화면으로 새지 않고 이 시트만 닫게 직접 잡아야 한다.
+  useEffect(() => {
+    if (reelsIdx == null) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [reelsIdx, onClose]);
 
   // 최상위 + 답글을 한 배열로 펼친다(답글은 depth 1 로 들여쓰기).
   // replies 가 없는 응답(단건 조회 등)도 있어 ?? [] 로 방어한다.
@@ -243,23 +259,29 @@ export default function CommentsSheet({
     );
   };
 
+  // null 이면 닫힌 상태 — 위의 훅은 전부 실행된 뒤라 조건부 훅 문제가 없다.
+  if (reelsIdx == null) return null;
+
   return (
     <>
-    <Modal
-      visible={reelsIdx != null}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    {/*
+      RN Modal 은 액티비티와 별개의 창이라 windowSoftInputMode=adjustResize 도,
+      Keyboard 이벤트도 그 창 안의 입력칸에는 제대로 안 걸린다(실기기에서 확인) —
+      그래서 이 화면(메인 창) 안의 절대배치 오버레이로 바꾼다. 같은 이유로 이미
+      Modal 을 안 쓰는 AuthBottomSheet 와 동일한 해법: 패널을
+      KeyboardAvoidingView(padding) 로 감싸 겹치는 높이만큼 위로 올린다.
+    */}
+    <View style={StyleSheet.absoluteFill}>
       <Pressable
         className="flex-1 justify-end"
         style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
         onPress={onClose}
       >
+        <KeyboardAvoidingView behavior="padding" style={{ height: "70%" }}>
         <Pressable
           onPress={() => {}}
           style={{
-            height: "70%",
+            flex: 1,
             backgroundColor: "#1C1C1C",
             borderTopLeftRadius: scale(16),
             borderTopRightRadius: scale(16),
@@ -362,15 +384,16 @@ export default function CommentsSheet({
           )}
 
           {/* 입력창 — 목록 로딩/실패와 무관하게 항상 하단 고정.
-              안드로이드는 windowSoftInputMode=adjustResize 로 화면이 줄어들어
-              시트가 키보드 위로 밀린다(KeyboardAvoidingView 불필요). */}
+              바깥 KeyboardAvoidingView 가 키보드가 뜨면 시트 자체를 줄여 위로
+              올려주므로 여기선 제스처 내비게이션 바에 안 가리도록 insets.bottom
+              만큼만 띄운다. */}
           <View
             style={{
               borderTopWidth: 1,
               borderTopColor: "#2E2E2E",
               paddingHorizontal: scale(16),
               paddingTop: verticalScale(10),
-              paddingBottom: verticalScale(12),
+              paddingBottom: insets.bottom + verticalScale(12),
               gap: verticalScale(8),
             }}
           >
@@ -480,8 +503,9 @@ export default function CommentsSheet({
             </View>
           </View>
         </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
-    </Modal>
+    </View>
 
     {/* 내 댓글이면 수정·삭제, 남의 댓글이면 신고·차단 */}
     <MyCommentSheet

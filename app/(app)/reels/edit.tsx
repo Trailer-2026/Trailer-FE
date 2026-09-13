@@ -8,11 +8,7 @@ import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
 import { Text } from "@/src/components/Text";
-import { captureFromCamera } from "@/src/features/reels/capture";
 import DraggableTimeline from "@/src/features/reels/components/DraggableTimeline";
-import MediaSourceSheet, {
-  type MediaSource,
-} from "@/src/features/reels/components/MediaSourceSheet";
 import GradedPhoto from "@/src/features/reels/components/GradedPhoto";
 import RenderOptions from "@/src/features/reels/components/RenderOptions";
 import {
@@ -45,16 +41,13 @@ const THUMB_GAP = 2;
  * 영상 만들기 2단계 — 고른 미디어 미리보기 · 순서 정렬 · 추가.
  *
  * 순서는 그대로 영상의 클립 순서가 된다(길게 눌러 드래그).
- * "생성하기" 는 아직 백엔드 연결 전 — TODO 참고.
  */
 export default function ReelsEditScreen() {
   const assets = useReelsCreateStore((s) => s.assets);
-  const addAssets = useReelsCreateStore((s) => s.addAssets);
   const reorder = useReelsCreateStore((s) => s.reorder);
 
   // 위쪽 큰 미리보기에 띄울 항목. 목록이 줄어들 수 있어 인덱스가 아니라 uri 로 잡는다.
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const selected =
     assets.find((a) => a.uri === selectedUri) ?? assets[0] ?? null;
 
@@ -70,16 +63,6 @@ export default function ReelsEditScreen() {
 
   // photos-only 렌더 대상은 사진만. 영상이 섞여 있어도 사진만 추려 보낸다.
   const photos = assets.filter((a) => a.kind === "image");
-
-  const onAddMore = async (source: MediaSource) => {
-    setSheetOpen(false);
-    if (source === "camera") {
-      const media = await captureFromCamera();
-      if (media && media.length > 0) addAssets(media);
-    } else {
-      router.push("/reels/gallery?mode=add");
-    }
-  };
 
   const onCreate = () => {
     if (render.isPending) return;
@@ -217,7 +200,7 @@ export default function ReelsEditScreen() {
         }}
       >
         <Pressable
-          onPress={() => setSheetOpen(true)}
+          onPress={() => router.push("/reels/gallery?mode=add")}
           className="items-center justify-center active:opacity-70"
           style={{
             width: scale(THUMB_H),
@@ -250,12 +233,6 @@ export default function ReelsEditScreen() {
 
       {/* 파티클은 사진 위로 떨어져야 영상과 같아 보인다 — 맨 마지막에 그린다. */}
       <ThemeParticles theme={options.theme} />
-
-      <MediaSourceSheet
-        visible={sheetOpen}
-        onSelect={onAddMore}
-        onClose={() => setSheetOpen(false)}
-      />
     </SafeAreaView>
   );
 }

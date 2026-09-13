@@ -2,6 +2,7 @@ import { useIsFocused } from "@react-navigation/native";
 import Feather from "@expo/vector-icons/Feather";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -402,8 +403,9 @@ function SceneryPromoCard({
           >
             {collapsed ? "펼치기" : "접기"}
           </Text>
+          {/* 접혀 있으면(펼치기 가능) 아래로, 펼쳐져 있으면(접기 가능) 위로. */}
           <Feather
-            name={collapsed ? "chevron-up" : "chevron-down"}
+            name={collapsed ? "chevron-down" : "chevron-up"}
             size={moderateScale(12)}
             color={bg.text}
           />
@@ -493,7 +495,9 @@ function SceneryPromoCard({
       </View>
 
       {/* 촬영 버튼 — 카드 아래에서 25 띄운 자리(시안 y+279, 높이 48).
-          접었을 때는 자리가 없어 그리지 않는다. */}
+          접었을 때는 자리가 없어 그리지 않는다.
+          사진을 붙일 여행이 없을 때(여행 자체가 없거나 아직 시작 전) 버튼을 눌러도
+          결국 "여행을 찾지 못했어요" 로 막히기만 했다 — 상태별로 안내를 바꾼다. */}
       {!collapsed ? (
         <View
           style={{
@@ -504,52 +508,84 @@ function SceneryPromoCard({
             gap: verticalScale(8),
           }}
         >
-          {/* 방금 붙였다는 알림 — 버튼 위에 5초만 떴다 사라진다. */}
-          {justAdded ? (
-            <View
-              className="flex-row items-center bg-white"
-              style={{
-                alignSelf: "flex-start",
-                borderRadius: 999,
-                paddingHorizontal: scale(12),
-                paddingVertical: verticalScale(6),
-                gap: scale(6),
-              }}
-            >
-              <Feather name="check" size={moderateScale(12)} color={ACCENT} />
-              <Text
-                className="font-semibold"
-                style={{ fontSize: moderateScale(12), color: "#353535" }}
-              >
-                사진을 붙였어요
-              </Text>
-            </View>
-          ) : null}
+          {photoTravelIdx != null ? (
+            <>
+              {/* 방금 붙였다는 알림 — 버튼 위에 5초만 떴다 사라진다. */}
+              {justAdded ? (
+                <View
+                  className="flex-row items-center bg-white"
+                  style={{
+                    alignSelf: "flex-start",
+                    borderRadius: 999,
+                    paddingHorizontal: scale(12),
+                    paddingVertical: verticalScale(6),
+                    gap: scale(6),
+                  }}
+                >
+                  <Feather name="check" size={moderateScale(12)} color={ACCENT} />
+                  <Text
+                    className="font-semibold"
+                    style={{ fontSize: moderateScale(12), color: "#353535" }}
+                  >
+                    사진을 붙였어요
+                  </Text>
+                </View>
+              ) : null}
 
-          <Pressable
-            onPress={() => setSheetOpen(true)}
-            disabled={addImages.isPending}
-            className="items-center justify-center active:opacity-80"
-            style={{
-              height: verticalScale(48),
-              borderRadius: scale(10),
-              backgroundColor: ACCENT,
-              opacity: addImages.isPending ? 0.6 : 1,
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="지금 촬영하러 가기"
-          >
-            {addImages.isPending ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
+              <Pressable
+                onPress={() => setSheetOpen(true)}
+                disabled={addImages.isPending}
+                className="items-center justify-center active:opacity-80"
+                style={{
+                  height: verticalScale(48),
+                  borderRadius: scale(10),
+                  backgroundColor: ACCENT,
+                  opacity: addImages.isPending ? 0.6 : 1,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="지금 촬영하러 가기"
+              >
+                {addImages.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text
+                    className="text-white"
+                    style={{ fontSize: moderateScale(16), fontWeight: "600" }}
+                  >
+                    지금 촬영하러 가기
+                  </Text>
+                )}
+              </Pressable>
+            </>
+          ) : currentTravel ? (
+            // 여행은 있지만 아직 시작 전(PLANNED) — 지금은 사진을 붙일 곳이 없다.
+            <Text
+              className="text-center font-medium"
+              style={{ fontSize: moderateScale(13), color: bg.subText }}
+            >
+              여행이 시작되면 사진을 붙일 수 있어요
+            </Text>
+          ) : (
+            // 담긴 여행 자체가 없다 — 촬영이 아니라 여행부터 만들게 유도한다.
+            <Pressable
+              onPress={() => router.push("/course/intro")}
+              className="items-center justify-center active:opacity-80"
+              style={{
+                height: verticalScale(48),
+                borderRadius: scale(10),
+                backgroundColor: ACCENT,
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="AI로 여행 일정 만들기"
+            >
               <Text
                 className="text-white"
                 style={{ fontSize: moderateScale(16), fontWeight: "600" }}
               >
-                지금 촬영하러 가기
+                여행 일정부터 짜볼까요?
               </Text>
-            )}
-          </Pressable>
+            </Pressable>
+          )}
         </View>
       ) : null}
 

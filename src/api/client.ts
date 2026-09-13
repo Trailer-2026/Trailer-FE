@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from "@/src/features/auth/storage";
+import { useNetworkStatus } from "@/src/api/network-status";
 // refreshTokens 는 require cycle(client ↔ api) 방지를 위해 인터셉터 내부에서 동적 import 한다.
 
 declare module "axios" {
@@ -94,6 +95,21 @@ api.interceptors.response.use(
     } finally {
       isRefreshing = false;
     }
+  },
+);
+
+// 오프라인 감지 — 요청이 실제로 네트워크 에러(ERR_NETWORK)로 실패/성공하는 것만
+// 본다. 401/토큰 재발급 인터셉터 뒤에 등록해 그 흐름은 건드리지 않는다.
+api.interceptors.response.use(
+  (response) => {
+    useNetworkStatus.getState().markOnline();
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.code === "ERR_NETWORK") {
+      useNetworkStatus.getState().markOffline();
+    }
+    return Promise.reject(error);
   },
 );
 

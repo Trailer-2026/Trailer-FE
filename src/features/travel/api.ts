@@ -26,12 +26,19 @@ import type {
  * 결과 화면에서 선택한 Itinerary.plan_id 를 그대로 보낸다.
  * - 400 "추천이 만료되었습니다..." 로 응답할 수 있음. 호출부에서 문구 매칭 없이
  *   axios status 로 분기(호출부의 error 처리 참조).
+ *
+ * 여러 날짜·구간을 통째로 복사해 저장하는 작업이라 전역 10초로는 가끔 부족했다.
+ * 서버는 실제로 다 만들었는데 클라이언트만 타임아웃으로 실패 처리되면, 그 뒤
+ * "이 여행 담기"를 다시 눌렀을 때 방금 그 성공(하지만 화면엔 안 보이는) 여행
+ * 때문에 "이미 예정된 여행이 있습니다" 400 이 뜬다 — 화면엔 여행이 없는데
+ * 저장은 막히는 것처럼 보이는 원인이 이거였다. 여유를 60초로 늘린다.
  */
 export async function createTravel(planId: string): Promise<TravelResponse> {
   const body: TravelCreateRequest = { plan_id: planId };
   const res = await api.post<CommonResponse<TravelResponse>>(
     "/api/travels",
     body,
+    { timeout: 60000 },
   );
   if (!res.data.data) throw new Error(res.data.message);
   return res.data.data;
