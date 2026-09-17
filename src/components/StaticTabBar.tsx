@@ -8,6 +8,7 @@ import CalendarGridIcon from "@/src/components/icons/CalendarGridIcon";
 import HomeIcon from "@/src/components/icons/HomeIcon";
 import PersonIcon from "@/src/components/icons/PersonIcon";
 import PlayIcon from "@/src/components/icons/PlayIcon";
+import { Text } from "@/src/components/Text";
 import { moderateScale, verticalScale } from "@/src/utils/responsive";
 
 /**
@@ -19,16 +20,17 @@ import { moderateScale, verticalScale } from "@/src/utils/responsive";
 // 여기서 실제로 넘기는 prop 만으로 타입을 잡는다.
 type TabIcon = ComponentType<{
   color?: string;
+  filled?: boolean;
   width?: number;
   height?: number;
 }>;
 
-const TABS: { path: Href; Icon: TabIcon; w: number; h: number }[] = [
-  { path: "/", Icon: HomeIcon, w: 22, h: 22 },
-  { path: "/feed", Icon: PlayIcon, w: 22, h: 22 },
-  { path: "/calendar", Icon: CalendarGridIcon, w: 22, h: 22 },
-  { path: "/notifications", Icon: BellIcon, w: 20, h: 22 },
-  { path: "/profile", Icon: PersonIcon, w: 19, h: 21 },
+const TABS: { path: Href; Icon: TabIcon; label: string; w: number; h: number }[] = [
+  { path: "/", Icon: HomeIcon, label: "홈", w: 22, h: 22 },
+  { path: "/feed", Icon: PlayIcon, label: "Shorts", w: 22, h: 22 },
+  { path: "/calendar", Icon: CalendarGridIcon, label: "일정", w: 22, h: 22 },
+  { path: "/notifications", Icon: BellIcon, label: "알림", w: 20, h: 22 },
+  { path: "/profile", Icon: PersonIcon, label: "내 페이지", w: 19, h: 21 },
 ];
 
 export function StaticTabBar() {
@@ -47,9 +49,9 @@ export function StaticTabBar() {
         paddingBottom: insets.bottom + verticalScale(8),
       }}
     >
-      {TABS.map(({ path, Icon, w, h }) => {
+      {TABS.map(({ path, Icon, label, w, h }) => {
         const active = pathname === path;
-        const color = active ? "#668DFF" : "#9D9D9D";
+        const color = active ? "#1A1A1A" : "#9D9D9D";
         return (
           <Pressable
             key={String(path)}
@@ -58,9 +60,20 @@ export function StaticTabBar() {
           >
             <Icon
               color={color}
+              filled={active}
               width={moderateScale(w)}
               height={moderateScale(h)}
             />
+            <Text
+              style={{
+                color,
+                fontWeight: active ? "600" : "400",
+                fontSize: moderateScale(10),
+                marginTop: verticalScale(4),
+              }}
+            >
+              {label}
+            </Text>
           </Pressable>
         );
       })}
