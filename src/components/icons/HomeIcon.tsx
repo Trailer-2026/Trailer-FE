@@ -1,9 +1,12 @@
 import * as React from "react";
 import Svg, { Path, type SvgProps } from "react-native-svg";
 
-const HomeIcon = ({ color = "#9D9D9D", ...props }: SvgProps) => (
+type Props = SvgProps & { color?: string; filled?: boolean };
+
+const HomeIcon = ({ color = "#9D9D9D", filled = false, ...props }: Props) => (
   <Svg width={22} height={22} fill="none" {...props}>
     <Path
+      fill={filled ? color : "none"}
       stroke={color}
       strokeLinecap="round"
       strokeLinejoin="round"

@@ -61,9 +61,13 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false, // 하단바 글씨 제거 (아이콘만)
-        tabBarActiveTintColor: "#668DFF",
+        tabBarActiveTintColor: "#1A1A1A",
         tabBarInactiveTintColor: "#9D9D9D",
+        tabBarLabelStyle: {
+          fontFamily: "Pretendard-SemiBold",
+          fontSize: moderateScale(10),
+          marginTop: verticalScale(4),
+        },
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopColor: "#E5E7EB",
@@ -75,9 +79,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ color }) => (
+          title: "홈",
+          tabBarIcon: ({ color, focused }) => (
             <HomeIcon
               color={color}
+              filled={focused}
               width={moderateScale(22)}
               height={moderateScale(22)}
             />
@@ -87,6 +93,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="feed"
         options={{
+          title: "Shorts",
           // 이 탭이 포커스된 동안에만 적용 → 릴스 화면에서만 하단바가 어두워진다.
           tabBarStyle: {
             backgroundColor: DARK_BAR_BG,
@@ -109,9 +116,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          tabBarIcon: ({ color }) => (
+          title: "일정",
+          tabBarIcon: ({ color, focused }) => (
             <CalendarGridIcon
               color={color}
+              filled={focused}
               width={moderateScale(22)}
               height={moderateScale(22)}
             />
@@ -121,9 +130,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
-          tabBarIcon: ({ color }) => (
+          title: "알림",
+          tabBarIcon: ({ color, focused }) => (
             <BellIcon
               color={color}
+              filled={focused}
               width={moderateScale(20)}
               height={moderateScale(22)}
             />
@@ -148,9 +159,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ color }) => (
+          title: "내 페이지",
+          tabBarIcon: ({ color, focused }) => (
             <PersonIcon
               color={color}
+              filled={focused}
               width={moderateScale(19)}
               height={moderateScale(21)}
             />
