@@ -19,7 +19,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describeApiError } from "@/src/api/errors";
 import BackIcon from "@/src/components/icons/BackIcon";
-import PlaceMarkerIcon from "@/src/components/icons/PlaceMarkerIcon";
+import PlaceThemeMarkerIcon, {
+  placeMarkerCategory,
+  PLACE_MARKER_TINT,
+} from "@/src/components/icons/PlaceThemeMarkerIcon";
 import RefreshIcon from "@/src/components/icons/RefreshIcon";
 import { StaticTabBar } from "@/src/components/StaticTabBar";
 import { Text } from "@/src/components/Text";
@@ -1033,18 +1036,19 @@ function railNode(row: Row): { icon: ReactNode; tint: string } {
           <Feather name="home" size={moderateScale(14)} color="#6B7280" />
         ),
       };
-    default:
+    default: {
+      const category = placeMarkerCategory(row.place.themes);
       return {
-        tint: "#B0E6DB",
+        tint: PLACE_MARKER_TINT[category],
         icon: (
-          <PlaceMarkerIcon
-            width={moderateScale(13.5)}
-            height={moderateScale(18)}
-            color="#B0E6DB"
-            dotFill={DARK_BG}
+          <PlaceThemeMarkerIcon
+            category={category}
+            width={moderateScale(13)}
+            height={moderateScale(13)}
           />
         ),
       };
+    }
   }
 }
 
