@@ -5,13 +5,30 @@ type Props = SvgProps & { color?: string; filled?: boolean };
 
 const CalendarGridIcon = ({ color = "#9D9D9D", filled = false, ...props }: Props) => (
   <Svg width={22} height={22} fill="none" {...props}>
+    {/* 바인더 링(위쪽 탭 두 개) — 항상 배경(흰색) 위라 filled 여부와 무관하게 color 유지 */}
     <Path
-      fill={filled ? color : "none"}
       stroke={color}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={1.453}
-      d="M5.168 2.847V.727M16.274 2.847V.727M17.258 1.679H4.184C2.272 1.679.727 3.237.727 5.166v12.073c0 1.93 1.545 3.487 3.457 3.487H17.27c1.912 0 3.458-1.558 3.458-3.487V5.166c-.011-1.929-1.556-3.487-3.469-3.487ZM.727 6.023h19.989"
+      d="M5.168 2.847V.727M16.274 2.847V.727"
+    />
+    {/* 몸통 — filled 땐 color 로 꽉 채우고 테두리를 흰색으로 바꿔 배경과 분리한다 */}
+    <Path
+      fill={filled ? color : "none"}
+      stroke={filled ? "#FFFFFF" : color}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.453}
+      d="M17.258 1.679H4.184C2.272 1.679.727 3.237.727 5.166v12.073c0 1.93 1.545 3.487 3.457 3.487H17.27c1.912 0 3.458-1.558 3.458-3.487V5.166c-.011-1.929-1.556-3.487-3.469-3.487Z"
+    />
+    {/* 헤더 구분선 — filled 땐 검은 몸통 위라 흰색이어야 보인다 */}
+    <Path
+      stroke={filled ? "#FFFFFF" : color}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.453}
+      d="M.727 6.023h19.989"
     />
     <Path
       fill={filled ? "#FFFFFF" : color}

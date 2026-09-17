@@ -35,7 +35,6 @@ export default function PlaceDetailScreen() {
   const { data, isLoading, error, refetch } = usePlaceDetail(contentId);
 
   const heroW = width - PAD * 2;
-  const cardW = (width - PAD * 2 - scale(12)) / 2;
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
@@ -155,21 +154,24 @@ export default function PlaceDetailScreen() {
                 가까운 맛집
               </Text>
               <View
-                className="flex-row flex-wrap"
                 style={{
                   paddingHorizontal: PAD,
                   marginTop: verticalScale(16),
-                  gap: scale(12),
                   // 주소가 2줄 자리를 고정으로 차지하므로 줄 간격은 좁게 잡는다.
-                  rowGap: verticalScale(12),
+                  gap: verticalScale(12),
                 }}
               >
-                {data.restaurants.map((r) => (
-                  <RestaurantCard
-                    key={r.content_id}
-                    restaurant={r}
-                    width={cardW}
-                  />
+                {/* flex-wrap + 미리 계산한 픽셀 너비 조합은 기기별 반올림에 따라
+                    카드 두 개 합이 한 픽셀 초과해 1개씩 줄바꿈되는 경우가 있었다.
+                    그 대신 두 개씩 직접 행으로 묶고 flex:1 로 나눠 Yoga 가 폭을
+                    계산하게 하면 기기와 무관하게 항상 2열로 나온다. */}
+                {chunkPairs(data.restaurants).map((pair, i) => (
+                  <View key={i} className="flex-row" style={{ gap: scale(12) }}>
+                    {pair.map((r) => (
+                      <RestaurantCard key={r.content_id} restaurant={r} />
+                    ))}
+                    {pair.length === 1 ? <View style={{ flex: 1 }} /> : null}
+                  </View>
                 ))}
               </View>
             </>
@@ -322,21 +324,15 @@ function InfoRow({
   );
 }
 
-/** 맛집 카드 — 사진 + 이름 + "분류 | 주소". */
-function RestaurantCard({
-  restaurant,
-  width,
-}: {
-  restaurant: NearbyRestaurant;
-  width: number;
-}) {
+/** 맛집 카드 — 사진 + 이름 + "분류 | 주소". flex:1 로 부모 행 폭을 반씩 나눠 가진다. */
+function RestaurantCard({ restaurant }: { restaurant: NearbyRestaurant }) {
   return (
-    <View style={{ width }}>
+    <View style={{ flex: 1 }}>
       <View
         className="overflow-hidden items-center justify-center"
         style={{
-          width,
-          height: width * 0.78,
+          width: "100%",
+          aspectRatio: 1 / 0.78,
           borderRadius: scale(8),
           backgroundColor: "#E5E7EB",
         }}
@@ -393,6 +389,13 @@ function shortAddress(address: string): string {
   const withoutParen = address.replace(/\s*\([^)]*\)\s*$/, "").trim();
   const parts = withoutParen.split(/\s+/);
   return parts.length > 1 ? parts.slice(1).join(" ") : withoutParen;
+}
+
+/** [1,2,3,4,5] → [[1,2],[3,4],[5]] — 맛집 카드를 2개씩 행으로 묶는다. */
+function chunkPairs<T>(items: T[]): T[][] {
+  const pairs: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) pairs.push(items.slice(i, i + 2));
+  return pairs;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

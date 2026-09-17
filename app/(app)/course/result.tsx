@@ -978,7 +978,7 @@ function TimelineRow({ row, isLast }: { row: Row; isLast: boolean }) {
         ) : row.t === "place" ? (
           <PlaceBody place={row.place} />
         ) : (
-          <LodgingBody name={row.name} lodgingType={row.lodgingType} imageUrl={row.imageUrl} />
+          <LodgingBody name={row.name} imageUrl={row.imageUrl} />
         )}
         {/* 항목 사이 구분선 (마지막 제외). 아래쪽에 둬서 다음 노드가
             제목 옆에 자연스럽게 정렬되고, 레일 연결선을 쪼개지 않는다. */}
@@ -1256,13 +1256,8 @@ function AlightBody({ train }: { train: TrainInfo }) {
 
 function PlaceBody({ place }: { place: PlaceInfo }) {
   const openHours = formatOpenHours(place.open_time, place.close_time);
-  const isFood = place.themes.includes("FOOD");
   return (
     <View>
-      <CategoryTag
-        label={isFood ? "맛집" : "관광"}
-        color={isFood ? "#F4A15E" : "#B0E6DB"}
-      />
       <Text
         className="font-bold"
         style={{ fontSize: moderateScale(16), color: DARK_TEXT }}
@@ -1303,16 +1298,13 @@ function PlaceBody({ place }: { place: PlaceInfo }) {
 
 function LodgingBody({
   name,
-  lodgingType,
   imageUrl,
 }: {
   name: string;
-  lodgingType: string;
   imageUrl: string | null;
 }) {
   return (
     <View>
-      <CategoryTag label={lodgingType ? `숙소 · ${lodgingType}` : "숙소"} color="#C9B6FF" />
       <Text
         className="font-bold"
         style={{ fontSize: moderateScale(16), color: DARK_TEXT }}
@@ -1324,28 +1316,6 @@ function LodgingBody({
         style={{ width: "100%", height: verticalScale(130) }}
         rounded
       />
-    </View>
-  );
-}
-
-/** 타임라인 행 위에 붙는 작은 구분 뱃지 (맛집 / 관광 / 숙소). */
-function CategoryTag({ label, color }: { label: string; color: string }) {
-  return (
-    <View
-      className="self-start rounded-md"
-      style={{
-        backgroundColor: color,
-        paddingHorizontal: scale(7),
-        paddingVertical: verticalScale(2),
-        marginBottom: verticalScale(6),
-      }}
-    >
-      <Text
-        className="font-bold"
-        style={{ fontSize: moderateScale(10.5), color: "#1A1A1A" }}
-      >
-        {label}
-      </Text>
     </View>
   );
 }
