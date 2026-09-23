@@ -1,6 +1,5 @@
 import { File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
-import { FFmpegKit, ReturnCode } from "ffmpeg-kit-react-native";
 import piexif from "piexifjs";
 
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
@@ -100,15 +99,15 @@ function formatExifDateTime(iso: string | null): string | null {
   );
 }
 
-/** 서버가 영상당 앞 N초만 사용하므로, 그 이상을 보내면 100MB 한도만 낭비된다. */
-const CLIP_SECONDS = 5;
+/** nginx 100MB 한도 기준 영상 1개 최대 허용 크기. */
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024; // 30MB
 
 /**
  * 영상을 업로드용 파일 파트로 준비한다.
  *
- * 5초 이하 영상은 원본 그대로, 5초 초과 영상은 앞 5초만 잘라 캐시에 저장한다.
- * stream copy(-c copy) 로 재인코딩 없이 빠르게 처리한다.
- * 컨테이너·코덱은 원본 그대로 유지(mp4/mov/m4v/webm 모두 서버가 허용).
+ * 서버가 영상당 앞 5초만 사용하므로 짧은 영상을 선택하도록 안내한다.
+ * 파일 크기가 30MB 를 초과하면 업로드하지 않고 오류를 던진다.
+ * (Galaxy A24 기준 1080p/30fps 약 14초 분량 — 5초 클립은 여유 있게 통과)
  */
 export async function prepareVideoForUpload(
   asset: ReelsMediaAsset,
@@ -118,29 +117,15 @@ export async function prepareVideoForUpload(
   const ext = name.split(".").pop()?.toLowerCase() ?? "mp4";
   const type = videoMimeType(ext);
 
-  // 5초 이하 영상은 trim 불필요 — 그대로 전송
-  const durationSecs = asset.duration != null ? asset.duration / 1000 : Infinity;
-  if (durationSecs <= CLIP_SECONDS) {
-    return { uri: asset.uri, name, type };
+  const videoFile = new File(asset.uri);
+  if (videoFile.exists && videoFile.size != null && videoFile.size > MAX_VIDEO_BYTES) {
+    const sizeMB = Math.round(videoFile.size / 1024 / 1024);
+    throw new Error(
+      `이 영상이 너무 커요 (${sizeMB}MB). 20초 이하의 짧은 영상을 선택해주세요.`,
+    );
   }
 
-  // 5초 초과: FFmpegKit 으로 앞 5초만 잘라 캐시에 저장
-  const outputName = `video_clip_${index}.${ext}`;
-  const output = new File(Paths.cache, outputName);
-  if (output.exists) output.delete();
-
-  const session = await FFmpegKit.execute(
-    `-i "${asset.uri}" -t ${CLIP_SECONDS} -c copy -y "${output.uri}"`,
-  );
-  const rc = await session.getReturnCode();
-
-  if (!ReturnCode.isSuccess(rc)) {
-    const logs = await session.getLogsAsString();
-    console.error("[ffmpeg-kit] trim failed:", logs);
-    throw new Error(`영상을 준비하는 중 오류가 발생했어요 (${name})`);
-  }
-
-  return { uri: output.uri, name: outputName, type };
+  return { uri: asset.uri, name, type };
 }
 
 function videoMimeType(ext: string): string {

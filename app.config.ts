@@ -1,10 +1,8 @@
-import { withGradleProperties } from "@expo/config-plugins";
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-export default ({ config }: ConfigContext): ExpoConfig => {
-  const base: ExpoConfig = {
-    ...config,
-    name: "trailer-app",
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  ...config,
+  name: "trailer-app",
   slug: "trailer-app",
   version: "1.0.2",
   orientation: "portrait",
@@ -140,11 +138,4 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       process.env.NODE_ENV === "production" ||
       process.env.EAS_BUILD === "true",
   },
-  };
-  // ffmpeg-kit-react-native 기본값은 https 패키지인데, 해당 AAR 이 Maven 에 없어 빌드 실패.
-  // min 패키지로 덮어쓴다(기본 코덱만 포함 — 영상 trim 에는 충분).
-  return withGradleProperties(base, (c) => {
-    c.modResults.push({ type: "property", key: "ffmpegKitPackage", value: "min" });
-    return c;
-  });
-};
+});
