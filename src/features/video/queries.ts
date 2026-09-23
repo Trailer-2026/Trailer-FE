@@ -95,17 +95,17 @@ export function useRenderStatus(reelsIdx: number | null) {
 }
 
 /**
- * 렌더 시작(사진 순서 지정). 성공 시 반환된 reels_idx 로 진행률 화면으로 이동한다(호출부).
+ * 렌더 시작(사진·영상 순서 지정). 성공 시 반환된 reels_idx 로 진행률 화면으로 이동한다(호출부).
  */
 export function useRenderPhotosOrdered() {
   return useMutation({
     mutationFn: ({
-      photos,
+      media,
       options,
     }: {
-      photos: ReelsMediaAsset[];
+      media: ReelsMediaAsset[];
       options: RenderOptions;
-    }) => renderPhotosOrdered(photos, options),
+    }) => renderPhotosOrdered(media, options),
   });
 }
 

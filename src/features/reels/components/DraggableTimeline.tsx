@@ -169,6 +169,25 @@ function DraggableThumb({
             {index + 1}
           </Text>
         </View>
+
+        {/* 영상 클립 배지 */}
+        {asset.kind === "video" ? (
+          <View
+            className="absolute rounded"
+            pointerEvents="none"
+            style={{
+              right: scale(4),
+              top: scale(4),
+              backgroundColor: "rgba(0,0,0,0.6)",
+              paddingHorizontal: scale(3),
+              paddingVertical: verticalScale(1),
+            }}
+          >
+            <Text className="text-white" style={{ fontSize: moderateScale(9) }}>
+              ▶
+            </Text>
+          </View>
+        ) : null}
         <View pointerEvents="none">
           <Text
             className="text-gray-400"

@@ -1,5 +1,6 @@
 import { File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import { FFmpegKit, ReturnCode } from "ffmpeg-kit-react-native";
 import piexif from "piexifjs";
 
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
@@ -97,6 +98,56 @@ function formatExifDateTime(iso: string | null): string | null {
     `${d.getFullYear()}:${p(d.getMonth() + 1)}:${p(d.getDate())} ` +
     `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
   );
+}
+
+/** 서버가 영상당 앞 N초만 사용하므로, 그 이상을 보내면 100MB 한도만 낭비된다. */
+const CLIP_SECONDS = 5;
+
+/**
+ * 영상을 업로드용 파일 파트로 준비한다.
+ *
+ * 5초 이하 영상은 원본 그대로, 5초 초과 영상은 앞 5초만 잘라 캐시에 저장한다.
+ * stream copy(-c copy) 로 재인코딩 없이 빠르게 처리한다.
+ * 컨테이너·코덱은 원본 그대로 유지(mp4/mov/m4v/webm 모두 서버가 허용).
+ */
+export async function prepareVideoForUpload(
+  asset: ReelsMediaAsset,
+  index: number,
+): Promise<UploadFile> {
+  const name = asset.file_name ?? `video_${index}.mp4`;
+  const ext = name.split(".").pop()?.toLowerCase() ?? "mp4";
+  const type = videoMimeType(ext);
+
+  // 5초 이하 영상은 trim 불필요 — 그대로 전송
+  const durationSecs = asset.duration != null ? asset.duration / 1000 : Infinity;
+  if (durationSecs <= CLIP_SECONDS) {
+    return { uri: asset.uri, name, type };
+  }
+
+  // 5초 초과: FFmpegKit 으로 앞 5초만 잘라 캐시에 저장
+  const outputName = `video_clip_${index}.${ext}`;
+  const output = new File(Paths.cache, outputName);
+  if (output.exists) output.delete();
+
+  const session = await FFmpegKit.execute(
+    `-i "${asset.uri}" -t ${CLIP_SECONDS} -c copy -y "${output.uri}"`,
+  );
+  const rc = await session.getReturnCode();
+
+  if (!ReturnCode.isSuccess(rc)) {
+    const logs = await session.getLogsAsString();
+    console.error("[ffmpeg-kit] trim failed:", logs);
+    throw new Error(`영상을 준비하는 중 오류가 발생했어요 (${name})`);
+  }
+
+  return { uri: output.uri, name: outputName, type };
+}
+
+function videoMimeType(ext: string): string {
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "m4v") return "video/x-m4v";
+  if (ext === "webm") return "video/webm";
+  return "video/mp4";
 }
 
 /** base64 JPEG 를 캐시 디렉터리에 저장하고 file:// uri 반환. */

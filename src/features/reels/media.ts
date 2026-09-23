@@ -7,6 +7,18 @@ import type { ReelsMediaAsset } from "./types";
 /** 사진 1장이 영상에서 차지하는 길이(초). 타임라인 눈금·총 길이 계산에 사용. */
 export const SECONDS_PER_PHOTO = 2;
 
+/** 영상 1개당 서버가 사용하는 최대 클립 길이(초). 서버가 앞 5초만 잘라 BGM 위에 합성한다. */
+export const RENDER_CLIP_SECONDS = 5;
+
+/** 렌더 결과물에서 이 미디어 1개가 차지하는 길이(초). */
+export function clipDurationSeconds(asset: ReelsMediaAsset): number {
+  if (asset.kind === "video") {
+    if (asset.duration == null || asset.duration <= 0) return RENDER_CLIP_SECONDS;
+    return Math.min(RENDER_CLIP_SECONDS, asset.duration / 1000);
+  }
+  return SECONDS_PER_PHOTO;
+}
+
 /**
  * EXIF 날짜는 "2024:05:03 12:33:21" 형식이라 Date 가 그대로 파싱하지 못한다.
  * 앞의 날짜 구분자만 '-' 로 바꿔 ISO 로 만든다. 타임존 정보는 EXIF 에 없어 로컬 시각으로 취급.
@@ -137,11 +149,7 @@ export function formatTimelineLabel(totalSeconds: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/** 미디어 목록의 총 재생 길이(초). 영상은 실제 길이, 사진은 SECONDS_PER_PHOTO. */
+/** 미디어 목록의 총 렌더 길이(초). 영상은 최대 5초, 사진은 SECONDS_PER_PHOTO. */
 export function totalDurationSeconds(assets: ReelsMediaAsset[]) {
-  return assets.reduce(
-    (sum, a) =>
-      sum + (a.kind === "video" && a.duration ? a.duration / 1000 : SECONDS_PER_PHOTO),
-    0,
-  );
+  return assets.reduce((sum, a) => sum + clipDurationSeconds(a), 0);
 }
