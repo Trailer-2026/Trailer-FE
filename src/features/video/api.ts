@@ -74,6 +74,14 @@ export async function renderPhotosOrdered(
     form.append("start_latitude", String(options.start_latitude));
     form.append("start_longitude", String(options.start_longitude));
   }
+  // 범위 안일 때만 전송 — 범위 밖이면 생략해 서버가 1번으로 처리하게 한다.
+  if (
+    options.cover_index != null &&
+    options.cover_index >= 1 &&
+    options.cover_index <= media.length
+  ) {
+    form.append("cover_index", String(options.cover_index));
+  }
 
   const res = await api.post<CommonResponse<VideoRenderStatusResponse>>(
     "/api/videos/render/photos-ordered",

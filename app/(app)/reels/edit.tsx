@@ -239,7 +239,7 @@ export default function ReelsEditScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <RenderOptions value={options} onChange={patchOptions} />
+        <RenderOptions value={options} onChange={patchOptions} assets={assets} />
       </ScrollView>
 
       {/* 하단 타임라인: + 추가 버튼 + 드래그로 순서 바꾸는 썸네일 목록 */}

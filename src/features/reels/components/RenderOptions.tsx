@@ -1,8 +1,10 @@
+import { Image } from "expo-image";
 import { useVideoPlayer } from "expo-video";
 import { useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Pressable, ScrollView, TextInput, View } from "react-native";
 
 import { Text } from "@/src/components/Text";
+import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { THEME_OPTIONS } from "@/src/features/video/options";
 import { useBgmTracks } from "@/src/features/video/queries";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
@@ -25,6 +27,7 @@ const BGM_PREVIEW: Record<string, number> = {
 type Props = {
   value: RenderOptionsValue;
   onChange: (patch: Partial<RenderOptionsValue>) => void;
+  assets?: ReelsMediaAsset[];
 };
 
 /**
@@ -32,7 +35,7 @@ type Props = {
  * BGM 목록은 서버(useBgmTracks)에서 받아 "무음 + 트랙들"로 구성한다.
  * 엔진(항상 modal)·인트로/아웃트로(항상 포함)는 서버 고정이라 UI 가 없다.
  */
-export default function RenderOptions({ value, onChange }: Props) {
+export default function RenderOptions({ value, onChange, assets }: Props) {
   const { data: tracks } = useBgmTracks();
 
   // 무음 + 서버 트랙(값=file, 라벨=title).
@@ -100,6 +103,13 @@ export default function RenderOptions({ value, onChange }: Props) {
         />
       </View>
 
+      {assets && assets.length > 0 && (
+        <CoverRow
+          assets={assets}
+          selected={value.cover_index ?? 1}
+          onSelect={(idx) => onChange({ cover_index: idx })}
+        />
+      )}
       <ChipRow
         label="테마"
         options={THEME_OPTIONS}
@@ -183,6 +193,82 @@ function PreviewButton({
         {playing ? "정지" : "미리듣기"}
       </Text>
     </Pressable>
+  );
+}
+
+/** 표지(썸네일)로 쓸 파일을 고르는 가로 스크롤 행. selected는 1-based. */
+function CoverRow({
+  assets,
+  selected,
+  onSelect,
+}: {
+  assets: ReelsMediaAsset[];
+  selected: number;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <View className="flex-row items-center" style={{ gap: scale(10) }}>
+      <Text
+        className="text-gray-400"
+        style={{ fontSize: moderateScale(12), width: scale(32) }}
+      >
+        표지
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: scale(6) }}
+        style={{ flex: 1 }}
+      >
+        {assets.map((asset, i) => {
+          const isSelected = selected === i + 1;
+          return (
+            <Pressable
+              key={asset.uri}
+              onPress={() => onSelect(i + 1)}
+              className="active:opacity-70"
+              style={{
+                width: scale(40),
+                height: verticalScale(54),
+                borderRadius: scale(6),
+                overflow: "hidden",
+                borderWidth: isSelected ? 2 : 0,
+                borderColor: ACCENT,
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`${i + 1}번 파일을 표지로`}
+            >
+              <Image
+                source={{ uri: asset.uri }}
+                contentFit="cover"
+                style={{ width: "100%", height: "100%" }}
+              />
+              {isSelected && (
+                <View
+                  className="absolute items-center justify-center"
+                  style={{
+                    top: scale(3),
+                    right: scale(3),
+                    width: moderateScale(16),
+                    height: moderateScale(16),
+                    borderRadius: moderateScale(8),
+                    backgroundColor: ACCENT,
+                  }}
+                >
+                  <Text
+                    className="font-bold text-white"
+                    style={{ fontSize: moderateScale(10) }}
+                  >
+                    ✓
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
