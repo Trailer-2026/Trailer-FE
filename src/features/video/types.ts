@@ -34,6 +34,8 @@ export type RenderOptions = {
   start_name?: string;
   start_latitude?: number;
   start_longitude?: number;
+  /** 표지(썸네일)로 쓸 파일 번호 — 보낸 순서 기준 1부터. 생략 시 서버가 1번을 씀. */
+  cover_index?: number;
 };
 
 /**

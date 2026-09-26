@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -17,7 +18,7 @@ import {
 } from "@/src/features/reels/components/ThemePreview";
 import { useReelsCreateStore } from "@/src/features/reels/create-store";
 import {
-  SECONDS_PER_PHOTO,
+  clipDurationSeconds,
   formatClock,
   formatTimelineLabel,
   totalDurationSeconds,
@@ -29,8 +30,10 @@ import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/t
 import { headerBarStyle } from "@/src/utils/header";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
-/** 사진→영상 렌더에 필요한 최소 사진 수(서버도 2장 미만이면 400). */
-const MIN_PHOTOS = 2;
+/** GPS 정보가 있어야 하는 최소 항목 수(서버 요건). */
+const MIN_GPS_ITEMS = 2;
+/** 영상 클립 합계 최대 초(서버 요건: 각 5초, 합계 15초). */
+const MAX_VIDEO_TOTAL_SECONDS = 15;
 
 const ACCENT = "#5E84F4"; // + 버튼
 const THUMB_W = 78;
@@ -61,35 +64,49 @@ export default function ReelsEditScreen() {
   const render = useRenderPhotosOrdered();
   const startTracking = useActiveRenderStore((s) => s.start);
 
-  // photos-only 렌더 대상은 사진만. 영상이 섞여 있어도 사진만 추려 보낸다.
-  const photos = assets.filter((a) => a.kind === "image");
+  // GPS 항목 수(사진은 갤러리에서 이미 GPS 보장, 영상은 GPS 없을 수 있음)
+  const gpsCount = assets.filter(
+    (a) => a.latitude != null && a.longitude != null,
+  ).length;
+  // 영상 클립 합계 길이(각 최대 5초 적용)
+  const totalVideoSecs = assets
+    .filter((a) => a.kind === "video")
+    .reduce((sum, a) => sum + clipDurationSeconds(a), 0);
 
   const onCreate = () => {
     if (render.isPending) return;
-    // 사전 검증 — 서버도 2장 미만이면 400 이지만 먼저 막아 요청을 아낀다.
-    if (photos.length < MIN_PHOTOS) {
+    if (assets.length < MIN_GPS_ITEMS) {
+      Alert.alert("파일이 부족해요", "사진·영상이 최소 2개 필요해요.");
+      return;
+    }
+    if (gpsCount < MIN_GPS_ITEMS) {
       Alert.alert(
-        "사진이 부족해요",
-        `영상으로 만들려면 사진이 최소 ${MIN_PHOTOS}장 필요해요.`,
+        "위치 정보 부족",
+        "GPS 정보가 있는 사진·영상이 최소 2개 필요해요.\n카카오톡 등으로 전달받은 파일은 GPS가 제거돼 있을 수 있어요.",
       );
       return;
     }
-    // photos-ordered 는 보낸 순서를 그대로 쓴다 — 타임라인에 보이는 순서가 곧 영상 순서.
+    if (totalVideoSecs > MAX_VIDEO_TOTAL_SECONDS) {
+      Alert.alert(
+        "영상이 너무 많아요",
+        `영상 클립은 합쳐서 최대 ${MAX_VIDEO_TOTAL_SECONDS}초까지 넣을 수 있어요.\n(영상마다 앞 5초만 사용됩니다)`,
+      );
+      return;
+    }
+    // photos-ordered 는 보낸 순서를 그대로 쓴다 — 타임라인 순서가 곧 영상 순서.
     render.mutate(
-      { photos, options },
+      { media: assets, options },
       {
         onSuccess: (status) => {
-          // 전역 추적 시작 → 진행률 화면을 떠나도 완료를 감지해 배너로 알림.
           startTracking(status.reels_idx);
           router.push(`/reels/progress?reels_idx=${status.reels_idx}`);
         },
-        // 400(GPS 부족·같은 장소·알 수 없는 옵션 등)은 서버 메시지를 그대로 노출.
         onError: (err) => Alert.alert("영상 만들기 실패", describeApiError(err)),
       },
     );
   };
 
-  const canCreate = photos.length >= MIN_PHOTOS && !render.isPending;
+  const canCreate = gpsCount >= MIN_GPS_ITEMS && !render.isPending;
   const totalSeconds = totalDurationSeconds(assets);
 
   return (
@@ -143,13 +160,49 @@ export default function ReelsEditScreen() {
       {/* 큰 미리보기 */}
       <View className="flex-1 items-center justify-center">
         {selected ? (
-          // 렌더러가 지도에 굽는 것과 같은 색보정을 사진에 걸어 결과 색감을 보여준다.
-          <GradedPhoto
-            uri={selected.uri}
-            theme={options.theme}
-            width={scale(248)}
-            height={verticalScale(370)}
-          />
+          selected.kind === "video" ? (
+            // 영상: expo-image 가 안드로이드에서 video/file:// URI 의 첫 프레임을 썸네일로 렌더링.
+            <View
+              className="items-center justify-center overflow-hidden"
+              style={{
+                width: scale(248),
+                height: verticalScale(370),
+                backgroundColor: "#111",
+              }}
+            >
+              <Image
+                source={{ uri: selected.uri }}
+                contentFit="cover"
+                style={{ width: "100%", height: "100%" }}
+              />
+              <View
+                className="absolute items-center justify-center"
+                pointerEvents="none"
+                style={{
+                  width: scale(52),
+                  height: scale(52),
+                  borderRadius: scale(26),
+                  backgroundColor: "rgba(0,0,0,0.55)",
+                }}
+              >
+                <PlayIcon
+                  color="#FFFFFF"
+                  filled
+                  holeColor="#000000"
+                  width={moderateScale(20)}
+                  height={moderateScale(20)}
+                />
+              </View>
+            </View>
+          ) : (
+            // 사진: 렌더러가 지도에 굽는 것과 같은 색보정을 걸어 결과 색감을 보여준다.
+            <GradedPhoto
+              uri={selected.uri}
+              theme={options.theme}
+              width={scale(248)}
+              height={verticalScale(370)}
+            />
+          )
         ) : (
           <Text
             className="text-gray-500"
@@ -186,7 +239,7 @@ export default function ReelsEditScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <RenderOptions value={options} onChange={patchOptions} />
+        <RenderOptions value={options} onChange={patchOptions} assets={assets} />
       </ScrollView>
 
       {/* 하단 타임라인: + 추가 버튼 + 드래그로 순서 바꾸는 썸네일 목록 */}
@@ -227,7 +280,12 @@ export default function ReelsEditScreen() {
           selectedUri={selected?.uri ?? null}
           onSelect={setSelectedUri}
           onReorder={reorder}
-          labelFor={(index) => formatTimelineLabel(index * SECONDS_PER_PHOTO)}
+          labelFor={(index) => {
+            // 각 클립의 누적 시작 시각(초)을 레이블로 표시
+            let t = 0;
+            for (let i = 0; i < index; i++) t += clipDurationSeconds(assets[i]);
+            return formatTimelineLabel(t);
+          }}
         />
       </View>
 

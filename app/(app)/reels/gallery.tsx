@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Linking,
   Modal,
@@ -24,6 +25,7 @@ const ACCENT = "#5E84F4";
 const PAGE_SIZE = 60;
 const COLS = 3;
 const GAP = 2;
+const MAX_MEDIA = 30;
 
 type Filter = "all" | "photo" | "video";
 
@@ -40,12 +42,12 @@ function mediaTypesFor(filter: Filter): MediaLibrary.MediaTypeValue[] {
 }
 
 /**
- * 영상 생성에 쓸 수 있는 항목만 남긴다 — 위치(EXIF GPS) + 촬영시각이 둘 다 있어야
- * 서버가 이동 경로를 그린다(없으면 렌더 요청이 400). 캡처·다운로드 사진은 대개 위치가 없다.
+ * 영상 생성에 쓸 수 있는 항목만 남긴다.
+ *
+ * 사진: 위치(EXIF GPS) + 촬영시각이 모두 있어야 한다 — 서버가 GPS 로 이동 경로를 그린다.
+ * 영상: 촬영시각만 있으면 OK — GPS 없는 영상은 서버가 촬영시각이 가장 가까운 사진 지점에 배치.
  *
  * 조회한 원본 정보는 cache 에 담아 확정 단계에서 재사용한다.
- * ponytail: 페이지마다 60건을 병렬로 읽는다. 사진 수천 장에서 느려지면
- *           PAGE_SIZE 를 줄이거나 화면에 보이는 칸부터 lazy 로 검사할 것.
  */
 async function filterUsable(
   assets: MediaLibrary.Asset[],
@@ -58,8 +60,10 @@ async function filterUsable(
   );
   return assets.filter((asset, i) => {
     const info = infos[i];
-    // EXIF 촬영시각이 없으면 MediaStore DATE_TAKEN 이 -1 로 온다(0 이 아니다).
-    if (!info?.location || !(info.creationTime > 0)) return false;
+    // 촬영시각이 없으면 MediaStore DATE_TAKEN 이 -1 로 온다(0 이 아니다).
+    if (!info || !(info.creationTime > 0)) return false;
+    // 사진은 GPS 필수, 영상은 GPS 없어도 허용
+    if (asset.mediaType !== "video" && !info.location) return false;
     cache.set(asset.id, info);
     return true;
   });
@@ -190,10 +194,19 @@ export default function ReelsGalleryScreen() {
     if (usable) MediaLibrary.getAlbumsAsync().then(setAlbums).catch(() => {});
   }, [usable]);
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    const isSelected = selected.includes(id);
+    if (!isSelected && selected.length >= MAX_MEDIA) {
+      Alert.alert(
+        "선택 초과",
+        `사진·영상은 합쳐서 ${MAX_MEDIA}개까지 선택할 수 있어요.`,
+      );
+      return;
+    }
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
+  };
 
   const onConfirm = async () => {
     if (selected.length === 0 || confirming) return;
@@ -246,7 +259,7 @@ export default function ReelsGalleryScreen() {
           className="font-semibold text-white"
           style={{ fontSize: moderateScale(16) }}
         >
-          사진 선택
+          사진·영상 선택
         </Text>
 
         <View
@@ -312,8 +325,8 @@ export default function ReelsGalleryScreen() {
                     lineHeight: moderateScale(20),
                   }}
                 >
-                  쓸 수 있는 사진이 없어요.{"\n"}촬영 위치와 시각이 기록된 사진만
-                  보여줘요.
+                  쓸 수 있는 사진·영상이 없어요.{"\n"}사진은 촬영 위치와 시각이 모두 기록된
+                  것만, 영상은 촬영 시각이 있는 것만 보여줘요.
                 </Text>
               </View>
             )

@@ -5,7 +5,7 @@ import type { CommonResponse } from "@/src/api/types";
 import { getAccessToken } from "@/src/features/auth/storage";
 
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
-import { preparePhotoForUpload } from "./photo-upload";
+import { preparePhotoForUpload, prepareVideoForUpload } from "./photo-upload";
 import type {
   BgmTrackResponse,
   ReelsUploadResponse,
@@ -27,34 +27,34 @@ export async function getBgmTracks(): Promise<BgmTrackResponse[]> {
 }
 
 /**
- * 사진→영상 렌더 시작. POST /api/videos/render/photos-ordered (multipart/form-data).
+ * 사진·영상 → 영상 렌더 시작. POST /api/videos/render/photos-ordered (multipart/form-data).
  *
- * photos-only 와 달리 **촬영 시각을 무시하고 보낸 순서 그대로** 지점을 이동한다 —
- * 화면 하단 타임라인의 드래그 순서가 곧 영상 순서다. GPS 좌표는 여전히 필요하고,
- * GPS 없는 사진은 서버가 알아서 뺀다.
+ * 촬영 시각을 무시하고 보낸 순서 그대로 지점을 이동한다 —
+ * 화면 하단 타임라인의 드래그 순서가 곧 영상 순서다.
  *
- * - photos: 업로드 전 각 사진을 리사이즈·압축한다(preparePhotoForUpload) — 원본을 그대로
- *   올리면 본문이 커져 413 이 난다. 리사이즈로 사라진 EXIF GPS·촬영시각은 앱이 가진
- *   좌표로 재주입한다. 백엔드가 EXIF 로 GPS 를 읽어 이동 경로를 만든다.
- * - 텍스트 옵션: theme, bgm(빈 값이면 무음 → 미전송), 출발지(선택, 위·경도 함께).
- *   엔진은 항상 modal, 인트로/아웃트로는 항상 붙어 전송 필드가 없다.
+ * - 사진: 리사이즈·압축 후 EXIF GPS·촬영시각 재주입(preparePhotoForUpload).
+ * - 영상: 원본 URI 그대로 전송(prepareVideoForUpload) — 서버가 앞 5초만 사용한다.
+ *   100MB 총 제한이 있으므로 호출부에서 영상 파일 크기를 사전에 확인해야 한다.
+ * - GPS 없는 사진은 서버가 자동 제외. GPS 없는 영상은 가장 가까운 사진 지점에 배치.
  * - Content-Type 은 지정하지 않는다 — RN 의 XHR 이 FormData 를 감지해 boundary 자동 부착.
- * - 리사이즈 + 여러 사진 업로드가 전역 10s 를 넘길 수 있어 timeout 을 60s 로 override.
  *
  * 응답: reels_idx 즉시 반환(status=running). 이후 getRenderStatus 로 폴링.
- * 400: 사진 2장 미만 / GPS 있는 사진 2장 미만 / 모두 같은 장소 / 알 수 없는 테마 /
- *      출발지 좌표 오류 → 서버 message 를 그대로 사용자에게 노출. 401 / 404(BGM 없음).
+ * 400: GPS 있는 항목 2개 미만 / 모두 같은 장소 / 영상 합계 15초 초과 등
+ *      → 서버 message 를 그대로 사용자에게 노출. 401 / 404(BGM 없음).
  */
 export async function renderPhotosOrdered(
-  photos: ReelsMediaAsset[],
+  media: ReelsMediaAsset[],
   options: RenderOptions,
 ): Promise<VideoRenderStatusResponse> {
   const form = new FormData();
 
-  // 각 사진 리사이즈·압축 + EXIF 재주입(병렬). Promise.all 은 입력 순서를 보존하므로
-  // 아래 append 순서 = 사용자가 정렬한 순서 = 영상 순서다.
+  // Promise.all 은 입력 순서를 보존 → append 순서 = 타임라인 순서 = 영상 순서.
   const files = await Promise.all(
-    photos.map((photo, index) => preparePhotoForUpload(photo, index)),
+    media.map((asset, index) =>
+      asset.kind === "video"
+        ? prepareVideoForUpload(asset, index)
+        : preparePhotoForUpload(asset, index),
+    ),
   );
   files.forEach((file) => {
     form.append("photos", {
@@ -73,6 +73,14 @@ export async function renderPhotosOrdered(
     form.append("start_name", options.start_name ?? "출발");
     form.append("start_latitude", String(options.start_latitude));
     form.append("start_longitude", String(options.start_longitude));
+  }
+  // 범위 안일 때만 전송 — 범위 밖이면 생략해 서버가 1번으로 처리하게 한다.
+  if (
+    options.cover_index != null &&
+    options.cover_index >= 1 &&
+    options.cover_index <= media.length
+  ) {
+    form.append("cover_index", String(options.cover_index));
   }
 
   const res = await api.post<CommonResponse<VideoRenderStatusResponse>>(

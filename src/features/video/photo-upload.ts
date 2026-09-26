@@ -99,6 +99,42 @@ function formatExifDateTime(iso: string | null): string | null {
   );
 }
 
+/** nginx 100MB 한도 기준 영상 1개 최대 허용 크기. */
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024; // 30MB
+
+/**
+ * 영상을 업로드용 파일 파트로 준비한다.
+ *
+ * 서버가 영상당 앞 5초만 사용하므로 짧은 영상을 선택하도록 안내한다.
+ * 파일 크기가 30MB 를 초과하면 업로드하지 않고 오류를 던진다.
+ * (Galaxy A24 기준 1080p/30fps 약 14초 분량 — 5초 클립은 여유 있게 통과)
+ */
+export async function prepareVideoForUpload(
+  asset: ReelsMediaAsset,
+  index: number,
+): Promise<UploadFile> {
+  const name = asset.file_name ?? `video_${index}.mp4`;
+  const ext = name.split(".").pop()?.toLowerCase() ?? "mp4";
+  const type = videoMimeType(ext);
+
+  const videoFile = new File(asset.uri);
+  if (videoFile.exists && videoFile.size != null && videoFile.size > MAX_VIDEO_BYTES) {
+    const sizeMB = Math.round(videoFile.size / 1024 / 1024);
+    throw new Error(
+      `이 영상이 너무 커요 (${sizeMB}MB). 20초 이하의 짧은 영상을 선택해주세요.`,
+    );
+  }
+
+  return { uri: asset.uri, name, type };
+}
+
+function videoMimeType(ext: string): string {
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "m4v") return "video/x-m4v";
+  if (ext === "webm") return "video/webm";
+  return "video/mp4";
+}
+
 /** base64 JPEG 를 캐시 디렉터리에 저장하고 file:// uri 반환. */
 function writeBase64Jpeg(base64: string, index: number): string {
   const binary = atob(base64);
