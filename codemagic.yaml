@@ -2,7 +2,6 @@ workflows:
   # APK — 내부 배포 / 실기기 설치용 (공모전 테스트 등)
   android-preview:
     name: Android Preview (APK)
-    instance_type: linux
     max_build_duration: 60
     environment:
       node: 22.11.0
@@ -29,7 +28,6 @@ workflows:
   # AAB — Google Play 스토어 제출용
   android-production:
     name: Android Production (AAB)
-    instance_type: linux
     max_build_duration: 60
     environment:
       node: 22.11.0
