@@ -1,9 +1,6 @@
 import type { RenderOptions, VideoTheme } from "./types";
 
-/**
- * 렌더 옵션 UI(칩)에서 쓰는 선택지 + 라벨.
- * BGM 목록은 서버(getBgmTracks)에서 받아 동적으로 구성하므로 여기엔 테마만 둔다.
- */
+/** 렌더 옵션 UI(칩)에서 쓰는 선택지 + 라벨. BGM 목록은 RenderOptions 컴포넌트에 하드코딩. */
 
 export const THEME_OPTIONS: { value: VideoTheme; label: string }[] = [
   { value: "default", label: "기본" },
