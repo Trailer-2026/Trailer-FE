@@ -9,7 +9,10 @@ workflows:
         - trailer_env   # Codemagic 대시보드 > Team > Environment variables 에서 생성
     scripts:
       - name: Create google-services.json
-        script: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+        script: |
+          printf '%s' "$CM_GOOGLE_SERVICES" > google-services.json
+          grep -v 'google-services' .gitignore > .gitignore.tmp && mv .gitignore.tmp .gitignore
+          git add -f google-services.json
       - name: Install dependencies
         script: npm ci
       - name: EAS local build (preview)
@@ -37,7 +40,10 @@ workflows:
         - trailer_env
     scripts:
       - name: Create google-services.json
-        script: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+        script: |
+          printf '%s' "$CM_GOOGLE_SERVICES" > google-services.json
+          grep -v 'google-services' .gitignore > .gitignore.tmp && mv .gitignore.tmp .gitignore
+          git add -f google-services.json
       - name: Install dependencies
         script: npm ci
       - name: EAS local build (production)
