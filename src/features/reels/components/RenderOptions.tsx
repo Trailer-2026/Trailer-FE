@@ -6,23 +6,28 @@ import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { Text } from "@/src/components/Text";
 import type { ReelsMediaAsset } from "@/src/features/reels/types";
 import { THEME_OPTIONS } from "@/src/features/video/options";
-import { useBgmTracks } from "@/src/features/video/queries";
 import type { RenderOptions as RenderOptionsValue } from "@/src/features/video/types";
 import { moderateScale, scale, verticalScale } from "@/src/utils/responsive";
 
 const ACCENT = "#5E84F4";
 
-/**
- * 미리듣기 음원 — 서버 bgm/ 폴더와 같은 mp3 를 앱에 번들해 오프라인에서도 들린다.
- * 키는 서버가 주는 title(파일명 "곡명 - 아티스트.mp3" 의 곡명). 곡이 추가되면 여기도 추가.
- * ponytail: 4곡 15MB. 곡이 더 늘면 번들 대신 서버 스트리밍으로 바꿀 것.
- */
+/** bgm 파라미터값(곡 제목) → 번들 mp3 매핑. */
 const BGM_PREVIEW: Record<string, number> = {
-  Beats: require("@/assets/bgm/beats.mp3"),
-  Funk: require("@/assets/bgm/funk.mp3"),
-  Instrumental: require("@/assets/bgm/instrumental.mp3"),
-  "Rock Trailer": require("@/assets/bgm/rock-trailer.mp3"),
+  "Take Off": require("@/assets/bgm/take-off.mp3"),
+  Holiday: require("@/assets/bgm/holiday.mp3"),
+  "Follow The Sun": require("@/assets/bgm/follow-the-sun.mp3"),
+  "Ocean Vibes": require("@/assets/bgm/ocean-vibes.mp3"),
+  "Last Summer": require("@/assets/bgm/last-summer.mp3"),
 };
+
+/** bgm 파라미터로 그대로 전송되는 곡 제목 목록. */
+const BGM_TRACKS: { value: string; label: string }[] = [
+  { value: "Take Off", label: "Take Off" },
+  { value: "Holiday", label: "Holiday" },
+  { value: "Follow The Sun", label: "Follow The Sun" },
+  { value: "Ocean Vibes", label: "Ocean Vibes" },
+  { value: "Last Summer", label: "Last Summer" },
+];
 
 type Props = {
   value: RenderOptionsValue;
@@ -32,28 +37,20 @@ type Props = {
 
 /**
  * 릴스 편집 화면의 렌더 옵션 패널 — 테마·BGM 칩.
- * BGM 목록은 서버(useBgmTracks)에서 받아 "무음 + 트랙들"로 구성한다.
  * 엔진(항상 modal)·인트로/아웃트로(항상 포함)는 서버 고정이라 UI 가 없다.
  */
 export default function RenderOptions({ value, onChange, assets }: Props) {
-  const { data: tracks } = useBgmTracks();
-
-  // 무음 + 서버 트랙(값=file, 라벨=title).
   const bgmOptions = [
     { value: "", label: "무음" },
-    ...(tracks ?? []).map((t) => ({ value: t.file, label: t.title })),
+    ...BGM_TRACKS,
   ];
 
-  // 미리듣기 — 화면당 플레이어 1개. 화면을 벗어나면 훅이 알아서 정리한다.
   const [previewing, setPreviewing] = useState<string | null>(null);
   const player = useVideoPlayer(null, (p) => {
-    p.loop = true; // 미리듣기라 반복 재생 — 멈춤은 사용자가 한다
+    p.loop = true;
   });
 
-  // 지금 고른 곡의 번들 음원(무음이거나 번들에 없으면 undefined → 버튼 비활성).
-  const selectedTitle =
-    bgmOptions.find((o) => o.value === value.bgm)?.label ?? "";
-  const previewSource = BGM_PREVIEW[selectedTitle];
+  const previewSource = BGM_PREVIEW[value.bgm];
   const playing = previewing === value.bgm;
 
   const togglePreview = () => {
@@ -67,7 +64,6 @@ export default function RenderOptions({ value, onChange, assets }: Props) {
     player.replaceAsync(previewSource).then(() => player.play());
   };
 
-  // 다른 곡으로 바꾸면 듣고 있던 건 멈춘다(재생 상태가 선택과 어긋나지 않게).
   const selectBgm = (bgm: string) => {
     if (previewing && previewing !== bgm) {
       player.pause();
@@ -133,7 +129,7 @@ export default function RenderOptions({ value, onChange, assets }: Props) {
   );
 }
 
-/** 선택한 곡 미리듣기 토글 버튼. 무음·번들에 없는 곡이면 흐리게 비활성. */
+/** 선택한 곡 미리듣기 토글 버튼. 무음이면 흐리게 비활성. */
 function PreviewButton({
   playing,
   disabled,
@@ -153,8 +149,6 @@ function PreviewButton({
         paddingHorizontal: scale(12),
         paddingVertical: verticalScale(6),
         borderRadius: scale(14),
-        // 테두리만 있으면 어두운 배경에서 잘 안 보인다 → 칩과 같은 꽉 찬 배경.
-        // 재생 중일 때만 강조색으로 바뀌어 상태가 바로 보인다.
         backgroundColor: playing ? ACCENT : "#2A2A2A",
         opacity: disabled ? 0.5 : 1,
         gap: scale(5),
@@ -163,7 +157,6 @@ function PreviewButton({
       accessibilityLabel={playing ? "미리듣기 정지" : "미리듣기"}
     >
       {playing ? (
-        // 정지(■) / 재생(▶) — 아이콘 파일을 따로 둘 만한 모양이 아니다.
         <View
           style={{
             width: moderateScale(8),

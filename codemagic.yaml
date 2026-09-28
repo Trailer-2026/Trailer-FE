@@ -1,0 +1,54 @@
+workflows:
+  # APK — 내부 배포 / 실기기 설치용 (공모전 테스트 등)
+  android-preview:
+    name: Android Preview (APK)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 22.11.0
+      groups:
+        - trailer_env   # Codemagic 대시보드 > Team > Environment variables 에서 생성
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: EAS local build (preview)
+        script: |
+          npm install -g eas-cli
+          eas build \
+            --platform android \
+            --profile preview \
+            --local \
+            --non-interactive
+    artifacts:
+      - "**/*.apk"
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - node_modules
+
+  # AAB — Google Play 스토어 제출용
+  android-production:
+    name: Android Production (AAB)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 22.11.0
+      groups:
+        - trailer_env
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: EAS local build (production)
+        script: |
+          npm install -g eas-cli
+          eas build \
+            --platform android \
+            --profile production \
+            --local \
+            --non-interactive
+    artifacts:
+      - "**/*.aab"
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - node_modules
