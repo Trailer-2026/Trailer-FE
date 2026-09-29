@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "trailer-app",
   slug: "trailer-app",
-  version: "1.0.3",
+  version: "1.0.4",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "trailerapp",
@@ -16,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: "com.trailer.app",
-    versionCode: 9,
+    versionCode: 10,
     adaptiveIcon: {
       // 브랜드 블루 — 로고 시안(Figma '로고' 프레임)의 배경색과 같은 값.
       // 배경은 단색이라 이미지 대신 색만 준다(backgroundImage 없음).
