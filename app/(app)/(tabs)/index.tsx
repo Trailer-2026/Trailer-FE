@@ -48,6 +48,14 @@ const ICONS = {
   main: require("../../../assets/images/Main1.webp"),
 };
 
+const SERVICE_SHORTCUTS = [
+  { id: "place", label: "여행지 탐색", icon: require("../../../assets/images/service-icon-place.png") },
+  { id: "course", label: "여행 코스 추천", icon: require("../../../assets/images/service-icon-course.png") },
+  { id: "scenic", label: "창밖 풍경 알림", icon: require("../../../assets/images/service-icon-scenic.png") },
+  { id: "stamp", label: "여행 업적 기록", icon: require("../../../assets/images/service-icon-stamp.png") },
+  { id: "reels", label: "여행 영상 제작", icon: require("../../../assets/images/service-icon-reels.png") },
+];
+
 /** 메인 배너 슬라이드 3장 — 좌우로 넘겨 본다. 배너는 번들 크기 때문에 WebP 로 둔다. */
 const HERO_SLIDES = [
   {
@@ -138,7 +146,11 @@ export default function HomeScreen() {
           <PromoHero />
         </View>
 
-        <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(28) }}>
+        <View style={{ marginTop: verticalScale(22) }}>
+          <ServiceShortcuts />
+        </View>
+
+        <View style={{ paddingHorizontal: scale(20), marginTop: verticalScale(22) }}>
           <SectionHeader />
         </View>
 
@@ -213,6 +225,71 @@ function Header() {
   );
 }
 
+
+/* ------------------------------------------------------------------ */
+/* 서비스 바로가기                                                      */
+/* ------------------------------------------------------------------ */
+function ServiceShortcuts() {
+  const { gateDialog, startAiCourse } = useAiCourseGate();
+
+  const handlePress = (id: string) => {
+    if (id === "course") { startAiCourse(); return; }
+    if (id === "place") router.navigate("/feed");
+    else if (id === "scenic") router.navigate("/notifications");
+    else if (id === "stamp") router.push("/profile/stamps");
+    else if (id === "reels") router.push("/reels/create");
+  };
+
+  return (
+    <View>
+      <Text
+        className="text-gray-700"
+        style={{ fontSize: moderateScale(16), paddingHorizontal: scale(20), marginBottom: verticalScale(14) }}
+      >
+        {"기차 여행 중 "}
+        <Text style={{ fontWeight: "700" }}>즐길 거리</Text>
+        {"와 "}
+        <Text style={{ fontWeight: "700" }}>기록</Text>
+        {"을 제공하는 서비스"}
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: scale(20), gap: scale(1) }}
+      >
+        {SERVICE_SHORTCUTS.map((item) => (
+          <Pressable
+            key={item.id}
+            className="items-center active:opacity-60"
+            style={{ width: scale(89) }}
+            onPress={() => handlePress(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+          >
+            <Image
+              source={item.icon}
+              style={{ width: scale(89), height: scale(89) }}
+              resizeMode="contain"
+            />
+            <Text
+              className="text-center"
+              style={{
+                fontSize: moderateScale(12),
+                color: "#353535",
+                marginTop: verticalScale(4),
+                letterSpacing: 0.24,
+                lineHeight: moderateScale(18),
+              }}
+            >
+              {item.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      {gateDialog}
+    </View>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* State A: 여행 없음 — 프로모션 히어로                                 */
